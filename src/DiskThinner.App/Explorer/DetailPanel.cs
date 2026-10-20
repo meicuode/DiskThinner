@@ -1,14 +1,17 @@
+using System.Diagnostics;
 using System.Globalization;
 using DiskThinner.App.Controls;
 using DiskThinner.App.Formatting;
+using DiskThinner.App.Rules;
 using DiskThinner.Core;
+using DiskThinner.Rules;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.App.Explorer;
 
 /// <summary>
-/// 右侧详情（原型 .ex-detail）。M1 显示大小、文件数、时间、属性和"打开所在位置"；
-/// 归属、类别、作用、证据和清理建议在 M2 规则上线后补上。
+/// 右侧详情（原型 .ex-detail）：大小和属性，规则给出的归属、类别、作用、删除后影响、证据、处理方式和"从根上解决"。
+/// 删除和运行命令在 M4 才实现，这里先展示，按钮置灰；"打开所在位置，自己清理"现在就能用。
 /// </summary>
 internal sealed class DetailPanel : Panel
 {
@@ -16,6 +19,7 @@ internal sealed class DetailPanel : Panel
     private NodeTree? _tree;
     private int _node = -1;
     private ScanStats? _stats;
+    private Classification? _classification;
 
     public DetailPanel()
     {
@@ -38,17 +42,24 @@ internal sealed class DetailPanel : Panel
     public event EventHandler<int>? OpenLocationRequested;
     public event EventHandler<int>? CopyPathRequested;
     public event EventHandler<int>? ShowInMapRequested;
+    public event EventHandler<int>? SelectRequested;
 
     private int ContentWidth => Math.Max(120, ClientSize.Width - Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
 
     /// <summary>当前显示的节点（测试用）。</summary>
     internal int ShownNode => _node;
 
-    public void ShowNode(NodeTree? tree, int node, ScanStats? stats)
+    /// <summary>当前显示的全部文字（测试用）。</summary>
+    internal IEnumerable<string> Texts => Descendants(_content).Select(c => c.Text).Where(t => !string.IsNullOrEmpty(t));
+
+    private static IEnumerable<Control> Descendants(Control c) => c.Controls.Cast<Control>().SelectMany(x => Descendants(x).Prepend(x));
+
+    public void ShowNode(NodeTree? tree, int node, ScanStats? stats, Classification? classification = null)
     {
         _tree = tree;
         _node = node;
         _stats = stats;
+        _classification = classification;
         Rebuild();
     }
 
@@ -93,8 +104,13 @@ internal sealed class DetailPanel : Panel
         var isDir = node.IsDirectory;
         var path = tree.GetPath(n);
         var width = ContentWidth;
+        var c = _classification;
+        var rule = c?.RuleOf(n);
+        var risk = c?.EffectiveRisk(n);
+        var protection = c?.ProtectionOf(n);
+        var root = c?.RootOf(n);
 
-        // 标题 + 属性标签
+        // ---- 标题：名称 + 风险标签 + 属性标签 ----
         var title = new FlowLayoutPanel { AutoSize = true, WrapContents = true, MaximumSize = new Size(width, 0), Width = width, Margin = new Padding(0), BackColor = Color.Transparent };
         title.Controls.Add(new Label
         {
@@ -106,6 +122,12 @@ internal sealed class DetailPanel : Panel
             UseMnemonic = false,
             Margin = new Padding(0, 0, 0, 2),
         });
+        if (risk is { } r)
+        {
+            var style = RuleView.RiskStyle(r);
+            title.Controls.Add(Ui.Tag(RuleView.RiskLabel(r, rule), style.Back, style.Fore));
+        }
+
         foreach (var tag in FlagTags(node))
         {
             title.Controls.Add(Ui.Tag(tag, Theme.TagBack, Theme.TagText));
@@ -113,7 +135,7 @@ internal sealed class DetailPanel : Panel
 
         _content.Controls.Add(title);
 
-        // 路径：可以选中复制
+        // ---- 路径：可以选中复制 ----
         var pathBox = new TextBox
         {
             Text = path,
@@ -133,19 +155,49 @@ internal sealed class DetailPanel : Panel
         var textSize = TextRenderer.MeasureText(path, pathBox.Font, new Size(width, 0), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
         pathBox.Height = textSize.Height + 4;
 
-        // 键值表
+        // ---- 键值表 ----
         var kv = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Width = width, Margin = new Padding(0), BackColor = Color.Transparent };
         kv.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Ui.Scale(this, 76)));
         kv.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var valueWidth = width - Ui.Scale(this, 80);
-        void Row(string key, string value, Font? font = null)
+        void Row(string key, string value, Font? font = null, Color? color = null)
         {
             kv.Controls.Add(new Label { Text = key, AutoSize = true, ForeColor = Theme.Muted, Font = Theme.Ui, Margin = new Padding(0, 3, 4, 3), UseMnemonic = false });
-            kv.Controls.Add(new Label { Text = value, AutoSize = true, MaximumSize = new Size(valueWidth, 0), ForeColor = Theme.Text, Font = font ?? Theme.Ui, Margin = new Padding(0, 3, 0, 3), UseMnemonic = false });
+            kv.Controls.Add(new Label { Text = value, AutoSize = true, MaximumSize = new Size(valueWidth, 0), ForeColor = color ?? Theme.Text, Font = font ?? Theme.Ui, Margin = new Padding(0, 3, 0, 3), UseMnemonic = false });
         }
 
         var size = ByteSize.Format(node.AllocSize);
         Row("大小", isDir ? $"{size} · {node.FileCount.ToString("N0", CultureInfo.InvariantCulture)} 个文件" : size, Theme.UiBold);
+
+        if (c is not null && node.AllocSize > 0)
+        {
+            var cleanable = c.Cleanable(n);
+            if (cleanable > 0)
+            {
+                var shared = root is not null && c.IsRoot(n) ? root.SharedBytes : 0;
+                Row("可释放", $"约 {ByteSize.Format(cleanable)}" + (shared > 1 << 20 ? $"（另有 {ByteSize.Format(shared)} 与别处用硬链接共享，删了也不释放）" : ""));
+            }
+
+            var unexplained = c.Unexplained(n);
+            if (isDir && unexplained > 0 && rule is null)
+            {
+                Row("未识别", ByteSize.Format(unexplained), color: ColorTranslator.FromHtml("#5b2a86"));
+            }
+        }
+
+        if (rule is not null)
+        {
+            var owner = RuleView.OwnerOf(c!.Engine.Rules, rule);
+            if (owner is not null)
+            {
+                Row("归属", owner);
+            }
+
+            Row("类别", Names.Display(rule.Kind));
+            Row("作用", rule.Purpose);
+            Row("删除后", rule.Impact);
+        }
+
         if (isDir)
         {
             Row("子目录", node.DirCount.ToString("N0", CultureInfo.InvariantCulture) + " 个");
@@ -165,16 +217,93 @@ internal sealed class DetailPanel : Panel
         Row(isDir ? "最后写入" : "修改时间", TimeText.Full(node.LastWriteUtc) + (isDir ? "（含子项）" : ""));
         _content.Controls.Add(kv);
 
-        // 说明
-        foreach (var note in Notes(node, isDir))
+        // ---- 保护和说明 ----
+        if (protection is { Level: ProtectionLevel.Hard or ProtectionLevel.Guide or ProtectionLevel.Soft } p)
         {
-            _content.Controls.Add(Callout(note, width));
+            var text = p.Level switch
+            {
+                ProtectionLevel.Hard => $"在保护名单里：{p.Reason}。DiskThinner 不会删除这里的任何东西。",
+                ProtectionLevel.Guide => $"{p.Reason}。DiskThinner 不会直接删除，只给出处理步骤。",
+                _ => $"{p.Reason}。只有实测过的规则才会在这里给出清理建议，请自己判断。",
+            };
+            _content.Controls.Add(Callout(text, width, p.Level == ProtectionLevel.Hard));
         }
 
-        _content.Controls.Add(Wrap(Ui.Label("归属、类别、作用和清理建议会在规则上线（M2）后显示在这里。", Theme.Small, Theme.Subtle), new Padding(0, 10, 0, 0)));
+        foreach (var note in Notes(node, isDir))
+        {
+            _content.Controls.Add(Callout(note, width, false));
+        }
 
-        // 操作
+        if (rule is not null && root is not null && !c!.IsRoot(n))
+        {
+            var link = new LinkLabel
+            {
+                Text = "规则命中的是上级目录：" + tree.GetNameString(root.Node),
+                AutoSize = true,
+                MaximumSize = new Size(width, 0),
+                Font = Theme.Small,
+                LinkColor = Theme.Accent,
+                Margin = new Padding(0, 8, 0, 0),
+                UseMnemonic = false,
+            };
+            link.LinkClicked += (_, _) => SelectRequested?.Invoke(this, root.Node);
+            _content.Controls.Add(link);
+        }
+
+        if (c is not null && rule is null && node.AllocSize > 0 && c.Unexplained(n) >= node.AllocSize)
+        {
+            _content.Controls.Add(Wrap(Ui.Label("没有规则认识这里。打开所在位置看看内容；AI 分析会在后续版本加入。", Theme.Small, Theme.Muted), new Padding(0, 10, 0, 0)));
+        }
+
+        // ---- 证据 ----
+        if (rule is { Evidence.Count: > 0 } && c!.IsRoot(n))
+        {
+            _content.Controls.Add(SectionTitle("依据"));
+            foreach (var ev in rule.Evidence)
+            {
+                _content.Controls.Add(EvidenceItem(ev, width));
+            }
+
+            var tierText = rule.Tier switch
+            {
+                Tier.Verified => "已实测",
+                Tier.Reviewed => "人工审阅",
+                _ => "草稿，未审阅",
+            };
+            _content.Controls.Add(Wrap(Ui.Label($"规则 {rule.Id} · {tierText}", Theme.Small, Theme.Subtle), new Padding(0, 4, 0, 0)));
+        }
+
+        // ---- 操作 ----
         _content.Controls.Add(SectionTitle("操作"));
+        if (rule is not null && Classification.IsCleanable(risk) && rule.Mode != MatchMode.Under)
+        {
+            foreach (var action in rule.Actions)
+            {
+                switch (action)
+                {
+                    case CommandAction cmd when KnownCommands.Find(cmd.CommandId) is { } known:
+                        var run = Disabled($"运行 {known.Display}");
+                        new ToolTip().SetToolTip(run, known.Description);
+                        run.AccessibleDescription = known.Description + "。清理功能在后续版本提供";
+                        _content.Controls.Add(Stretch(run, width));
+                        break;
+                    case DeleteAction del:
+                        _content.Controls.Add(Stretch(Disabled(DescribeDelete(del)), width));
+                        break;
+                }
+            }
+
+            if (rule.Actions.Any(a => a is CommandAction or DeleteAction))
+            {
+                _content.Controls.Add(Wrap(Ui.Label("清理计划和自动执行会在 M4 加入；现在可以打开所在位置自己处理。", Theme.Small, Theme.Subtle), new Padding(0, 0, 0, 6)));
+            }
+        }
+
+        foreach (var guide in rule?.Actions.OfType<GuideAction>() ?? [])
+        {
+            _content.Controls.Add(GuideItem(guide, width));
+        }
+
         var open = Ui.Button(isDir ? "打开所在位置，自己清理" : "在资源管理器中显示，自己清理",
             accessibleDescription: "用资源管理器打开，DiskThinner 不会删除任何东西");
         open.Click += (_, _) => OpenLocationRequested?.Invoke(this, n);
@@ -190,6 +319,46 @@ internal sealed class DetailPanel : Panel
             map.Click += (_, _) => ShowInMapRequested?.Invoke(this, n);
             _content.Controls.Add(Stretch(map, width));
         }
+
+        // ---- 从根上解决 ----
+        if (rule?.Relocate is { } relocate && c!.IsRoot(n))
+        {
+            _content.Controls.Add(SectionTitle("从根上解决"));
+            var text = relocate.Env is { } env
+                ? $"设置环境变量 {env}，把它放到其他盘，以后不再占 C 盘。" + (relocate.Note is null ? "" : relocate.Note)
+                : relocate.Note ?? "";
+            _content.Controls.Add(Callout(text, width, false, info: true));
+            if (relocate.Env is { } envName)
+            {
+                var copyCmd = Ui.Button("复制设置命令");
+                copyCmd.Click += (_, _) => Shell.ShellActions.CopyPath($"[Environment]::SetEnvironmentVariable('{envName}', 'D:\\{envName}', 'User')");
+                copyCmd.AccessibleDescription = "复制一条 PowerShell 命令，按需修改路径后运行";
+                _content.Controls.Add(copyCmd);
+                _content.Controls.Add(Wrap(Ui.Label("命令里的 D:\\ 路径只是示例，请改成你想放的位置；改完后要重新打开相关程序，并删除旧位置的内容。", Theme.Small, Theme.Subtle), new Padding(0, 4, 0, 0)));
+            }
+        }
+    }
+
+    private static string DescribeDelete(DeleteAction d)
+    {
+        var what = d.Scope switch
+        {
+            DeleteScope.Children => "逐个删除子项",
+            DeleteScope.Self => "删除",
+            _ => "清空内容",
+        };
+        var filters = new List<string>();
+        if (d.OlderThanDays is { } days)
+        {
+            filters.Add($"只删 {days} 天前的");
+        }
+
+        if (d.KeepLatest is { } keep)
+        {
+            filters.Add($"保留最新的 {keep} 个");
+        }
+
+        return filters.Count == 0 ? what : $"{what}（{string.Join("，", filters)}）";
     }
 
     private IEnumerable<string> Notes(Node node, bool isDir)
@@ -261,14 +430,69 @@ internal sealed class DetailPanel : Panel
         return label;
     }
 
-    private Control Callout(string text, int width)
+    private Control EvidenceItem(Evidence ev, int width)
     {
-        var panel = new CalloutPanel
+        if (ev.Url is { } url && Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps)
+        {
+            var link = new LinkLabel
+            {
+                Text = ev.Note ?? uri.Host + uri.AbsolutePath,
+                AutoSize = true,
+                MaximumSize = new Size(width, 0),
+                Font = Theme.Small,
+                LinkColor = Theme.Accent,
+                Margin = new Padding(0, 2, 0, 2),
+                UseMnemonic = false,
+                AccessibleDescription = "在浏览器中打开 " + url,
+            };
+            new ToolTip().SetToolTip(link, url);
+            link.LinkClicked += (_, _) => OpenUrl(url);
+            return link;
+        }
+
+        return Wrap(Ui.Label(ev.Note ?? ev.Url ?? "", Theme.Small, Theme.Muted), new Padding(0, 2, 0, 2));
+    }
+
+    private Control GuideItem(GuideAction guide, int width)
+    {
+        var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Width = width, Margin = new Padding(0, 0, 0, 6), BackColor = Color.Transparent };
+        panel.Controls.Add(Callout(guide.Text, width, false, info: true));
+        if (guide.Url is { } url && url.StartsWith("https://", StringComparison.Ordinal))
+        {
+            var link = new LinkLabel { Text = "查看官方说明", AutoSize = true, Font = Theme.Small, LinkColor = Theme.Accent, Margin = new Padding(0, 2, 0, 0) };
+            link.LinkClicked += (_, _) => OpenUrl(url);
+            panel.Controls.Add(link);
+        }
+
+        return panel;
+    }
+
+    /// <summary>只打开规则里的 https 链接，交给系统默认浏览器。</summary>
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            using var _ = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            MessageBox.Show(FindForm(), "无法打开浏览器：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
+    private Control Callout(string text, int width, bool danger, bool info = false)
+    {
+        var (bar, back, fore) = danger
+            ? (ColorTranslator.FromHtml("#a4262c"), ColorTranslator.FromHtml("#fde7e9"), ColorTranslator.FromHtml("#6b1419"))
+            : info
+                ? (Theme.Accent, Theme.AccentWeak, Theme.Text)
+                : (Theme.WarnBorder, Theme.WarnBack, Theme.WarnText);
+        var panel = new CalloutPanel(bar)
         {
             Width = width,
             Padding = new Padding(Ui.Scale(this, 10), 6, 8, 6),
             Margin = new Padding(0, 8, 0, 0),
-            BackColor = Theme.WarnBack,
+            BackColor = back,
         };
         var label = new Label
         {
@@ -276,13 +500,21 @@ internal sealed class DetailPanel : Panel
             AutoSize = true,
             MaximumSize = new Size(width - panel.Padding.Horizontal, 0),
             Font = Theme.Small,
-            ForeColor = Theme.WarnText,
+            ForeColor = fore,
             Location = new Point(panel.Padding.Left, panel.Padding.Top),
             UseMnemonic = false,
         };
         panel.Controls.Add(label);
         panel.Height = label.PreferredHeight + panel.Padding.Vertical;
         return panel;
+    }
+
+    private static Button Disabled(string text)
+    {
+        var b = Ui.Button(text);
+        b.Enabled = false;
+        b.AccessibleDescription = "清理功能在后续版本提供";
+        return b;
     }
 
     private static Control Stretch(Button b, int width)
@@ -295,14 +527,14 @@ internal sealed class DetailPanel : Panel
         return b;
     }
 
-    /// <summary>原型 .callout.warn：左侧 3 像素黄色竖条。</summary>
-    private sealed class CalloutPanel : Panel
+    /// <summary>原型 .callout：左侧 3 像素竖条。</summary>
+    private sealed class CalloutPanel(Color bar) : Panel
     {
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            using var bar = new SolidBrush(Theme.WarnBorder);
-            e.Graphics.FillRectangle(bar, 0, 0, Ui.Scale(this, 3), Height);
+            using var brush = new SolidBrush(bar);
+            e.Graphics.FillRectangle(brush, 0, 0, Ui.Scale(this, 3), Height);
         }
     }
 }

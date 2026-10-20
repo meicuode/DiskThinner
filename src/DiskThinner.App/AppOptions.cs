@@ -10,6 +10,7 @@ namespace DiskThinner.App;
 ///   --report r.txt       扫描完成后写入耗时和内存
 ///   --exit-after-scan    完成上面几步后退出
 ///   --primary-screen     窗口放在主显示器上
+///   --page explorer      启动后打开的页面（overview / explorer）
 /// </summary>
 internal sealed record AppOptions
 {
@@ -22,6 +23,9 @@ internal sealed record AppOptions
 
     /// <summary>窗口放在主显示器上（多显示器、缩放比例不同时用来验证高 DPI）。</summary>
     public bool PrimaryScreen { get; init; }
+
+    /// <summary>启动后打开的页面：overview（默认）或 explorer。</summary>
+    public string? StartPage { get; init; }
 
     public static AppOptions Parse(string[] args)
     {
@@ -42,6 +46,7 @@ internal sealed record AppOptions
             Report = Value("--report"),
             ExitAfterScan = Flag("--exit-after-scan"),
             PrimaryScreen = Flag("--primary-screen"),
+            StartPage = Value("--page") is { } page && page is "overview" or "explorer" ? page : null,
         };
     }
 

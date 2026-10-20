@@ -49,9 +49,12 @@ internal sealed class TreemapView : Control
 
     public TimeSpan LastRenderTime { get; private set; }
 
-    public void SetTree(NodeTree? tree)
+    private DiskThinner.Rules.Classification? _classification;
+
+    public void SetTree(NodeTree? tree, DiskThinner.Rules.Classification? classification = null)
     {
         _tree = tree;
+        _classification = classification;
         _mapRoot = tree?.Root ?? -1;
         _selected = -1;
         Rebuild();
@@ -135,9 +138,8 @@ internal sealed class TreemapView : Control
         g.SmoothingMode = SmoothingMode.None;
         g.Clear(Color.White);
 
-        var brushes = new Dictionary<FileKind, SolidBrush>();
+        var brushes = new Dictionary<Color, SolidBrush>();
         using var dirBack = new SolidBrush(ColorTranslator.FromHtml("#eceef1"));
-        using var leafDir = new SolidBrush(FileKinds.ColorOf(FileKind.Other));
         using var border = new Pen(Color.FromArgb(45, 0, 0, 0));
         var minBorder = 8 * DeviceDpi / 96f;
         try
@@ -145,19 +147,19 @@ internal sealed class TreemapView : Control
             foreach (var r in _rects)
             {
                 var isDir = tree[r.Node].IsDirectory;
-                if (!isDir)
+                if (!isDir || r.Leaf)
                 {
-                    var kind = FileKinds.Classify(tree, r.Node);
-                    if (!brushes.TryGetValue(kind, out var brush))
+                    var color = FillColor(r.Node);
+                    if (!brushes.TryGetValue(color, out var brush))
                     {
-                        brushes[kind] = brush = new SolidBrush(FileKinds.ColorOf(kind));
+                        brushes[color] = brush = new SolidBrush(color);
                     }
 
                     g.FillRectangle(brush, r.Bounds);
                 }
                 else
                 {
-                    g.FillRectangle(r.Leaf ? leafDir : dirBack, r.Bounds);
+                    g.FillRectangle(dirBack, r.Bounds);
                 }
 
                 // 太小的块不画边框，否则整片都是线
@@ -179,6 +181,35 @@ internal sealed class TreemapView : Control
 
         return bmp;
     }
+
+    /// <summary>
+    /// 块的颜色：有规则时按规则类别（原型图例），没被识别的是紫色；还没跑规则时按文件类型。
+    /// 不再细分的目录用它自己的规则；没有规则的目录用"其他"。
+    /// </summary>
+    private Color FillColor(int node)
+    {
+        var tree = _tree!;
+        if (_classification is { } c)
+        {
+            if (c.RuleOf(node) is { } rule)
+            {
+                return DiskThinner.App.Rules.RuleView.ColorOf(DiskThinner.App.Rules.RuleView.GroupOf(rule.Kind));
+            }
+
+            if ((tree[node].Flags & NodeFlags.Metadata) != 0)
+            {
+                return DiskThinner.App.Rules.RuleView.ColorOf(DiskThinner.App.Rules.RuleView.Group.System);
+            }
+
+            return c.Unexplained(node) > 0
+                ? DiskThinner.App.Rules.RuleView.ColorOf(DiskThinner.App.Rules.RuleView.Group.Unknown)
+                : DiskThinner.App.Rules.RuleView.ColorOf(DiskThinner.App.Rules.RuleView.Group.Other);
+        }
+
+        return tree[node].IsDirectory ? FileKinds.ColorOf(FileKind.Other) : FileKinds.ColorOf(FileKinds.Classify(tree, node));
+    }
+
+    public bool HasRules => _classification is not null;
 
     /// <summary>在足够大的块上写名称和大小（原型里的 Windows 60.2 GB 这类标签），只标前两层，避免满屏文字。</summary>
     private void DrawLabels(Graphics g)

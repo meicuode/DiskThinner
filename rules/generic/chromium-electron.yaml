@@ -1,0 +1,255 @@
+# 通用结构规则：Chromium 内核的浏览器和 Electron 应用（VS Code、Kiro、钉钉、Postman 等）。
+# 它们的目录结构相同，靠"同级目录里有这些特征子项"识别，不需要知道是哪个软件。
+locations:
+  - id: gen.chromium.cache
+    dir: '%USERPROFILE%\AppData\**\{Cache,Code Cache,GPUCache,DawnCache,DawnGraphiteCache,DawnWebGPUCache,GraphiteDawnCache,GrShaderCache,ShaderCache}'
+    sibling_any: [Local Storage, Preferences, Network, IndexedDB, Session Storage, Code Cache, GPUCache, Local State, Default]
+    kind: cache
+    risk: safe
+    regenerates: true
+    requires_closed: true
+    purpose: Chromium / Electron 内核的网页缓存、脚本编译缓存和显卡着色器缓存
+    impact: 会自动重建，之后第一次打开网页或程序会慢一些；程序正在运行时部分文件会被跳过
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://www.chromium.org/developers/design-documents/network-stack/disk-cache/
+
+  - id: gen.chromium.sw-cache
+    dir: '%USERPROFILE%\AppData\**\Service Worker\{CacheStorage,ScriptCache}'
+    kind: cache
+    risk: safe
+    regenerates: true
+    requires_closed: true
+    purpose: 网页 Service Worker 的离线缓存
+    impact: 会自动重建；个别网页应用离线时暂时打不开，联网后恢复
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://developer.mozilla.org/docs/Web/API/CacheStorage
+
+  - id: gen.chromium.crx-cache
+    dir: '%USERPROFILE%\AppData\**\{component_crx_cache,extensions_crx_cache}'
+    kind: update-cache
+    risk: safe
+    regenerates: true
+    purpose: 浏览器组件和扩展的安装包缓存
+    impact: 需要时会重新下载
+    actions:
+      - delete: contents
+    evidence:
+      - note: Chromium 组件更新器下载的 .crx 安装包，安装完成后只作为缓存
+
+  - id: gen.chromium.models
+    dir: '%USERPROFILE%\AppData\**\{optimization_guide_model_store,OnDeviceHeadSuggestModel,OptGuideOnDeviceModel}'
+    kind: model
+    risk: low
+    regenerates: true
+    purpose: 浏览器下载的本地 AI 模型（搜索建议、页面摘要等功能用）
+    impact: 删除后浏览器会在需要时重新下载
+    actions:
+      - delete: contents
+    evidence:
+      - note: Chromium 的 Optimization Guide 模型存储，按需下载
+
+  - id: gen.electron.cacheddata
+    dir: '%APPDATA%\*\CachedData'
+    sibling_any: [Local Storage, Code Cache, GPUCache, Preferences]
+    kind: cache
+    risk: safe
+    regenerates: true
+    requires_closed: true
+    purpose: Electron 应用（VS Code 等）的 V8 脚本编译缓存，每个版本一个子目录，旧版本的不会自动删
+    impact: 会自动重建，下次启动略慢
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://code.visualstudio.com/docs/supporting/faq
+
+  - id: gen.electron.vsix-cache
+    dir: '%APPDATA%\*\CachedExtensionVSIXs'
+    kind: update-cache
+    risk: safe
+    regenerates: true
+    purpose: VS Code 系编辑器下载的扩展安装包
+    impact: 扩展已经装好，这里只是安装包缓存；需要时重新下载
+    actions:
+      - delete: contents
+    evidence:
+      - note: VS Code 系编辑器安装扩展时下载的 .vsix 文件
+
+  - id: gen.browser.profile
+    under: '%LOCALAPPDATA%\*\*\User Data'
+    kind: browser-data
+    risk: medium
+    purpose: 浏览器的用户资料（书签、历史记录、扩展、网站数据）
+    impact: 删除会丢失浏览记录、登录状态和网站保存的数据；书签和密码如果没开同步也会丢失
+    actions:
+      - guide: 在浏览器的"设置 → 隐私 → 清除浏览数据"里清理
+
+  - id: gen.squirrel.packages
+    dir: '%LOCALAPPDATA%\*\packages'
+    sibling_any: [Update.exe]
+    kind: update-cache
+    risk: safe
+    regenerates: true
+    purpose: Squirrel 自动更新程序下载的安装包（Discord、Teams 旧版、Postman 等）
+    impact: 更新已经安装，这里只是安装包；下次更新时重新下载
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://github.com/Squirrel/Squirrel.Windows/blob/develop/docs/using/install-process.md
+
+  - id: gen.squirrel.app
+    dir: '%LOCALAPPDATA%\*\app-*'
+    sibling_any: [Update.exe]
+    kind: program
+    risk: never
+    purpose: Squirrel 自动更新安装的程序版本，旧版本由更新程序自己清理
+    impact: 不要手动删除，请通过卸载程序删除
+
+  - id: gen.electron.updater
+    dir: '%LOCALAPPDATA%\*-updater'
+    kind: update-cache
+    risk: safe
+    regenerates: true
+    purpose: Electron 应用自动更新程序（electron-updater）下载的新版安装包
+    impact: 更新已经安装或尚未安装时，下次检查更新会重新下载
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://www.electron.build/auto-update
+
+  - id: gen.appx.temp
+    dir: '%LOCALAPPDATA%\Packages\*\TempState'
+    kind: temp
+    risk: safe
+    regenerates: true
+    purpose: 商店应用的临时文件
+    impact: 会自动重建
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://learn.microsoft.com/windows/uwp/design/app-settings/store-and-retrieve-app-data
+
+  - id: gen.appx.ac-temp
+    dir: '%LOCALAPPDATA%\Packages\*\AC\Temp'
+    kind: temp
+    risk: safe
+    regenerates: true
+    purpose: 商店应用容器里的临时文件
+    impact: 会自动重建
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://learn.microsoft.com/windows/uwp/design/app-settings/store-and-retrieve-app-data
+
+  - id: gen.appx.inetcache
+    dir: '%LOCALAPPDATA%\Packages\*\AC\INetCache'
+    kind: cache
+    risk: safe
+    regenerates: true
+    purpose: 商店应用的网页缓存
+    impact: 会自动重建
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://learn.microsoft.com/windows/uwp/design/app-settings/store-and-retrieve-app-data
+
+  - id: gen.appx.localcache
+    dir: '%LOCALAPPDATA%\Packages\*\LocalCache'
+    kind: cache
+    risk: low
+    regenerates: true
+    purpose: 商店应用的本地缓存（应用自己决定放什么，有的应用会把数据放在这里）
+    impact: 多数情况下会自动重建，但个别应用可能丢失离线数据
+    tier: draft
+    evidence:
+      - url: https://learn.microsoft.com/uwp/api/windows.storage.applicationdata.localcachefolder
+
+  - id: gen.appx
+    under: '%LOCALAPPDATA%\Packages\*'
+    kind: app-data
+    risk: high
+    purpose: 商店应用的数据（设置、本地数据库、下载的内容）
+    impact: 删除可能丢失这个应用的数据。想清理请在"设置 → 应用 → 高级选项 → 重置"里操作
+    actions:
+      - guide: 在"设置 → 应用 → 已安装的应用 → 高级选项"里重置或修复
+
+  - id: gen.user-programs
+    under: '%LOCALAPPDATA%\Programs\*'
+    kind: program
+    risk: never
+    purpose: 按用户安装的程序（VS Code、Python、Ollama 等常装在这里）
+    impact: 不要手动删除，请在"设置 → 应用"里卸载
+
+  - id: gen.model-files
+    file: '%USERPROFILE%\**\*.{gguf,safetensors,ckpt}'
+    kind: model
+    risk: low
+    purpose: AI 模型文件，单个通常几百 MB 到几十 GB
+    impact: 删除后用到时需要重新下载，可能很慢；如果是你自己训练或微调的模型，请先确认
+    tier: draft
+    evidence:
+      - note: GGUF（llama.cpp / Ollama）、safetensors 和 ckpt（PyTorch / Hugging Face）是常见的模型权重格式
+
+  - id: gen.vm-disk
+    file: '%USERPROFILE%\**\*.{vhdx,vhd,vmdk,vdi}'
+    kind: vm-disk
+    risk: guide
+    label: 压缩或移动
+    purpose: 虚拟机或 WSL / Docker 的虚拟磁盘。里面删了文件，这个文件也不会自动变小
+    impact: 删除会丢失整个虚拟机的数据。可以在虚拟机软件里压缩，或者把它移到其他盘
+    actions:
+      - guide: WSL 的磁盘可以用 diskpart 或 Optimize-VHD 压缩，也可以用 wsl --manage <发行版> --move 移到其他盘
+        url: https://learn.microsoft.com/windows/wsl/disk-space
+
+  - id: gen.node-modules
+    dir: '%USERPROFILE%\**\node_modules'
+    not_under: ['%USERPROFILE%\AppData', '%USERPROFILE%\.vscode', '%USERPROFILE%\.kiro', '%USERPROFILE%\.cursor']
+    kind: build-output
+    risk: low
+    purpose: Node.js 项目安装的依赖
+    impact: 删除后在项目里运行 npm install（或 pnpm / yarn）重新安装；很久不碰的项目可以放心删
+    actions:
+      - delete: self
+    evidence:
+      - url: https://docs.npmjs.com/cli/configuring-npm/folders
+
+  - id: gen.python-venv
+    dir: '%USERPROFILE%\**\{.venv,venv}'
+    has_any: [pyvenv.cfg]
+    not_under: ['%USERPROFILE%\AppData']
+    kind: build-output
+    risk: low
+    purpose: Python 项目的虚拟环境
+    impact: 删除后需要重新创建虚拟环境并安装依赖
+    actions:
+      - delete: self
+    evidence:
+      - url: https://docs.python.org/3/library/venv.html
+
+  - id: gen.pycache
+    dir: '%USERPROFILE%\**\__pycache__'
+    kind: build-output
+    risk: safe
+    regenerates: true
+    purpose: Python 的字节码缓存
+    impact: 下次运行时自动重新生成
+    actions:
+      - delete: self
+    evidence:
+      - url: https://docs.python.org/3/tutorial/modules.html#compiled-python-files
+
+  - id: gen.cachedir-tag
+    dir: '%USERPROFILE%\**\*'
+    has_any: [CACHEDIR.TAG]
+    kind: cache
+    risk: low
+    regenerates: true
+    purpose: 带有 CACHEDIR.TAG 标记的目录，按约定只存放可以重新生成的缓存（Rust target、pytest、部分工具的缓存）
+    impact: 程序需要时会重新生成或下载
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://bford.info/cachedir/

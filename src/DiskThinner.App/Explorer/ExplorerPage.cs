@@ -24,7 +24,11 @@ internal sealed class ExplorerPage : UserControl
     private readonly ProgressOverlay _overlay = new() { Dock = DockStyle.Fill, Visible = false };
     private readonly SplitContainer _outer;
     private readonly SplitContainer _left;
+    private readonly FlowLayoutPanel _legend;
+    private readonly CheckBox _onlyCleanable = Ui.Chip("只看可清理");
+    private readonly CheckBox _onlyUnknown = Ui.Chip("只看未识别");
     private ScanResult? _result;
+    private DiskThinner.Rules.Classification? _classification;
     private int _selected = -1;
 
     public ExplorerPage()
@@ -37,7 +41,14 @@ internal sealed class ExplorerPage : UserControl
         var title = Ui.Label("空间浏览", Theme.PageTitle);
         title.Dock = DockStyle.Left;
         title.Padding = new Padding(0, 4, 12, 0);
+        var chips = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Padding = new Padding(0, 2, 0, 0) };
+        chips.Controls.Add(_onlyCleanable);
+        chips.Controls.Add(_onlyUnknown);
+        _onlyCleanable.Enabled = _onlyUnknown.Enabled = false;
+        _onlyCleanable.CheckedChanged += (_, _) => OnFilterChanged(_onlyCleanable);
+        _onlyUnknown.CheckedChanged += (_, _) => OnFilterChanged(_onlyUnknown);
         bar.Controls.Add(_crumb);
+        bar.Controls.Add(chips);
         bar.Controls.Add(title);
         bar.Paint += (_, e) =>
         {
@@ -64,13 +75,8 @@ internal sealed class ExplorerPage : UserControl
 
         // 方块图上方的图例和范围
         var legend = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 26, WrapContents = false, BackColor = Color.White, Padding = new Padding(8, 4, 8, 0) };
-        // M1 按文件类型着色；M2 规则上线后改为按类别（原型的图例）
-        legend.Controls.Add(new Label { Text = "按文件类型：", AutoSize = true, Font = Theme.Small, ForeColor = Theme.Subtle, Margin = new Padding(0, 2, 6, 0) });
-        foreach (var kind in FileKinds.LegendOrder)
-        {
-            legend.Controls.Add(new LegendSwatch(FileKinds.ColorOf(kind)));
-            legend.Controls.Add(new Label { Text = FileKinds.NameOf(kind), AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted, Margin = new Padding(0, 2, 10, 0) });
-        }
+        _legend = legend;
+        BuildLegend(byRule: false);
 
         var mapHead = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = Color.White, Padding = new Padding(8, 2, 8, 2) };
         _zoomOut = Ui.Button("返回上一级");
@@ -108,6 +114,7 @@ internal sealed class ExplorerPage : UserControl
         _detail.OpenLocationRequested += (_, n) => OpenLocation(n);
         _detail.CopyPathRequested += (_, n) => CopyPath(n);
         _detail.ShowInMapRequested += (_, n) => _map.SetMapRoot(n);
+        _detail.SelectRequested += (_, n) => SelectFrom(n, null);
         _overlay.CancelRequested += (_, _) => CancelRequested?.Invoke(this, EventArgs.Empty);
 
         var menu = new ContextMenuStrip();
@@ -158,15 +165,78 @@ internal sealed class ExplorerPage : UserControl
 
     public void HideProgress() => _overlay.Visible = false;
 
-    public void SetResult(ScanResult? result)
+    public void SetResult(ScanResult? result, DiskThinner.Rules.Classification? classification = null)
     {
         _result = result;
+        _classification = result is null ? null : classification;
         _overlay.Visible = false;
-        _list.SetTree(result?.Tree);
-        _map.SetTree(result?.Tree);
+        _onlyCleanable.Checked = _onlyUnknown.Checked = false;
+        _onlyCleanable.Enabled = _onlyUnknown.Enabled = _classification is not null;
+        _list.SetTree(result?.Tree, _classification);
+        _map.SetTree(result?.Tree, _classification);
+        BuildLegend(byRule: _classification is not null);
         UpdateBanner();
         var first = result is null ? -1 : result.Tree.Root;
         SelectFrom(first, null);
+    }
+
+    public DiskThinner.Rules.Classification? Classification => _classification;
+
+    internal CheckBox OnlyCleanable => _onlyCleanable;
+
+    internal CheckBox OnlyUnknown => _onlyUnknown;
+
+    /// <summary>"只看可清理"和"只看未识别"互斥：勾选一个时取消另一个。</summary>
+    private void OnFilterChanged(CheckBox changed)
+    {
+        if (changed.Checked)
+        {
+            var other = changed == _onlyCleanable ? _onlyUnknown : _onlyCleanable;
+            if (other.Checked)
+            {
+                other.Checked = false; // 会再次进入这里，但 Checked 为 false 时只重新应用过滤
+            }
+        }
+
+        var c = _classification;
+        Func<int, bool>? filter = c is null ? null
+            : _onlyCleanable.Checked ? n => c.Cleanable(n) > 0
+            : _onlyUnknown.Checked ? n => c.Unexplained(n) > 0
+            : null;
+        _list.SetFilter(filter);
+        if (_list.SelectedNode >= 0 && _list.SelectedNode != _selected)
+        {
+            SelectFrom(_list.SelectedNode, _list);
+        }
+    }
+
+    private void BuildLegend(bool byRule)
+    {
+        _legend.SuspendLayout();
+        _legend.Controls.Clear();
+        void Item(Color color, string text)
+        {
+            _legend.Controls.Add(new LegendSwatch(color));
+            _legend.Controls.Add(new Label { Text = text, AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted, Margin = new Padding(0, 2, 10, 0) });
+        }
+
+        if (byRule)
+        {
+            foreach (var g in DiskThinner.App.Rules.RuleView.LegendOrder)
+            {
+                Item(DiskThinner.App.Rules.RuleView.ColorOf(g), DiskThinner.App.Rules.RuleView.NameOf(g));
+            }
+        }
+        else
+        {
+            _legend.Controls.Add(new Label { Text = "按文件类型：", AutoSize = true, Font = Theme.Small, ForeColor = Theme.Subtle, Margin = new Padding(0, 2, 6, 0) });
+            foreach (var kind in FileKinds.LegendOrder)
+            {
+                Item(FileKinds.ColorOf(kind), FileKinds.NameOf(kind));
+            }
+        }
+
+        _legend.ResumeLayout();
     }
 
     /// <summary>按路径选中（命令行 --select 用）。</summary>
@@ -186,12 +256,18 @@ internal sealed class ExplorerPage : UserControl
         return n >= 0;
     }
 
+    /// <summary>从概览等页面跳过来时用：选中节点，被过滤掉时先取消过滤。</summary>
+    public void Reveal(int node) => SelectFrom(node, null);
+
     private void SelectFrom(int node, object? source)
     {
         _selected = node;
         var tree = _result?.Tree;
-        if (!ReferenceEquals(source, _list))
+        if (!ReferenceEquals(source, _list) && !_list.SelectNode(node) && node >= 0 && _list.HasFilter)
         {
+            // 要选中的节点被"只看可清理/未识别"过滤掉了：取消过滤再选
+            _onlyCleanable.Checked = _onlyUnknown.Checked = false;
+            _selected = node;
             _list.SelectNode(node);
         }
 
@@ -201,7 +277,7 @@ internal sealed class ExplorerPage : UserControl
         }
 
         _crumb.Show(tree, node);
-        _detail.ShowNode(tree, node, _result?.Stats);
+        _detail.ShowNode(tree, node, _result?.Stats, _classification);
     }
 
     private void UpdateMapScope()

@@ -37,6 +37,34 @@ internal static class Ui
         UseMnemonic = false,
     };
 
+    /// <summary>原型的 .chip：可以切换的小按钮（CheckBox 的按钮外观，读屏软件读作复选框）。</summary>
+    public static CheckBox Chip(string text)
+    {
+        // 按钮外观的 CheckBox 自动大小时会按复选框的布局算宽度，文字会被截掉；这里按 96 DPI 量好固定尺寸，交给窗体统一缩放
+        var textWidth = TextRenderer.MeasureText(text, Theme.Small).Width;
+        var c = new CheckBox
+        {
+            Text = text,
+            Appearance = Appearance.Button,
+            AutoSize = false,
+            Size = new Size(textWidth + 24, 26),
+            FlatStyle = FlatStyle.Flat,
+            Font = Theme.Small,
+            BackColor = Color.White,
+            ForeColor = Theme.Text,
+            Margin = new Padding(6, 0, 0, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Hand,
+            UseVisualStyleBackColor = false,
+            AccessibleName = text,
+        };
+        c.FlatAppearance.BorderColor = Theme.BorderStrong;
+        c.FlatAppearance.CheckedBackColor = Theme.AccentWeak;
+        c.FlatAppearance.MouseOverBackColor = Theme.Background;
+        c.CheckedChanged += (_, _) => c.ForeColor = c.Checked ? Theme.Accent : Theme.Text;
+        return c;
+    }
+
     /// <summary>原型的 .tag：小号圆角底色文字。</summary>
     public static Label Tag(string text, Color back, Color fore) => new()
     {

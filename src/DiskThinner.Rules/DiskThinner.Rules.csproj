@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 规则模型、路径匹配、保护名单、归属判断、规则库读写。不引用 WinForms，按 Native AOT 要求编写。 -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
+    <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Rules.Tests" />
+  </ItemGroup>
+</Project>

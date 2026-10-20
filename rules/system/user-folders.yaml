@@ -1,0 +1,39 @@
+# 用户自己的文件。程序不会建议清理这些位置；大的文件请用户自己判断。
+locations:
+  - id: user.documents
+    under: '%USERPROFILE%\{Documents,Desktop,Pictures,Videos,Music,Favorites,Contacts,Saved Games,3D Objects}'
+    kind: user-data
+    risk: high
+    purpose: 你自己的文档、图片、视频等文件
+    impact: 删除后无法恢复（除非有备份）。如果占用很大，可以考虑把这个文件夹移到其他盘：右键文件夹 → 属性 → 位置
+
+  - id: user.downloads
+    under: '%USERPROFILE%\Downloads'
+    kind: user-data
+    risk: high
+    purpose: 浏览器和其他程序下载的文件
+    impact: 常常堆着用过的安装包和压缩包，但需要你自己确认哪些不要了
+
+  - id: user.onedrive
+    under: '%USERPROFILE%\OneDrive*'
+    kind: user-data
+    risk: high
+    purpose: OneDrive 同步到本机的文件
+    impact: 在这里删除会同时删除云端的文件。想省空间请用"释放空间"（文件按需下载），而不是删除
+    actions:
+      - guide: 右键文件夹选择"释放空间"，文件只保留在云端
+        url: https://support.microsoft.com/office/save-disk-space-with-onedrive-files-on-demand-for-windows-0e6860d3-d9f3-4971-b321-7092438fb38e
+
+  - id: user.source
+    under: '%USERPROFILE%\source'
+    kind: user-data
+    risk: high
+    purpose: 代码仓库（Visual Studio 的默认项目位置）
+    impact: 删除后丢失没有推送的代码。项目里的 bin、obj、node_modules 可以重新生成
+
+  - id: user.registry-hive
+    file: '%USERPROFILE%\NTUSER.DAT*'
+    kind: system
+    risk: never
+    purpose: 你的用户注册表
+    impact: 不能删除

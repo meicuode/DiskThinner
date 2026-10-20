@@ -364,6 +364,10 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 
 **M2 规则与归属（6 到 8 人日）**
 
+> 拆成两半提交。上半（规则引擎、规则库、dtrule、140 条规则、界面接入、概览页）2026-10-20 完成，见 `docs/m2a-report.md`。
+> 下半：Inventory、程序身份、按路径推断归属、"按归属 / 按类别汇总"视图，以及在同样条件下重测并压低主程序峰值内存。
+> 调整：只有带 delete 或白名单命令动作的 dir / file 规则才计入"可清理"；不收"所有 *.log 文件"这类规则（会误伤 LevelDB 和 ESE 数据库的事务日志）。
+
 - 规则 Schema、第一批 YAML 规则、`dtrule validate`、`dtrule build`、`dtrule probe`。
 - rules.db 嵌入和加载、匹配引擎、Inventory、exe 身份、归属引擎、保护名单。
 - 空间浏览补上归属、类别和风险、来源标签列；"按归属汇总""按类别汇总"；"只看可清理""只看未识别"；详情里的作用、删除后影响、证据、操作和"从根上解决"（搬家引导）。

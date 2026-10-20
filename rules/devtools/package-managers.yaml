@@ -1,0 +1,516 @@
+# 开发工具的包缓存和工具链。几乎都能重新下载（risk: low），优先用官方清理命令。
+locations:
+  # ---------- Python ----------
+  - id: dev.uv.cache
+    dir: '%LOCALAPPDATA%\uv\cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: uv 下载和解压过的 Python 包，多个虚拟环境共用（大量文件通过硬链接共享）
+    impact: 已建好的虚拟环境不受影响，下次装包需要重新下载。和虚拟环境硬链接共享的部分删了也不会释放空间
+    actions:
+      - command: uv.cache-prune
+      - command: uv.cache-clean
+    relocate: { env: UV_CACHE_DIR }
+    evidence:
+      - url: https://docs.astral.sh/uv/concepts/cache/
+
+  - id: dev.uv.python
+    dir: '%APPDATA%\uv\python'
+    kind: program
+    risk: low
+    purpose: uv 安装的 Python 解释器
+    impact: 删除后用到这些 Python 版本的虚拟环境会失效，需要 uv python install 重新安装
+    actions:
+      - guide: 用 uv python list --only-installed 查看，uv python uninstall <版本> 删除不用的版本
+    relocate: { env: UV_PYTHON_INSTALL_DIR }
+    evidence:
+      - url: https://docs.astral.sh/uv/concepts/python-versions/
+
+  - id: dev.uv.tools
+    dir: '%APPDATA%\uv\tools'
+    kind: program
+    risk: low
+    purpose: uv tool install 安装的命令行工具
+    impact: 删除后这些命令不能用，需要重新安装
+    actions:
+      - guide: 用 uv tool list 查看，uv tool uninstall <名称> 卸载
+    relocate: { env: UV_TOOL_DIR }
+    evidence:
+      - url: https://docs.astral.sh/uv/concepts/tools/
+
+  - id: dev.pip.cache
+    dir: '%LOCALAPPDATA%\pip\cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: pip 下载过的包和编译好的 wheel
+    impact: 下次安装需要重新下载
+    actions:
+      - command: pip.cache-purge
+    relocate: { env: PIP_CACHE_DIR }
+    evidence:
+      - url: https://pip.pypa.io/en/stable/topics/caching/
+
+  - id: dev.conda.pkgs
+    dir: '%USERPROFILE%\{anaconda3,miniconda3,miniforge3,.conda}\pkgs'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: conda 下载的包缓存
+    impact: 已创建的环境不受影响，下次安装需要重新下载
+    actions:
+      - command: conda.clean-all
+    relocate: { env: CONDA_PKGS_DIRS }
+    evidence:
+      - url: https://docs.conda.io/projects/conda/en/latest/commands/clean.html
+
+  - id: dev.huggingface
+    dir: '%USERPROFILE%\.cache\huggingface'
+    kind: model
+    risk: low
+    regenerates: true
+    purpose: Hugging Face 下载的模型和数据集
+    impact: 删除后用到时重新下载，大模型可能要很久
+    actions:
+      - guide: 用 huggingface-cli scan-cache 查看，huggingface-cli delete-cache 选择删除
+        url: https://huggingface.co/docs/huggingface_hub/guides/manage-cache
+    relocate: { env: HF_HOME }
+    evidence:
+      - url: https://huggingface.co/docs/huggingface_hub/guides/manage-cache
+
+  - id: dev.torch-hub
+    dir: '%USERPROFILE%\.cache\torch'
+    kind: model
+    risk: low
+    regenerates: true
+    purpose: PyTorch Hub 下载的模型
+    impact: 用到时重新下载
+    actions:
+      - delete: contents
+    relocate: { env: TORCH_HOME }
+    evidence:
+      - url: https://pytorch.org/docs/stable/hub.html#where-are-my-downloaded-models-saved
+
+  - id: dev.puppeteer
+    dir: '%USERPROFILE%\.cache\puppeteer'
+    kind: program
+    risk: low
+    regenerates: true
+    purpose: Puppeteer 下载的浏览器
+    impact: 下次运行 Puppeteer 时重新下载
+    actions:
+      - delete: contents
+    relocate: { env: PUPPETEER_CACHE_DIR }
+    evidence:
+      - url: https://pptr.dev/guides/configuration
+
+  - id: dev.xdg-cache
+    under: '%USERPROFILE%\.cache'
+    kind: cache
+    risk: low
+    tier: draft
+    purpose: 各种命令行工具约定的缓存目录（~/.cache）
+    impact: 按约定只放可以重新生成的缓存，但具体内容取决于工具，请先看看是谁的
+    evidence:
+      - url: https://specifications.freedesktop.org/basedir-spec/latest/
+
+  # ---------- Node.js ----------
+  - id: dev.npm.cache
+    dir: '%LOCALAPPDATA%\npm-cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: npm 下载过的包（_cacache）和 npx 临时安装的工具（_npx）
+    impact: 下次安装需要重新下载；不影响已安装的项目
+    actions:
+      - command: npm.cache-clean
+    relocate: { note: 运行 npm config set cache <新路径> }
+    evidence:
+      - url: https://docs.npmjs.com/cli/commands/npm-cache
+
+  - id: dev.npm.global
+    under: '%APPDATA%\npm'
+    kind: program
+    risk: never
+    purpose: npm 全局安装的命令行工具（claude、codex 等常装在这里）
+    impact: 不要手动删除，用 npm uninstall -g <包名> 卸载
+
+  - id: dev.pnpm.store
+    dir: '%LOCALAPPDATA%\pnpm\store'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: pnpm 的全局包仓库，项目里的依赖通过硬链接指向这里
+    impact: 用 pnpm store prune 只删除没有项目引用的包；直接删除整个目录会让现有项目需要重新安装
+    actions:
+      - command: pnpm.store-prune
+    evidence:
+      - url: https://pnpm.io/cli/store
+
+  - id: dev.yarn.cache
+    dir: '%LOCALAPPDATA%\Yarn\Cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: Yarn 1 下载过的包
+    impact: 下次安装需要重新下载
+    actions:
+      - command: yarn.cache-clean
+    evidence:
+      - url: https://classic.yarnpkg.com/en/docs/cli/cache
+
+  - id: dev.electron.cache
+    dir: '%LOCALAPPDATA%\{electron,electron-builder}\Cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: Electron 和 electron-builder 下载的运行时和打包工具
+    impact: 下次构建 Electron 项目时重新下载
+    actions:
+      - delete: contents
+    relocate: { env: ELECTRON_CACHE }
+    evidence:
+      - url: https://www.electronjs.org/docs/latest/tutorial/installation#cache
+
+  - id: dev.node-gyp
+    dir: '%LOCALAPPDATA%\node-gyp\Cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: node-gyp 下载的 Node.js 头文件，用来编译原生模块
+    impact: 下次编译原生模块时重新下载
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://github.com/nodejs/node-gyp#installation
+
+  - id: dev.playwright
+    dir: '%LOCALAPPDATA%\ms-playwright'
+    kind: program
+    risk: low
+    regenerates: true
+    purpose: Playwright 下载的测试浏览器（Chromium、Firefox、WebKit），每个版本一个子目录，旧版本不会自动删
+    impact: 删除后运行测试前需要 npx playwright install 重新下载；可以只删旧版本号的目录
+    actions:
+      - guide: 运行 npx playwright uninstall 删除当前项目不再使用的浏览器
+        url: https://playwright.dev/docs/browsers#remove-browsers
+    relocate: { env: PLAYWRIGHT_BROWSERS_PATH }
+    evidence:
+      - url: https://playwright.dev/docs/browsers#managing-browser-binaries
+
+  # ---------- .NET ----------
+  - id: dev.nuget.packages
+    dir: '%USERPROFILE%\.nuget\packages'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: NuGet 全局包目录，所有 .NET 项目还原时共用
+    impact: 下次构建项目时重新下载，第一次会慢；离线时无法构建
+    actions:
+      - command: nuget.global-packages
+    relocate: { env: NUGET_PACKAGES }
+    evidence:
+      - url: https://learn.microsoft.com/nuget/consume-packages/managing-the-global-packages-and-cache-folders
+
+  - id: dev.nuget.http-cache
+    dir: '%LOCALAPPDATA%\NuGet\v3-cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: NuGet 的下载缓存（HTTP 缓存）
+    impact: 下次还原时重新下载索引和包
+    actions:
+      - command: nuget.http-cache
+    relocate: { env: NUGET_HTTP_CACHE_PATH }
+    evidence:
+      - url: https://learn.microsoft.com/nuget/consume-packages/managing-the-global-packages-and-cache-folders
+
+  - id: dev.nuget.plugins-cache
+    dir: '%LOCALAPPDATA%\NuGet\plugins-cache'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: NuGet 凭据插件的缓存
+    impact: 会自动重建
+    actions:
+      - command: nuget.plugins-cache
+    evidence:
+      - url: https://learn.microsoft.com/nuget/consume-packages/managing-the-global-packages-and-cache-folders
+
+  - id: dev.dotnet.tools
+    dir: '%USERPROFILE%\.dotnet\tools'
+    kind: program
+    risk: low
+    purpose: dotnet tool install -g 安装的全局工具
+    impact: 删除后这些命令不能用，需要重新安装
+    actions:
+      - guide: 用 dotnet tool list -g 查看，dotnet tool uninstall -g <名称> 卸载
+    evidence:
+      - url: https://learn.microsoft.com/dotnet/core/tools/global-tools
+
+  - id: dev.dotnet.home
+    under: '%USERPROFILE%\.dotnet'
+    kind: cache
+    risk: low
+    tier: draft
+    purpose: .NET SDK 的用户数据（首次运行标记、遥测、工作负载清单缓存等）
+    impact: 多数会自动重建
+    evidence:
+      - note: 全局工具单独由 dev.dotnet.tools 规则描述
+
+  - id: dev.vs.component-cache
+    dir: '%LOCALAPPDATA%\Microsoft\VisualStudio\*\ComponentModelCache'
+    kind: cache
+    risk: safe
+    regenerates: true
+    requires_closed: true
+    purpose: Visual Studio 的扩展组件缓存
+    impact: 下次启动 Visual Studio 时重建，启动会慢一些；Visual Studio 打开时不要删
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://learn.microsoft.com/visualstudio/extensibility/how-to-troubleshoot-extensions
+
+  - id: dev.vs.local
+    under: '%LOCALAPPDATA%\Microsoft\VisualStudio'
+    kind: app-data
+    risk: medium
+    purpose: Visual Studio 的本地设置、扩展和缓存
+    impact: 删除会丢失窗口布局、最近打开的项目等设置，扩展需要重新安装
+
+  - id: dev.azure-functions
+    dir: '%LOCALAPPDATA%\AzureFunctionsTools'
+    kind: program
+    risk: low
+    regenerates: true
+    purpose: Visual Studio 自动下载的 Azure Functions 核心工具，每个版本一份
+    impact: 下次调试 Functions 项目时 Visual Studio 会重新下载
+    actions:
+      - delete: contents
+    evidence:
+      - note: Visual Studio 的 Azure Functions 工具在首次调试时下载到这里
+
+  # ---------- Java / Rust / Go ----------
+  - id: dev.gradle.caches
+    dir: '%USERPROFILE%\.gradle\caches'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: Gradle 下载的依赖和构建缓存
+    impact: 下次构建时重新下载，第一次会慢
+    actions:
+      - delete: contents
+    relocate: { env: GRADLE_USER_HOME }
+    evidence:
+      - url: https://docs.gradle.org/current/userguide/directory_layout.html
+
+  - id: dev.gradle.wrapper
+    dir: '%USERPROFILE%\.gradle\wrapper\dists'
+    kind: program
+    risk: low
+    regenerates: true
+    purpose: Gradle Wrapper 下载的各个版本的 Gradle
+    impact: 下次构建时重新下载项目需要的版本
+    actions:
+      - delete: contents
+    relocate: { env: GRADLE_USER_HOME }
+    evidence:
+      - url: https://docs.gradle.org/current/userguide/gradle_wrapper.html
+
+  - id: dev.gradle.daemon
+    dir: '%USERPROFILE%\.gradle\daemon'
+    kind: log
+    risk: safe
+    regenerates: true
+    purpose: Gradle 守护进程的日志
+    impact: 删除后无法查看历史日志
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://docs.gradle.org/current/userguide/directory_layout.html
+
+  - id: dev.maven
+    dir: '%USERPROFILE%\.m2\repository'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: Maven 本地仓库
+    impact: 下次构建时重新下载依赖；自己 mvn install 到本地的包会丢失
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://maven.apache.org/guides/introduction/introduction-to-repositories.html
+
+  - id: dev.cargo.registry
+    dir: '%USERPROFILE%\.cargo\registry'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: Cargo 下载的 crate 和索引
+    impact: 下次构建时重新下载
+    actions:
+      - delete: contents
+    relocate: { env: CARGO_HOME }
+    evidence:
+      - url: https://doc.rust-lang.org/cargo/guide/cargo-home.html
+
+  - id: dev.rustup.toolchains
+    dir: '%USERPROFILE%\.rustup\toolchains'
+    kind: program
+    risk: low
+    purpose: rustup 安装的 Rust 工具链
+    impact: 删除后需要重新安装；可以只删不用的旧版本
+    actions:
+      - guide: 用 rustup toolchain list 查看，rustup toolchain uninstall <名称> 删除
+    relocate: { env: RUSTUP_HOME }
+    evidence:
+      - url: https://rust-lang.github.io/rustup/concepts/toolchains.html
+
+  - id: dev.go.modcache
+    dir: '%USERPROFILE%\go\pkg\mod'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: Go 模块缓存
+    impact: 下次构建时重新下载
+    actions:
+      - command: go.clean-modcache
+    relocate: { env: GOMODCACHE }
+    evidence:
+      - url: https://go.dev/ref/mod#module-cache
+
+  - id: dev.go.build-cache
+    dir: '%LOCALAPPDATA%\go-build'
+    kind: build-output
+    risk: safe
+    regenerates: true
+    purpose: Go 的编译缓存
+    impact: 下次构建会慢一些
+    actions:
+      - command: go.clean-cache
+    relocate: { env: GOCACHE }
+    evidence:
+      - url: https://pkg.go.dev/cmd/go#hdr-Build_and_test_caching
+
+  - id: dev.vcpkg.archives
+    dir: '%LOCALAPPDATA%\vcpkg\archives'
+    kind: package-cache
+    risk: low
+    regenerates: true
+    purpose: vcpkg 的二进制缓存
+    impact: 下次安装依赖时需要重新编译
+    actions:
+      - delete: contents
+    relocate: { env: VCPKG_DEFAULT_BINARY_CACHE }
+    evidence:
+      - url: https://learn.microsoft.com/vcpkg/users/binarycaching
+
+  # ---------- 虚拟化 / 移动开发 ----------
+  - id: dev.docker.wsl
+    dir: '%LOCALAPPDATA%\Docker\wsl'
+    kind: vm-disk
+    risk: guide
+    label: 压缩或移动
+    purpose: Docker Desktop 的 WSL 2 虚拟磁盘，存放镜像、容器和数据卷；删掉容器后这个文件不会自动变小
+    impact: 不要手动删除。先用 docker system prune 清理不用的镜像和容器，再压缩虚拟磁盘，或在设置里把它移到其他盘
+    actions:
+      - guide: 运行 docker system prune -a，然后在 Docker Desktop 的"设置 → 资源 → 高级"里移动磁盘位置
+        url: https://docs.docker.com/desktop/settings-and-maintenance/settings/#advanced
+    evidence:
+      - url: https://docs.docker.com/desktop/features/wsl/
+
+  - id: dev.wsl.distro-store
+    file: '%LOCALAPPDATA%\Packages\*\LocalState\ext4.vhdx'
+    kind: vm-disk
+    risk: guide
+    label: 压缩或移动
+    purpose: 从商店安装的 WSL 发行版（Ubuntu 等）的虚拟磁盘；在 Linux 里删除文件后它不会自动变小
+    impact: 删除会丢失整个 Linux 发行版。可以压缩或用 wsl --manage 移到其他盘
+    actions:
+      - guide: 运行 wsl --manage <发行版> --set-sparse true 让磁盘自动收缩，或 wsl --manage <发行版> --move <新路径>
+        url: https://learn.microsoft.com/windows/wsl/disk-space
+    evidence:
+      - url: https://learn.microsoft.com/windows/wsl/disk-space
+
+  - id: dev.wsl.distro
+    file: '%LOCALAPPDATA%\wsl\*\ext4.vhdx'
+    kind: vm-disk
+    risk: guide
+    label: 压缩或移动
+    purpose: WSL 发行版（Ubuntu 等）的虚拟磁盘；在 Linux 里删除文件后它不会自动变小
+    impact: 删除会丢失整个 Linux 发行版。可以压缩或用 wsl --manage 移到其他盘
+    actions:
+      - guide: 运行 wsl --manage <发行版> --set-sparse true 让磁盘自动收缩，或 wsl --manage <发行版> --move <新路径>
+        url: https://learn.microsoft.com/windows/wsl/disk-space
+    evidence:
+      - url: https://learn.microsoft.com/windows/wsl/disk-space
+
+  - id: dev.android.sdk
+    dir: '%LOCALAPPDATA%\Android\Sdk'
+    kind: program
+    risk: low
+    purpose: Android SDK（平台、构建工具、模拟器镜像）
+    impact: 在 Android Studio 的 SDK Manager 里删除不用的版本，不要整个删除
+    actions:
+      - guide: 在 Android Studio 的"设置 → Android SDK"里取消勾选不用的版本
+    evidence:
+      - url: https://developer.android.com/studio/intro/update#sdk-manager
+
+  - id: dev.android.avd
+    dir: '%USERPROFILE%\.android\avd'
+    kind: vm-disk
+    risk: medium
+    purpose: Android 模拟器的虚拟设备，每个几 GB
+    impact: 删除后模拟器里的应用和数据丢失；可以在设备管理器里删除不用的设备
+    actions:
+      - guide: 在 Android Studio 的设备管理器里删除不用的虚拟设备
+    evidence:
+      - url: https://developer.android.com/studio/run/managing-avds
+
+  - id: dev.jetbrains.caches
+    dir: '%LOCALAPPDATA%\JetBrains\*\caches'
+    kind: cache
+    risk: safe
+    regenerates: true
+    requires_closed: true
+    purpose: JetBrains IDE 的索引和缓存
+    impact: 下次打开项目时重建索引，会慢一阵；IDE 打开时不要删
+    actions:
+      - guide: 在 IDE 里用"文件 → 清除缓存"
+        url: https://www.jetbrains.com/help/idea/invalidate-caches.html
+    evidence:
+      - url: https://www.jetbrains.com/help/idea/directories-used-by-the-ide-to-store-settings-caches-plugins-and-logs.html
+
+  - id: dev.jetbrains.local
+    under: '%LOCALAPPDATA%\JetBrains'
+    kind: app-data
+    risk: medium
+    purpose: JetBrains IDE 的本地数据（旧版本的目录不会自动删除）
+    impact: 旧版本 IDE 的目录可以删；当前版本的删除会丢失本地设置
+    actions:
+      - guide: IDE 启动时会提示清理旧版本的目录，或在 Toolbox 里卸载旧版本
+
+  - id: dev.aws-toolkit
+    dir: '%LOCALAPPDATA%\AWSToolkit'
+    kind: cache
+    risk: low
+    tier: draft
+    purpose: AWS Toolkit（Visual Studio / VS Code 扩展）下载的工具和缓存
+    impact: 用到时重新下载
+    evidence:
+      - note: 由目录名和扩展的行为推断，未实测
+
+  - id: dev.postman.app
+    under: '%LOCALAPPDATA%\Postman'
+    kind: program
+    risk: never
+    purpose: Postman 程序（Squirrel 安装）
+    impact: 不要手动删除，请在"设置 → 应用"里卸载
+
+  - id: dev.postman.data
+    under: '%APPDATA%\Postman'
+    kind: app-data
+    risk: high
+    purpose: Postman 的本地数据（未同步的集合、环境、历史）
+    impact: 删除可能丢失没有同步到云端的数据

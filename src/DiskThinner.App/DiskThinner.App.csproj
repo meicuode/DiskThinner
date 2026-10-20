@@ -10,8 +10,33 @@
   <ItemGroup>
     <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
     <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+    <ProjectReference Include="..\DiskThinner.Rules\DiskThinner.Rules.csproj" />
+    <!-- 只为了在构建主程序前先构建 dtrule，用它把 rules/*.yaml 编译成 rules.db；不引用它的程序集 -->
+    <ProjectReference Include="..\..\tools\dtrule\dtrule.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DiskThinner.App.Tests" />
   </ItemGroup>
+
+  <!-- 内置规则库：校验并编译 rules 目录，嵌入为资源。规则有错误时构建失败。 -->
+  <PropertyGroup>
+    <RulesSourceDir>$(MSBuildThisFileDirectory)..\..\rules\</RulesSourceDir>
+    <DtRuleDll>$(MSBuildThisFileDirectory)..\..\tools\dtrule\bin\$(Configuration)\$(TargetFramework)\dtrule.dll</DtRuleDll>
+    <RulesDb>$(IntermediateOutputPath)rules.db</RulesDb>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuleSource Include="$(RulesSourceDir)**\*.yaml" />
+    <UpToDateCheckInput Include="@(RuleSource)" />
+  </ItemGroup>
+  <Target Name="CompileRules" AfterTargets="ResolveProjectReferences" BeforeTargets="PrepareResources"
+          Inputs="@(RuleSource);$(DtRuleDll)" Outputs="$(RulesDb)">
+    <Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(DtRuleDll)&quot; build &quot;$(RulesSourceDir.TrimEnd('\'))&quot; --out &quot;$(RulesDb)&quot;"
+          EnvironmentVariables="DOTNET_CLI_UI_LANGUAGE=en" StandardOutputImportance="low" />
+  </Target>
+  <Target Name="EmbedRules" AfterTargets="CompileRules" BeforeTargets="PrepareResources">
+    <ItemGroup>
+      <EmbeddedResource Include="$(RulesDb)" LogicalName="DiskThinner.rules.db" />
+      <FileWrites Include="$(RulesDb)" />
+    </ItemGroup>
+  </Target>
 </Project>

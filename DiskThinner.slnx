@@ -7,10 +7,15 @@
   <Folder Name="/src/">
     <Project Path="src/DiskThinner.App/DiskThinner.App.csproj" />
     <Project Path="src/DiskThinner.Core/DiskThinner.Core.csproj" />
+    <Project Path="src/DiskThinner.Rules/DiskThinner.Rules.csproj" />
     <Project Path="src/DiskThinner.Scanner/DiskThinner.Scanner.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DiskThinner.App.Tests/DiskThinner.App.Tests.csproj" />
+    <Project Path="tests/DiskThinner.Rules.Tests/DiskThinner.Rules.Tests.csproj" />
     <Project Path="tests/DiskThinner.Scanner.Tests/DiskThinner.Scanner.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/dtrule/dtrule.csproj" />
   </Folder>
 </Solution>

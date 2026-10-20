@@ -17,6 +17,10 @@ internal sealed class MainForm : Form
     private readonly Panel _pageHost = new() { Dock = DockStyle.Fill };
     private readonly Dictionary<string, Control> _pages = [];
     private readonly ExplorerPage _explorer = new() { Dock = DockStyle.Fill };
+    private readonly OverviewPage _overview = new() { Dock = DockStyle.Fill };
+    private readonly ToolStripStatusLabel _statusRules = new() { TextAlign = ContentAlignment.MiddleRight };
+    private DiskThinner.Rules.RuleEngine? _engine;
+    private string? _rulesError;
     private readonly ComboBox _drives = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300, AccessibleName = "选择磁盘" };
     private readonly Button _rescan = Ui.Button("重新扫描", primary: true);
     private readonly ToolStripStatusLabel _statusScan = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
@@ -64,7 +68,7 @@ internal sealed class MainForm : Form
         _nav.Selected += (_, key) => ShowPage(key);
 
         _pages["explorer"] = _explorer;
-        _pages["overview"] = new PlaceholderPage("概览", "M2 和 M3", "还剩多少空间、近 7 天涨了多少、能清多少、还有多少不认识，以及建议先处理的项目。");
+        _pages["overview"] = _overview;
         _pages["growth"] = new PlaceholderPage("增长分析", "M3", "对比两次快照，找出哪些目录在变大。");
         _pages["cleanup"] = new PlaceholderPage("清理计划", "M4", "按风险分组的清理清单，确认后执行。");
         _pages["log"] = new PlaceholderPage("操作记录", "M4", "每次删除、运行命令、手动清理和拦截的记录。");
@@ -76,6 +80,11 @@ internal sealed class MainForm : Form
             _pageHost.Controls.Add(page);
         }
 
+        _overview.NavigateRequested += (_, node) =>
+        {
+            _nav.Select("explorer");
+            _explorer.Reveal(node);
+        };
         _explorer.RestartRequested += (_, _) => RestartElevated();
         _explorer.CancelRequested += (_, _) => _scanCts?.Cancel();
         _rescan.Click += (_, _) => StartScan(SelectedDrive());
@@ -87,8 +96,7 @@ internal sealed class MainForm : Form
             }
         };
 
-        // M1 只有空间浏览可用，默认打开它
-        _nav.Select("explorer");
+        _nav.Select(options.StartPage ?? "overview");
 
         ResumeLayout(false);
         PerformLayout();
@@ -118,6 +126,7 @@ internal sealed class MainForm : Form
         var status = new StatusStrip { BackColor = Theme.TitleBar, SizingGrip = true, Font = Theme.Small };
         _statusMode.Text = _elevated ? "管理员模式" : "普通权限（MFT 快速扫描需要管理员）";
         status.Items.Add(_statusScan);
+        status.Items.Add(_statusRules);
         status.Items.Add(_statusMode);
         return status;
     }
@@ -220,6 +229,7 @@ internal sealed class MainForm : Form
         var title = mode == ScanMode.Mft ? $"正在读取 {drive.TrimEnd('\\')} 的主文件表（MFT）" : $"正在逐个目录扫描 {drive.TrimEnd('\\')}";
         var hint = mode == ScanMode.Mft ? "通常只需要几秒。" : $"遍历扫描较慢，整个系统盘约需 1 到 2 分钟。{(reason is null ? "" : "原因：" + reason + "。")}";
         _explorer.ShowProgress(title, hint, 0, cancellable: true);
+        _overview.ShowScanning();
         _rescan.Enabled = false;
         _statusScan.Text = "正在扫描…";
 
@@ -247,11 +257,13 @@ internal sealed class MainForm : Form
         });
 
         ScanResult? result = null;
+        DiskThinner.Rules.Classification? classification = null;
         long peakAfterScan = 0;
         try
         {
-            result = await Task.Run(() =>
+            (result, classification) = await Task.Run(() =>
             {
+                var engine = EnsureRules();
                 var r = VolumeScanner.Scan(drive, preference, progress, cts.Token);
                 using (var proc = Process.GetCurrentProcess())
                 {
@@ -260,14 +272,15 @@ internal sealed class MainForm : Form
 
                 // 扫描是一次性的重活，结束后把空闲的 GC 内存还给系统
                 GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-                return r;
+                var c = engine?.Classify(r.Tree, cts.Token);
+                return (r, c);
             }, cts.Token);
         }
         catch (OperationCanceledException)
         {
             if (_scanCts == cts)
             {
-                _explorer.SetResult(previous);
+                _explorer.SetResult(previous, _explorer.Classification);
                 _statusScan.Text = previous is null ? "扫描已取消" : "扫描已取消，显示的是上一次的结果 · " + ExplorerPage.Describe(previous.Stats);
                 _rescan.Enabled = true;
             }
@@ -278,7 +291,7 @@ internal sealed class MainForm : Form
         {
             if (_scanCts == cts)
             {
-                _explorer.SetResult(previous);
+                _explorer.SetResult(previous, _explorer.Classification);
                 _rescan.Enabled = true;
                 _statusScan.Text = "扫描失败";
                 MessageBox.Show(this, $"扫描 {drive} 失败：{ex.Message}", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -294,8 +307,12 @@ internal sealed class MainForm : Form
 
         _rescan.Enabled = true;
         var renderWatch = Stopwatch.StartNew();
-        _explorer.SetResult(result);
+        _explorer.SetResult(result, classification);
+        _overview.SetResult(result, classification);
         _statusScan.Text = ExplorerPage.Describe(result.Stats);
+        _statusRules.Text = _engine is { } eng
+            ? $"规则 {eng.Rules.Locations.Count} 条 · 匹配 {classification?.Duration.TotalSeconds:F1} 秒"
+            : "规则没有加载：" + _rulesError;
         LoadDrives();
         SelectDriveInCombo(drive);
         await AfterScanAutomation(result, peakAfterScan, renderWatch);
@@ -368,6 +385,11 @@ internal sealed class MainForm : Form
                 $"bind_and_first_paint_ms={bindMs:F0}",
                 $"treemap_render_ms={_explorer.Map.LastRenderTime.TotalMilliseconds:F0}",
                 $"treemap_blocks={_explorer.Map.BlockCount}",
+                $"rules={_engine?.Rules.Locations.Count}",
+                $"rules_error={_rulesError}",
+                $"classify_ms={_explorer.Classification?.Duration.TotalMilliseconds:F0}",
+                $"cleanable_bytes={_explorer.Classification?.TotalCleanable}",
+                $"unexplained_bytes={_explorer.Classification?.Unexplained(result.Tree.Root)}",
                 $"nodes={s.Nodes}",
                 $"files={root.FileCount}",
                 $"dirs={root.DirCount}",
@@ -387,6 +409,27 @@ internal sealed class MainForm : Form
         {
             Close();
         }
+    }
+
+    /// <summary>第一次扫描时加载内置规则库（在后台线程）。加载失败时继续扫描，只是没有规则结果。</summary>
+    private DiskThinner.Rules.RuleEngine? EnsureRules()
+    {
+        if (_engine is not null || _rulesError is not null)
+        {
+            return _engine;
+        }
+
+        try
+        {
+            _engine = new DiskThinner.Rules.RuleEngine(Rules.RuleStore.LoadBuiltIn(), DiskThinner.Rules.PathContext.FromSystem());
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or FormatException or InvalidOperationException
+                                       or Microsoft.Data.Sqlite.SqliteException)
+        {
+            _rulesError = ex.Message;
+        }
+
+        return _engine;
     }
 
     private void RestartElevated()

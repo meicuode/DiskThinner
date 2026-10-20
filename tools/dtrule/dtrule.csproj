@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 规则维护工具：校验 YAML 规则、编译成 rules.db、在本机实测覆盖率。只在开发机和 CI 上运行，不随产品发布。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DiskThinner.RuleTools</RootNamespace>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiskThinner.Rules\DiskThinner.Rules.csproj" />
+    <ProjectReference Include="..\..\src\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Rules.Tests" />
+  </ItemGroup>
+</Project>

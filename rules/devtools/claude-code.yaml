@@ -1,0 +1,59 @@
+app:
+  id: anthropic.claude-code
+  name: Claude Code
+  vendor: Anthropic
+  exes: [claude.exe]
+  processes: [claude.exe]
+locations:
+  - id: anthropic.claude-code.credentials
+    file: '%USERPROFILE%\.claude\.credentials.json'
+    kind: credential
+    risk: never
+    purpose: Claude Code 的登录凭据
+    impact: 删除后需要重新登录
+
+  - id: anthropic.claude-code.projects
+    dir: '%USERPROFILE%\.claude\projects'
+    kind: session-history
+    risk: medium
+    requires_closed: true
+    purpose: 会话记录（每个项目一个子目录，jsonl 格式），用于 --resume 恢复历史会话
+    impact: 删除后无法恢复这些旧会话，不影响正常使用。更推荐在设置里调小 cleanupPeriodDays，让 Claude Code 自己清理
+    actions:
+      - delete: children
+        older_than_days: 30
+      - guide: 在 ~/.claude/settings.json 里设置 "cleanupPeriodDays"（默认 30 天）
+        url: https://docs.anthropic.com/en/docs/claude-code/settings
+    relocate: { env: CLAUDE_CONFIG_DIR }
+    evidence:
+      - url: https://docs.anthropic.com/en/docs/claude-code/settings
+
+  - id: anthropic.claude-code.shell-snapshots
+    dir: '%USERPROFILE%\.claude\shell-snapshots'
+    kind: temp
+    risk: safe
+    regenerates: true
+    purpose: 每次会话启动时保存的 shell 环境快照
+    impact: 新会话会重新生成
+    actions:
+      - delete: children
+        older_than_days: 7
+    evidence:
+      - note: 会话开始时生成，会话结束后不再使用
+
+  - id: anthropic.claude-code.versions
+    dir: '%USERPROFILE%\.local\share\claude\versions'
+    kind: program
+    risk: low
+    purpose: Claude Code 原生安装版的各个版本，自动更新时会保留旧版本
+    impact: 当前正在使用的版本不能删；旧版本可以删除
+    tier: draft
+    evidence:
+      - note: 原生安装程序把每个版本放在单独的子目录里
+
+  - id: anthropic.claude-code.home
+    under: '%USERPROFILE%\.claude'
+    kind: config
+    risk: high
+    purpose: Claude Code 的设置、自定义命令、子代理和记忆文件（settings.json、CLAUDE.md、commands、agents）
+    impact: 删除会丢失你的配置和自定义内容

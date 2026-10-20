@@ -11,6 +11,7 @@ internal sealed class TreeRows
     private readonly List<(int Node, int Depth)> _rows = [];
     private readonly NodeTree _tree;
     private readonly bool[] _expanded;
+    private Func<int, bool>? _filter;
 
     public TreeRows(NodeTree tree)
     {
@@ -18,6 +19,25 @@ internal sealed class TreeRows
         _expanded = new bool[tree.Count];
         _rows.Add((tree.Root, 0));
     }
+
+    /// <summary>
+    /// 只显示满足条件的节点（例如"子树里有可清理的空间"）。根总是显示。展开状态保留，行列表按新条件重建。
+    /// 传 null 取消过滤。
+    /// </summary>
+    public void SetFilter(Func<int, bool>? filter)
+    {
+        _filter = filter;
+        _rows.Clear();
+        _rows.Add((_tree.Root, 0));
+        if (_expanded[_tree.Root])
+        {
+            AppendVisibleChildren(_tree.Root, 1, _rows);
+        }
+    }
+
+    public bool HasFilter => _filter is not null;
+
+    private bool Visible(int node) => _filter is null || _filter(node);
 
     public int Count => _rows.Count;
 
@@ -29,7 +49,18 @@ internal sealed class TreeRows
 
     public bool IsExpanded(int node) => _expanded[node];
 
-    public bool HasChildren(int node) => _tree[node].FirstChild >= 0;
+    public bool HasChildren(int node)
+    {
+        for (var c = _tree[node].FirstChild; c >= 0; c = _tree[c].NextSibling)
+        {
+            if (Visible(c))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>展开一行，返回新增的行数。</summary>
     public int Expand(int row)
@@ -162,6 +193,11 @@ internal sealed class TreeRows
     {
         for (var c = _tree[node].FirstChild; c >= 0; c = _tree[c].NextSibling)
         {
+            if (!Visible(c))
+            {
+                continue;
+            }
+
             output.Add((c, depth));
             if (_expanded[c])
             {

@@ -1,0 +1,64 @@
+app:
+  id: openai.codex
+  name: Codex
+  vendor: OpenAI
+  exes: [codex.exe]
+  processes: [codex.exe]
+locations:
+  - id: openai.codex.auth
+    file: '%USERPROFILE%\.codex\auth.json'
+    kind: credential
+    risk: never
+    purpose: Codex CLI 的登录凭据
+    impact: 删除后需要重新登录
+
+  - id: openai.codex.sessions
+    dir: '%USERPROFILE%\.codex\{sessions,archived_sessions}'
+    kind: session-history
+    risk: medium
+    requires_closed: true
+    purpose: Codex 的会话记录（rollout 文件，按日期分目录）
+    impact: 删除后无法恢复这些旧会话，不影响正常使用
+    actions:
+      - delete: children
+        older_than_days: 30
+    relocate: { env: CODEX_HOME }
+    evidence:
+      - url: https://github.com/openai/codex/blob/main/docs/config.md
+
+  - id: openai.codex.log
+    dir: '%USERPROFILE%\.codex\log'
+    kind: log
+    risk: safe
+    regenerates: true
+    purpose: Codex CLI 的运行日志
+    impact: 删除后无法查看历史日志
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://github.com/openai/codex/blob/main/docs/config.md
+
+  - id: openai.codex.packages
+    dir: '%USERPROFILE%\.codex\packages'
+    kind: program
+    risk: low
+    tier: draft
+    purpose: Codex 自动下载的组件（app-server、独立运行时等），更新后旧版本会保留
+    impact: 当前版本正在使用时不能删；旧版本可以删除，需要时会重新下载
+    evidence:
+      - note: 由目录结构推断（releases 下按版本号分目录），未实测
+
+  - id: openai.codex.home
+    under: '%USERPROFILE%\.codex'
+    kind: config
+    risk: high
+    purpose: Codex CLI 的配置（config.toml、AGENTS.md、提示词）
+    impact: 删除会丢失你的配置
+
+  - id: openai.codex.desktop
+    under: '%LOCALAPPDATA%\OpenAI\Codex'
+    kind: app-data
+    risk: medium
+    tier: draft
+    purpose: Codex 桌面应用的本地数据
+    impact: 删除可能丢失登录状态和本地记录

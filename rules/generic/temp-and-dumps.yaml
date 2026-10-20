@@ -1,0 +1,160 @@
+# 通用结构规则：临时文件、崩溃转储、日志。和是哪个软件无关。
+#
+# 注意：这里故意没有"所有 *.log 文件"这样的规则。Chromium / Electron 的 LevelDB（Local Storage、IndexedDB）
+# 和 ESE 数据库（Windows Search、WebCache）都用 .log 作为事务日志，删掉会损坏数据。只认名为 log / logs 的目录。
+locations:
+  - id: gen.user-temp
+    dir: '%LOCALAPPDATA%\Temp'
+    kind: temp
+    risk: safe
+    regenerates: true
+    purpose: 当前用户的临时文件（%TEMP%），安装程序、更新程序和各种软件都往这里写
+    impact: 正在使用的文件会被跳过；只删 1 天前的文件，避免影响正在进行的安装
+    actions:
+      - delete: contents
+        older_than_days: 1
+    evidence:
+      - url: https://support.microsoft.com/windows/free-up-drive-space-in-windows-85529ccb-c365-490d-b548-831022bc9b32
+
+  - id: gen.crashdumps
+    dir: '%LOCALAPPDATA%\CrashDumps'
+    kind: crash-dump
+    risk: safe
+    purpose: 程序崩溃时 Windows 错误报告生成的用户态转储
+    impact: 删除后无法再用这些转储分析崩溃原因
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://learn.microsoft.com/windows/win32/wer/collecting-user-mode-dumps
+
+  - id: gen.wer-user
+    dir: '%LOCALAPPDATA%\Microsoft\Windows\WER'
+    kind: crash-dump
+    risk: safe
+    purpose: 当前用户的 Windows 错误报告
+    impact: 删除后无法再查看或提交这些错误报告
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://learn.microsoft.com/windows/win32/wer/wer-settings
+
+  - id: gen.dump-files
+    file: '%USERPROFILE%\**\*.{dmp,mdmp,hdmp}'
+    kind: crash-dump
+    risk: safe
+    purpose: 程序崩溃时生成的内存转储文件
+    impact: 删除后无法再用它分析当时的崩溃；如果是你特意抓取用于排查问题的转储，请先确认
+    actions:
+      - delete: self
+    evidence:
+      - note: .dmp / .mdmp / .hdmp 是 Windows 调试转储格式，只用于事后分析
+
+  - id: gen.programdata-dumps
+    file: '%PROGRAMDATA%\**\*.{dmp,mdmp,hdmp}'
+    kind: crash-dump
+    risk: safe
+    purpose: 系统级程序崩溃时生成的内存转储文件
+    impact: 删除后无法再用它分析当时的崩溃
+    actions:
+      - delete: self
+    evidence:
+      - note: .dmp / .mdmp / .hdmp 是 Windows 调试转储格式，只用于事后分析
+
+  - id: gen.crashpad
+    dir: '%USERPROFILE%\AppData\**\Crashpad'
+    kind: crash-dump
+    risk: safe
+    regenerates: true
+    purpose: Chromium / Electron 程序（浏览器、VS Code、聊天软件等）的崩溃报告
+    impact: 删除后无法再提交这些崩溃报告，不影响程序使用
+    actions:
+      - delete: contents
+    evidence:
+      - url: https://chromium.googlesource.com/crashpad/crashpad/+/HEAD/doc/overview_design.md
+
+  - id: gen.logs-dir
+    dir: '%USERPROFILE%\AppData\**\{log,logs}'
+    kind: log
+    risk: safe
+    regenerates: true
+    purpose: 程序的运行日志
+    impact: 删除后无法再查看历史日志，排查问题时可能需要；正在写入的日志会被跳过
+    actions:
+      - delete: contents
+        older_than_days: 7
+    evidence:
+      - note: 名为 log / logs 的目录约定只存放日志
+
+  - id: gen.programdata-logs-dir
+    dir: '%PROGRAMDATA%\**\{log,logs}'
+    kind: log
+    risk: safe
+    regenerates: true
+    purpose: 系统级程序和服务的运行日志
+    impact: 删除后无法再查看历史日志；正在写入的日志会被跳过
+    actions:
+      - delete: contents
+        older_than_days: 7
+    evidence:
+      - note: 名为 log / logs 的目录约定只存放日志
+
+  - id: gen.inetcache
+    dir: '%LOCALAPPDATA%\Microsoft\Windows\INetCache'
+    kind: cache
+    risk: safe
+    regenerates: true
+    purpose: Internet Explorer / WebView 和部分 Office 组件的网页缓存
+    impact: 会自动重建
+    actions:
+      - delete: contents
+    evidence:
+      - note: Windows 系统自带"临时 Internet 文件"清理的目标目录
+
+  - id: gen.thumbcache
+    file: '%LOCALAPPDATA%\Microsoft\Windows\Explorer\{thumbcache,iconcache}_*.db'
+    kind: cache
+    risk: safe
+    regenerates: true
+    requires_closed: true
+    purpose: 资源管理器的缩略图和图标缓存
+    impact: 会自动重建，之后第一次打开图片文件夹时缩略图显示会慢一些；资源管理器正在使用的会被跳过
+    actions:
+      - delete: self
+    evidence:
+      - note: Windows 系统自带"缩略图"清理的目标文件
+
+  - id: gen.d3dscache
+    dir: '%LOCALAPPDATA%\D3DSCache'
+    kind: cache
+    risk: safe
+    regenerates: true
+    purpose: DirectX 着色器缓存
+    impact: 会自动重建，游戏首次加载可能慢一些
+    actions:
+      - delete: contents
+    evidence:
+      - note: Windows 系统自带"DirectX 着色器缓存"清理的目标目录
+
+  - id: gen.gpu-shader-cache
+    dir: '%LOCALAPPDATA%\{NVIDIA,AMD}\{DXCache,DxcCache,GLCache}'
+    kind: cache
+    risk: safe
+    regenerates: true
+    purpose: 显卡驱动的着色器缓存
+    impact: 会自动重建，游戏首次加载可能慢一些
+    actions:
+      - delete: contents
+    evidence:
+      - note: 显卡驱动编译着色器后的缓存，按需重新生成
+
+  - id: gen.rdp-cache
+    dir: '%LOCALAPPDATA%\Microsoft\Terminal Server Client\Cache'
+    kind: cache
+    risk: safe
+    regenerates: true
+    purpose: 远程桌面客户端的位图缓存
+    impact: 会自动重建，下次远程连接时画面刷新可能慢一点
+    actions:
+      - delete: contents
+    evidence:
+      - note: 远程桌面连接（mstsc）的持久位图缓存

@@ -1,0 +1,60 @@
+# VS Code 系编辑器：VS Code、Cursor、Kiro、Windsurf、Trae、Antigravity。目录结构相同。
+# 缓存类子目录（Cache、CachedData、CachedExtensionVSIXs 等）由 generic/chromium-electron.yaml 识别。
+locations:
+  - id: dev.vscode.workspace-storage
+    dir: '%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}\User\workspaceStorage'
+    kind: app-data
+    risk: medium
+    requires_closed: true
+    purpose: 每个打开过的工作区一个子目录，保存扩展的工作区状态、聊天记录、索引等。项目删除后这里不会自动清理
+    impact: 删除后打开项目时扩展的状态要重建，AI 聊天历史可能丢失；只删很久没打开的项目更稳妥
+    actions:
+      - delete: children
+        older_than_days: 90
+    evidence:
+      - url: https://code.visualstudio.com/api/extension-capabilities/common-capabilities#data-storage
+
+  - id: dev.vscode.history
+    dir: '%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}\User\History'
+    kind: session-history
+    risk: medium
+    purpose: 本地历史（文件保存时自动留的副本，用于"时间线"视图）
+    impact: 删除后时间线里找不回这些旧版本
+    actions:
+      - delete: children
+        older_than_days: 30
+    evidence:
+      - url: https://code.visualstudio.com/docs/editor/codebasics#_local-history
+
+  - id: dev.vscode.global-storage
+    dir: '%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}\User\globalStorage'
+    kind: app-data
+    risk: high
+    purpose: 扩展的全局数据（登录状态、AI 助手的任务历史、下载的语言服务器等）
+    impact: 删除可能丢失扩展的设置和历史。请在对应扩展里清理，或者只删已卸载扩展留下的子目录
+
+  - id: dev.vscode.appdata
+    under: '%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}'
+    kind: app-data
+    risk: medium
+    purpose: 编辑器的用户数据（设置、快捷键、状态）
+    impact: 删除 User 目录会丢失设置、快捷键和代码片段
+
+  - id: dev.vscode.extensions
+    dir: '%USERPROFILE%\.{vscode,cursor,kiro,windsurf,trae,antigravity}\extensions'
+    kind: program
+    risk: low
+    purpose: 已安装的扩展。卸载扩展后旧版本目录有时不会马上删除
+    impact: 不要手动删，请在编辑器的扩展面板里卸载不用的扩展
+    actions:
+      - guide: 在编辑器的扩展面板里卸载不用的扩展
+    evidence:
+      - url: https://code.visualstudio.com/docs/editor/extension-marketplace#_where-are-extensions-installed
+
+  - id: dev.kiro.home
+    under: '%USERPROFILE%\.kiro'
+    kind: session-history
+    risk: medium
+    tier: draft
+    purpose: Kiro 的会话记录、设置、技能和扩展
+    impact: 删除会丢失聊天记录和全局设置

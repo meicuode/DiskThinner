@@ -4,6 +4,12 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <!-- 规则库与快照：SQLite -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <!-- 只在 dtrule（规则维护工具）里使用 -->
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- 仅测试项目使用 -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

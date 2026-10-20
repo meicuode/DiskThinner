@@ -1,6 +1,8 @@
 using System.Globalization;
 using DiskThinner.App.Controls;
 using DiskThinner.App.Formatting;
+using DiskThinner.App.Rules;
+using DiskThinner.Rules;
 using DiskThinner.Core;
 using DiskThinner.Scanner;
 
@@ -15,10 +17,11 @@ internal sealed class TreeListView : ListView
     private const int IndentWidth = 16;
 
     // 96 DPI 下的列宽；句柄创建和 DPI 变化时按 DeviceDpi 换算
-    private static readonly int[] BaseColumnWidths = [380, 92, 124, 110];
+    private static readonly int[] BaseColumnWidths = [300, 88, 120, 96, 150, 230];
 
     private readonly DerivedFonts _fonts = new();
     private TreeRows? _rows;
+    private Classification? _classification;
     private bool _suppressSelection;
     private DateTime _now = DateTime.Now;
     private int _hoverRow = -1;
@@ -41,6 +44,8 @@ internal sealed class TreeListView : ListView
         Columns.Add("大小", BaseColumnWidths[1], HorizontalAlignment.Right);
         Columns.Add("占上级", BaseColumnWidths[2]);
         Columns.Add("最后写入", BaseColumnWidths[3]);
+        Columns.Add("归属", BaseColumnWidths[4]);
+        Columns.Add("类别 / 风险", BaseColumnWidths[5]);
 
         RetrieveVirtualItem += OnRetrieveVirtualItem;
         DrawColumnHeader += (_, e) => e.DrawDefault = true;
@@ -130,19 +135,20 @@ internal sealed class TreeListView : ListView
         SmallImageList = new ImageList { ImageSize = new Size(1, Ui.Scale(this, 24)) };
     }
 
-    public void SetTree(NodeTree? tree)
+    public void SetTree(NodeTree? tree, Classification? classification = null)
     {
         _suppressSelection = true;
         try
         {
             VirtualListSize = 0;
             _rows = tree is null ? null : new TreeRows(tree);
+            _classification = classification;
             _now = DateTime.Now;
             if (_rows is not null)
             {
                 _rows.Expand(0);
                 VirtualListSize = _rows.Count;
-        FitNameColumn();
+                FitNameColumn();
                 SelectRow(0);
             }
         }
@@ -154,12 +160,40 @@ internal sealed class TreeListView : ListView
         Invalidate();
     }
 
-    /// <summary>展开祖先并选中节点（不触发 NodeSelected）。</summary>
-    public void SelectNode(int node)
+    /// <summary>只显示满足条件的节点；null 取消过滤。保持当前选中项（如果它仍然可见）。</summary>
+    public void SetFilter(Func<int, bool>? filter)
+    {
+        if (_rows is null)
+        {
+            return;
+        }
+
+        var selected = SelectedNode;
+        _suppressSelection = true;
+        try
+        {
+            _rows.SetFilter(filter);
+            VirtualListSize = _rows.Count;
+            FitNameColumn();
+            var row = selected >= 0 ? _rows.FindVisibleRow(selected) : -1;
+            SelectRow(row >= 0 ? row : 0);
+        }
+        finally
+        {
+            _suppressSelection = false;
+        }
+
+        Invalidate();
+    }
+
+    public bool HasFilter => _rows?.HasFilter ?? false;
+
+    /// <summary>展开祖先并选中节点（不触发 NodeSelected）。节点被过滤掉时返回 false。</summary>
+    public bool SelectNode(int node)
     {
         if (_rows is null || node < 0)
         {
-            return;
+            return false;
         }
 
         _suppressSelection = true;
@@ -167,11 +201,13 @@ internal sealed class TreeListView : ListView
         {
             var row = _rows.Reveal(node);
             VirtualListSize = _rows.Count;
-        FitNameColumn();
+            FitNameColumn();
             if (row >= 0)
             {
                 SelectRow(row);
             }
+
+            return row >= 0;
         }
         finally
         {
@@ -219,8 +255,39 @@ internal sealed class TreeListView : ListView
         item.SubItems.Add(ByteSize.Format(node.AllocSize));
         item.SubItems.Add(PercentOfParent(tree, n).ToString("0.0", CultureInfo.InvariantCulture) + "%");
         item.SubItems.Add(TimeText.Relative(node.LastWriteUtc, _now));
+        var (owner, kind) = Describe(n);
+        item.SubItems.Add(owner);
+        item.SubItems.Add(kind);
         e.Item = item;
     }
+
+    /// <summary>归属列和类别列的文字（给读屏软件和测试用；绘制时另外画标签）。</summary>
+    internal (string Owner, string Kind) Describe(int n)
+    {
+        var c = _classification;
+        if (c is null)
+        {
+            return ("", "");
+        }
+
+        if (c.RuleOf(n) is { } rule)
+        {
+            var owner = RuleView.OwnerOf(c.Engine.Rules, rule) ?? "";
+            var risk = c.EffectiveRisk(n) ?? rule.Risk;
+            return (owner, $"{Names.Display(rule.Kind)} {RuleView.RiskLabel(risk, rule)}");
+        }
+
+        if (c.ProtectionOf(n) is { Level: ProtectionLevel.Hard or ProtectionLevel.Guide } p)
+        {
+            return ("", ProtectionList.Display(p.Level));
+        }
+
+        return IsUnrecognized(n) ? ("未识别", "") : ("", "");
+    }
+
+    /// <summary>整个节点都没有被任何规则解释（目录要求整棵子树都没有规则）。</summary>
+    private bool IsUnrecognized(int n) =>
+        _classification is { } c && c.RuleOf(n) is null && Tree![n].AllocSize > 0 && c.Unexplained(n) >= Tree[n].AllocSize;
 
     internal static string DisplayName(NodeTree tree, int n)
     {
@@ -327,6 +394,14 @@ internal sealed class TreeListView : ListView
                 break;
             }
 
+            case 4:
+                DrawOwner(g, e.Bounds, n, s, flags);
+                break;
+
+            case 5:
+                DrawKind(g, e.Bounds, n, s, flags);
+                break;
+
             default:
             {
                 var align = Columns[e.ColumnIndex].TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left;
@@ -334,6 +409,71 @@ internal sealed class TreeListView : ListView
                 TextRenderer.DrawText(g, e.SubItem.Text, font, Rectangle.Inflate(e.Bounds, -(int)(6 * s), 0), textColor, flags | align);
                 break;
             }
+        }
+    }
+
+    /// <summary>归属列：应用名 + "规则"标签；整块没被识别时显示"未识别"。规则在上级目录命中的子项用浅色。</summary>
+    private void DrawOwner(Graphics g, Rectangle bounds, int n, float s, TextFormatFlags flags)
+    {
+        var c = _classification;
+        if (c is null)
+        {
+            return;
+        }
+
+        var x = bounds.X + (int)(6 * s);
+        var tagH = (int)(17 * s);
+        var tagY = bounds.Y + (bounds.Height - tagH) / 2;
+        if (c.RuleOf(n) is { } rule)
+        {
+            var owner = RuleView.OwnerOf(c.Engine.Rules, rule);
+            var inherited = !c.IsRoot(n);
+            if (owner is not null)
+            {
+                var w = Math.Min(TextRenderer.MeasureText(g, owner, _fonts.Regular).Width, bounds.Right - x - (int)(44 * s));
+                TextRenderer.DrawText(g, owner, _fonts.Regular, new Rectangle(x, bounds.Y, w, bounds.Height), inherited ? Theme.Muted : Theme.Text, flags);
+                x += w + (int)(4 * s);
+            }
+
+            if (!inherited && x + (int)(36 * s) < bounds.Right)
+            {
+                RuleView.DrawTag(g, "规则", _fonts.Small, new Point(x, tagY), tagH, RuleView.RuleSource);
+            }
+
+            return;
+        }
+
+        if (IsUnrecognized(n))
+        {
+            RuleView.DrawTag(g, "未识别", _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
+        }
+    }
+
+    /// <summary>类别列：类别文字 + 风险标签（颜色取自原型）。</summary>
+    private void DrawKind(Graphics g, Rectangle bounds, int n, float s, TextFormatFlags flags)
+    {
+        var c = _classification;
+        if (c is null)
+        {
+            return;
+        }
+
+        var x = bounds.X + (int)(6 * s);
+        var tagH = (int)(17 * s);
+        var tagY = bounds.Y + (bounds.Height - tagH) / 2;
+        var rule = c.RuleOf(n);
+        var risk = c.EffectiveRisk(n);
+        if (rule is not null)
+        {
+            var kind = Names.Display(rule.Kind);
+            var w = TextRenderer.MeasureText(g, kind, _fonts.Regular).Width;
+            TextRenderer.DrawText(g, kind, _fonts.Regular, new Rectangle(x, bounds.Y, w, bounds.Height), c.IsRoot(n) ? Theme.Text : Theme.Muted, flags);
+            x += w + (int)(4 * s);
+        }
+
+        if (risk is { } r && x < bounds.Right - (int)(20 * s))
+        {
+            RuleView.DrawTag(g, RuleView.RiskLabel(r, rule), _fonts.Small, new Point(x, tagY), tagH, RuleView.RiskStyle(r));
         }
     }
 
