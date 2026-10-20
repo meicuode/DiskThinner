@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 阶段 0.4：用 WizTree 导出数据估算规则覆盖率 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="candidate-rules.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,17 @@
+<Project>
+  <!-- 所有项目共用的编译设置 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+
+    <Product>DiskThinner</Product>
+    <Company>DiskThinner contributors</Company>
+    <Copyright>Copyright (c) 2026 DiskThinner contributors</Copyright>
+    <Version>0.0.1</Version>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,156 @@
+# 阶段 0.4 候选规则（实验用，正式格式在 M2 定义）
+#
+# 格式：id | 层 | 类别 | 风险 | 模式 [& 条件]...
+#   层：system 系统位置 / generic 通用结构 / devtools 开发与 AI 工具 / apps 常用软件抽样
+#   风险：safe 会自动重建 / low 需重新下载 / medium 丢历史或登录态 / high 丢用户数据 / never 不能删 / guide 只能用官方工具处理
+#   模式：
+#     dir:<glob>    目录完整路径匹配，命中后整棵子树都归这条规则，不再往下找
+#     file:<glob>   文件完整路径匹配
+#     under:<glob>  兜底：这个目录下没被更具体的规则认领的部分都归它（继续往下找，找不到再回来兜底）
+#   glob：* 匹配一段内任意字符，** 匹配任意层目录，{a,b} 任选其一，大小写不敏感
+#   条件：has:<名称>（目录里有这个子项）、sibling:<名称>（同级有这个子项）、notpath:<glob>（路径不能匹配）
+#   路径令牌：%USERPROFILE% 展开为 C:\Users\*（所有用户），其余同理
+# 顺序有意义：同一节点按文件顺序匹配第一条。
+
+# ---------------- 系统位置 ----------------
+sys.pagefile        | system  | system        | guide  | file:C:\pagefile.sys
+sys.hiberfil        | system  | system        | guide  | file:C:\hiberfil.sys
+sys.swapfile        | system  | system        | guide  | file:C:\swapfile.sys
+sys.ntfs-metadata   | system  | system        | never  | file:C:\$*
+sys.svi             | system  | system        | guide  | dir:C:\System Volume Information
+sys.recycle-bin     | system  | recycle-bin   | medium | dir:C:\$Recycle.Bin
+sys.windows-old     | system  | backup        | guide  | dir:C:\Windows.old
+sys.winsxs          | system  | system        | guide  | dir:%WINDIR%\WinSxS
+sys.installer       | system  | update-cache  | guide  | dir:%WINDIR%\Installer
+sys.wu-download     | system  | update-cache  | safe   | dir:%WINDIR%\SoftwareDistribution\Download
+sys.do-cache        | system  | update-cache  | safe   | dir:%WINDIR%\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache
+sys.do-cache-2      | system  | update-cache  | safe   | dir:%WINDIR%\SoftwareDistribution\DeliveryOptimization
+sys.service-temp    | system  | temp          | safe   | dir:%WINDIR%\ServiceProfiles\*\AppData\Local\Temp
+sys.windows-temp    | system  | temp          | safe   | dir:%WINDIR%\Temp
+sys.livekernel      | system  | crash-dump    | safe   | dir:%WINDIR%\LiveKernelReports
+sys.minidump        | system  | crash-dump    | safe   | dir:%WINDIR%\Minidump
+sys.memory-dmp      | system  | crash-dump    | safe   | file:%WINDIR%\MEMORY.DMP
+sys.aspnet-temp     | system  | build-output  | safe   | dir:%WINDIR%\Microsoft.NET\*\*\Temporary ASP.NET Files
+sys.windows-logs    | system  | log           | guide  | dir:%WINDIR%\Logs
+sys.windows         | system  | system        | never  | under:%WINDIR%
+sys.wer             | system  | crash-dump    | safe   | dir:%PROGRAMDATA%\Microsoft\Windows\WER
+sys.package-cache   | system  | update-cache  | guide  | dir:%PROGRAMDATA%\Package Cache
+sys.defender        | system  | system        | never  | dir:%PROGRAMDATA%\Microsoft\Windows Defender
+sys.program-files   | system  | program       | never  | under:C:\Program Files
+sys.program-files86 | system  | program       | never  | under:C:\Program Files (x86)
+user.ntuser         | system  | config        | never  | file:%USERPROFILE%\NTUSER.DAT*
+user.documents      | system  | user-data     | never  | under:%USERPROFILE%\Documents
+user.desktop        | system  | user-data     | never  | under:%USERPROFILE%\Desktop
+user.pictures       | system  | user-data     | never  | under:%USERPROFILE%\Pictures
+user.videos         | system  | user-data     | never  | under:%USERPROFILE%\Videos
+user.music          | system  | user-data     | never  | under:%USERPROFILE%\Music
+user.downloads      | system  | user-data     | high   | under:%USERPROFILE%\Downloads
+user.onedrive       | system  | user-data     | never  | under:%USERPROFILE%\OneDrive*
+
+# ---------------- 通用结构规则 ----------------
+gen.user-temp           | generic | temp          | safe   | dir:%LOCALAPPDATA%\Temp
+gen.crashdumps          | generic | crash-dump    | safe   | dir:%LOCALAPPDATA%\CrashDumps
+gen.wer-user            | generic | crash-dump    | safe   | dir:%LOCALAPPDATA%\Microsoft\Windows\WER
+gen.inetcache           | generic | cache         | safe   | dir:%LOCALAPPDATA%\Microsoft\Windows\INetCache
+gen.thumbcache          | generic | cache         | safe   | file:%LOCALAPPDATA%\Microsoft\Windows\Explorer\*cache_*.db
+gen.crashpad            | generic | crash-dump    | safe   | dir:C:\Users\*\AppData\**\Crashpad
+gen.chromium-cache      | generic | cache         | safe   | dir:C:\Users\*\AppData\**\{Cache,Code Cache,GPUCache,DawnCache,DawnGraphiteCache,DawnWebGPUCache,GraphiteDawnCache,GrShaderCache,ShaderCache} & sibling:{Local Storage,Preferences,Network,IndexedDB,Session Storage,Code Cache,GPUCache}
+gen.chromium-sw-cache   | generic | cache         | safe   | dir:C:\Users\*\AppData\**\Service Worker\{CacheStorage,ScriptCache}
+gen.chromium-crx-cache  | generic | cache         | safe   | dir:C:\Users\*\AppData\**\{component_crx_cache,extensions_crx_cache}
+gen.chromium-models     | generic | model         | low    | dir:C:\Users\*\AppData\**\{optimization_guide_model_store,OnDeviceHeadSuggestModel}
+gen.electron-cacheddata | generic | cache         | safe   | dir:%APPDATA%\*\CachedData & sibling:{Local Storage,Code Cache,GPUCache}
+gen.electron-vsix       | generic | cache         | safe   | dir:%APPDATA%\*\CachedExtensionVSIXs
+gen.logs-dir            | generic | log           | safe   | dir:C:\Users\*\AppData\**\{log,logs}
+gen.log-files           | generic | log           | safe   | file:C:\Users\**\*.{log,etl}
+gen.programdata-logs    | generic | log           | safe   | file:%PROGRAMDATA%\**\*.{log,etl}
+gen.dump-files          | generic | crash-dump    | safe   | file:C:\Users\**\*.{dmp,mdmp,hdmp}
+gen.programdata-dumps   | generic | crash-dump    | safe   | file:%PROGRAMDATA%\**\*.{dmp,mdmp,hdmp}
+gen.cachedir-tag        | generic | cache         | safe   | dir:C:\Users\** & has:CACHEDIR.TAG
+gen.node-modules        | generic | build-output  | low    | dir:%USERPROFILE%\**\node_modules & notpath:C:\Users\*\AppData\**
+gen.python-venv         | generic | build-output  | low    | dir:%USERPROFILE%\** & has:pyvenv.cfg & notpath:C:\Users\*\AppData\**
+gen.pycache             | generic | build-output  | safe   | dir:C:\Users\**\__pycache__
+gen.dotnet-obj          | generic | build-output  | safe   | dir:%USERPROFILE%\**\obj & has:project.assets.json
+gen.squirrel-packages   | generic | update-cache  | safe   | dir:%LOCALAPPDATA%\*\packages & sibling:Update.exe
+gen.squirrel-app        | generic | program       | never  | dir:%LOCALAPPDATA%\*\app-* & sibling:Update.exe
+gen.vm-disk             | generic | vm-disk       | guide  | file:C:\Users\**\*.{vhdx,vhd,vmdk,vdi}
+gen.model-files         | generic | model         | low    | file:C:\Users\**\*.{gguf,safetensors,ckpt,onnx}
+gen.appx-tempstate      | generic | temp          | safe   | dir:%LOCALAPPDATA%\Packages\*\TempState
+gen.appx-inetcache      | generic | cache         | safe   | dir:%LOCALAPPDATA%\Packages\*\AC\INetCache
+gen.appx                | generic | app-data      | high   | under:%LOCALAPPDATA%\Packages\*
+gen.user-programs       | generic | program       | never  | under:%LOCALAPPDATA%\Programs\*
+gen.browser-profile     | generic | browser-data  | medium | under:%LOCALAPPDATA%\*\*\User Data
+
+# ---------------- 开发与 AI 工具 ----------------
+dev.uv-cache            | devtools | package-cache | low    | dir:%LOCALAPPDATA%\uv\cache
+dev.uv-python           | devtools | program       | low    | dir:%APPDATA%\uv\python
+dev.uv-tools            | devtools | program       | low    | dir:%APPDATA%\uv\tools
+dev.pip-cache           | devtools | package-cache | low    | dir:%LOCALAPPDATA%\pip\cache
+dev.npm-cache           | devtools | package-cache | low    | dir:%LOCALAPPDATA%\npm-cache
+dev.npm-global          | devtools | program       | never  | under:%APPDATA%\npm
+dev.pnpm-store          | devtools | package-cache | low    | dir:%LOCALAPPDATA%\pnpm\store
+dev.pnpm-cache          | devtools | package-cache | low    | dir:%LOCALAPPDATA%\pnpm-cache
+dev.yarn-cache          | devtools | package-cache | low    | dir:%LOCALAPPDATA%\Yarn\Cache
+dev.nuget-packages      | devtools | package-cache | low    | dir:%USERPROFILE%\.nuget\packages
+dev.nuget-v3-cache      | devtools | package-cache | low    | dir:%LOCALAPPDATA%\NuGet\v3-cache
+dev.nuget-plugins       | devtools | package-cache | low    | dir:%LOCALAPPDATA%\NuGet\plugins-cache
+dev.dotnet-tools        | devtools | program       | low    | dir:%USERPROFILE%\.dotnet\tools
+dev.dotnet-home         | devtools | cache         | low    | under:%USERPROFILE%\.dotnet
+dev.gradle-caches       | devtools | package-cache | low    | dir:%USERPROFILE%\.gradle\caches
+dev.gradle-wrapper      | devtools | program       | low    | dir:%USERPROFILE%\.gradle\wrapper\dists
+dev.gradle-daemon       | devtools | log           | safe   | dir:%USERPROFILE%\.gradle\daemon
+dev.maven               | devtools | package-cache | low    | dir:%USERPROFILE%\.m2\repository
+dev.cargo-registry      | devtools | package-cache | low    | dir:%USERPROFILE%\.cargo\registry
+dev.rustup              | devtools | program       | low    | dir:%USERPROFILE%\.rustup\toolchains
+dev.go-mod              | devtools | package-cache | low    | dir:%USERPROFILE%\go\pkg\mod
+dev.go-build            | devtools | build-output  | safe   | dir:%LOCALAPPDATA%\go-build
+dev.puppeteer           | devtools | program       | low    | dir:%USERPROFILE%\.cache\puppeteer
+dev.huggingface         | devtools | model         | low    | dir:%USERPROFILE%\.cache\huggingface
+dev.torch               | devtools | model         | low    | dir:%USERPROFILE%\.cache\torch
+dev.xdg-cache           | devtools | cache         | low    | under:%USERPROFILE%\.cache
+dev.ollama              | devtools | model         | low    | dir:%USERPROFILE%\.ollama\models
+dev.playwright          | devtools | program       | low    | dir:%LOCALAPPDATA%\ms-playwright
+dev.electron-cache      | devtools | package-cache | low    | dir:%LOCALAPPDATA%\{electron,electron-builder}\Cache
+dev.node-gyp            | devtools | package-cache | low    | dir:%LOCALAPPDATA%\node-gyp\Cache
+dev.docker-wsl          | devtools | vm-disk       | guide  | dir:%LOCALAPPDATA%\Docker\wsl
+dev.wsl-distro          | devtools | vm-disk       | guide  | file:%LOCALAPPDATA%\Packages\*\LocalState\ext4.vhdx
+dev.wsl-distro-2        | devtools | vm-disk       | guide  | file:%LOCALAPPDATA%\wsl\*\ext4.vhdx
+dev.android-sdk         | devtools | program       | low    | dir:%LOCALAPPDATA%\Android\Sdk
+dev.android-avd         | devtools | vm-disk       | medium | dir:%USERPROFILE%\.android\avd
+dev.vscode-workspace    | devtools | app-data      | medium | dir:%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}\User\workspaceStorage
+dev.vscode-history      | devtools | session-history | medium | dir:%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}\User\History
+dev.vscode-globalstore  | devtools | app-data      | high   | dir:%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}\User\globalStorage
+dev.vscode-appdata      | devtools | app-data      | medium | under:%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}
+dev.vscode-extensions   | devtools | program       | low    | dir:%USERPROFILE%\.{vscode,cursor,kiro,windsurf,trae,antigravity}\extensions
+dev.claude-projects     | devtools | session-history | medium | dir:%USERPROFILE%\.claude\projects
+dev.claude-snapshots    | devtools | temp          | safe   | dir:%USERPROFILE%\.claude\{shell-snapshots,todos}
+dev.claude-versions     | devtools | program       | low    | dir:%USERPROFILE%\.local\share\claude\versions
+dev.claude-home         | devtools | config        | high   | under:%USERPROFILE%\.claude
+dev.codex-sessions      | devtools | session-history | medium | dir:%USERPROFILE%\.codex\{sessions,archived_sessions}
+dev.codex-log           | devtools | log           | safe   | dir:%USERPROFILE%\.codex\log
+dev.codex-packages      | devtools | program       | low    | dir:%USERPROFILE%\.codex\packages
+dev.codex-home          | devtools | config        | high   | under:%USERPROFILE%\.codex
+dev.codex-desktop       | devtools | app-data      | medium | under:%LOCALAPPDATA%\OpenAI\Codex
+dev.kiro-home           | devtools | session-history | medium | under:%USERPROFILE%\.kiro
+dev.vs-component-cache  | devtools | cache         | safe   | dir:%LOCALAPPDATA%\Microsoft\VisualStudio\*\ComponentModelCache
+dev.vs-local            | devtools | app-data      | medium | under:%LOCALAPPDATA%\Microsoft\VisualStudio
+dev.vs-packages         | devtools | update-cache  | guide  | dir:%PROGRAMDATA%\Microsoft\VisualStudio\Packages
+dev.jetbrains-caches    | devtools | cache         | safe   | dir:%LOCALAPPDATA%\JetBrains\*\caches
+dev.jetbrains           | devtools | app-data      | medium | under:%LOCALAPPDATA%\JetBrains
+dev.azure-functions     | devtools | program       | low    | dir:%LOCALAPPDATA%\AzureFunctionsTools
+dev.aws-toolkit         | devtools | cache         | low    | dir:%LOCALAPPDATA%\AWSToolkit
+dev.postman-app         | devtools | program       | never  | under:%LOCALAPPDATA%\Postman
+dev.postman-data        | devtools | app-data      | high   | under:%APPDATA%\Postman
+dev.conda-pkgs          | devtools | package-cache | low    | dir:%USERPROFILE%\{anaconda3,miniconda3,.conda}\pkgs
+dev.vcpkg-archives      | devtools | package-cache | low    | dir:%LOCALAPPDATA%\vcpkg\archives
+dev.local-bin           | devtools | program       | never  | under:%USERPROFILE%\.local\bin
+
+# ---------------- 常用软件抽样（看看第 3 层能补多少） ----------------
+app.dingtalk-data       | apps | app-data      | high   | under:%APPDATA%\DingTalk
+app.dingtalk-program    | apps | program       | never  | under:%LOCALAPPDATA%\DingTalk_*
+app.wechat              | apps | user-data     | high   | under:%APPDATA%\Tencent\xwechat
+app.tencent             | apps | app-data      | high   | under:%APPDATA%\Tencent
+app.perplexity          | apps | browser-data  | medium | under:%LOCALAPPDATA%\Perplexity
+app.sogou-models        | apps | model         | low    | dir:%LOCALLOW%\SogouPY\models
+app.sogou               | apps | app-data      | medium | under:%LOCALLOW%\SogouPY
+app.onedrive-program    | apps | program       | never  | under:%LOCALAPPDATA%\Microsoft\OneDrive
+app.edge-webview        | apps | program       | never  | under:%LOCALAPPDATA%\Microsoft\EdgeWebView

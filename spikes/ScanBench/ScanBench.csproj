@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 阶段 0.2：MFT 扫描与目录遍历扫描的对比验证 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+  </ItemGroup>
+</Project>

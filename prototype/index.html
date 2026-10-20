@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiskThinner UI 原型 v0.2</title>
+<!--
+  DiskThinner 主界面 HTML 原型（v0.2）
+  - 纯 HTML + CSS，无脚本。页面切换用隐藏的单选框实现，直接用浏览器打开即可。
+  - 所有数据均为示例数据，仅用于确认布局、信息结构和交互流程。
+  - 视觉按 WinForms 可实现的范围设计：标准控件 + 少量自绘（方块图、趋势图、标签）。
+-->
+<style>
+:root{
+  --bg:#f3f3f3; --surface:#f9f9f9; --card:#ffffff;
+  --border:#e1e1e1; --border-strong:#c4c4c4;
+  --text:#1a1a1a; --muted:#5c5c5c; --subtle:#808080;
+  --accent:#0a5fb4; --accent-weak:#e6f0fa;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","PingFang SC",sans-serif;font-size:13px;color:var(--text);background:#d5dae1;line-height:1.45}
+.app{min-width:1280px;height:100vh;padding:14px}
+.view-radio{position:absolute;opacity:0;pointer-events:none}
+
+/* ---------- 窗口框架 ---------- */
+.shell{height:100%;display:grid;grid-template-rows:32px 46px minmax(0,1fr) 26px;background:var(--bg);border:1px solid #b5bbc3;border-radius:8px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.titlebar{display:flex;align-items:center;gap:8px;padding-left:12px;background:#eceef1;border-bottom:1px solid var(--border)}
+.logo{width:16px;height:16px;border-radius:4px;background:#0a5fb4;position:relative}
+.logo::after{content:"";position:absolute;left:4px;right:4px;bottom:3px;height:3px;background:#fff;border-radius:1px}
+.title{font-weight:600}
+.proto-badge{margin-left:6px;font-size:11px;color:#6b4700;background:#fff2cc;border:1px solid #efd48a;border-radius:10px;padding:0 8px}
+.winbtns{margin-left:auto;display:flex;height:100%}
+.winbtns span{width:46px;display:grid;place-items:center;color:#444}
+.toolbar{display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.body{display:grid;grid-template-columns:188px minmax(0,1fr);min-height:0}
+.statusbar{display:flex;align-items:center;gap:18px;padding:0 12px;font-size:12px;color:var(--muted);background:#eceef1;border-top:1px solid var(--border);white-space:nowrap;overflow:hidden}
+.statusbar .right{margin-left:auto}
+
+/* ---------- 图标 ---------- */
+svg.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- 导航 ---------- */
+.nav{background:var(--surface);border-right:1px solid var(--border);padding:8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.nav label{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:4px;cursor:pointer;color:#333}
+.nav label:hover{background:#eaecef}
+.nav .badge{margin-left:auto;font-size:11px;background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;line-height:16px}
+.nav .group{margin:14px 10px 4px;font-size:11px;color:var(--subtle)}
+.nav .proto{color:#6b4700}
+
+/* ---------- 页面切换（无脚本） ---------- */
+.main{position:relative;min-width:0;min-height:0;overflow:hidden}
+.page{display:none;height:100%;overflow:auto;padding:16px 20px 24px}
+#v-overview:checked ~ .shell .p-overview,
+#v-explorer:checked ~ .shell .p-explorer,
+#v-growth:checked ~ .shell .p-growth,
+#v-ai:checked ~ .shell .p-ai,
+#v-cleanup:checked ~ .shell .p-cleanup,
+#v-quarantine:checked ~ .shell .p-quarantine,
+#v-settings:checked ~ .shell .p-settings{display:block}
+#v-dlg-etw:checked ~ .shell .p-dlg-etw,
+#v-dlg-send:checked ~ .shell .p-dlg-send,
+#v-dlg-clean:checked ~ .shell .p-dlg-clean{display:grid}
+#v-overview:checked ~ .shell .nav label[for="v-overview"],
+#v-explorer:checked ~ .shell .nav label[for="v-explorer"],
+#v-growth:checked ~ .shell .nav label[for="v-growth"],
+#v-ai:checked ~ .shell .nav label[for="v-ai"],
+#v-cleanup:checked ~ .shell .nav label[for="v-cleanup"],
+#v-quarantine:checked ~ .shell .nav label[for="v-quarantine"],
+#v-settings:checked ~ .shell .nav label[for="v-settings"],
+#v-dlg-etw:checked ~ .shell .nav label[for="v-dlg-etw"],
+#v-dlg-send:checked ~ .shell .nav label[for="v-dlg-send"],
+#v-dlg-clean:checked ~ .shell .nav label[for="v-dlg-clean"]{background:#dfe9f6;color:var(--accent);font-weight:600;box-shadow:inset 3px 0 0 var(--accent)}
+#v-overview:focus-visible ~ .shell .nav label[for="v-overview"],
+#v-explorer:focus-visible ~ .shell .nav label[for="v-explorer"],
+#v-growth:focus-visible ~ .shell .nav label[for="v-growth"],
+#v-ai:focus-visible ~ .shell .nav label[for="v-ai"],
+#v-cleanup:focus-visible ~ .shell .nav label[for="v-cleanup"],
+#v-quarantine:focus-visible ~ .shell .nav label[for="v-quarantine"],
+#v-settings:focus-visible ~ .shell .nav label[for="v-settings"],
+#v-dlg-etw:focus-visible ~ .shell .nav label[for="v-dlg-etw"],
+#v-dlg-send:focus-visible ~ .shell .nav label[for="v-dlg-send"],
+#v-dlg-clean:focus-visible ~ .shell .nav label[for="v-dlg-clean"]{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* ---------- 通用控件 ---------- */
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:1px solid var(--border-strong);border-radius:4px;background:#fff;color:var(--text);font:inherit;cursor:pointer;white-space:nowrap;text-decoration:none;user-select:none}
+.btn:hover{background:#f3f3f3}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#09539d}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover{background:#eaecef}
+.btn.sm{height:24px;padding:0 8px;font-size:12px}
+.btn.ai{color:#5b2a86;border-color:#d6c1ea;background:#f8f2fd}
+.btn.danger{color:#a4262c;border-color:#e8b4b8}
+.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.sep{width:1px;height:22px;background:var(--border)}
+.search{display:flex;align-items:center;gap:6px;height:28px;width:300px;border:1px solid var(--border-strong);border-radius:4px;background:#fff;padding:0 8px;color:var(--subtle)}
+.search input{border:0;outline:0;font:inherit;width:100%;background:transparent;color:var(--text)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;font-size:12px;border:1px solid var(--border-strong);background:#fff;cursor:pointer;white-space:nowrap}
+.pill:hover{background:#f3f3f3}
+.dot{width:8px;height:8px;border-radius:50%;background:#9aa0a6;flex:none}
+.dot.on{background:#107c10}
+.select{height:28px;border:1px solid var(--border-strong);border-radius:4px;background:#fff;font:inherit;padding:0 6px;color:var(--text)}
+.input{height:28px;border:1px solid var(--border-strong);border-radius:4px;padding:0 8px;font:inherit;width:100%;max-width:440px;background:#fff;color:var(--text)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border:1px solid var(--border-strong);border-radius:12px;background:#fff;font-size:12px;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--accent-weak);border-color:#9cc3ea;color:var(--accent);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:4px;overflow:hidden}
+.seg span{padding:0 10px;height:26px;display:inline-flex;align-items:center;background:#fff;border-right:1px solid var(--border-strong);cursor:pointer;font-size:12px}
+.seg span:last-child{border-right:0}
+.seg span.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+.toggle{appearance:none;width:36px;height:20px;border-radius:10px;background:#fff;border:1px solid #8a8a8a;position:relative;vertical-align:middle;cursor:pointer;margin:0;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:#5f5f5f}
+.toggle:checked{background:var(--accent);border-color:var(--accent)}
+.toggle:checked::after{left:19px;background:#fff}
+.toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- 标签：风险 / 来源 ---------- */
+.tag{display:inline-block;font-size:11px;line-height:18px;padding:0 6px;border-radius:3px;white-space:nowrap;vertical-align:middle}
+.r-safe{color:#0d5f0d;background:#e1f3df}
+.r-low{color:#0b4f8c;background:#e1edf9}
+.r-medium{color:#6e4600;background:#fff0c2}
+.r-high{color:#9c1f25;background:#fde3e5}
+.r-never{color:#fff;background:#595959}
+.r-sys{color:#3d3d3d;background:#e8e8e8}
+.s-obs{color:var(--accent);border:1px solid #8db8e3;background:#fff}
+.s-rule{color:#404040;border:1px solid #b4b4b4;background:#fff}
+.s-infer{color:#404040;border:1px dashed #9a9a9a;background:#fff}
+.s-ai{color:#5b2a86;border:1px solid #d6c1ea;background:#f8f2fd}
+
+/* ---------- 页面通用 ---------- */
+.page-head{display:flex;align-items:flex-end;gap:12px;margin-bottom:14px}
+.page-head h1{font-size:20px;font-weight:600;margin:0}
+.page-head .sub{color:var(--muted)}
+.page-head .actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+.card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:14px 16px}
+.card h2{font-size:14px;margin:0 0 10px;font-weight:600;display:flex;align-items:center;gap:8px}
+.card h2 .more{margin-left:auto;font-weight:400;font-size:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.mt12{margin-top:12px}
+.muted{color:var(--muted)}
+.subtle{color:var(--subtle)}
+.small{font-size:12px}
+.stat .k{color:var(--muted);font-size:12px}
+.stat .v{font-size:24px;font-weight:600;margin-top:2px}
+.stat .v small{font-size:13px;font-weight:400;color:var(--muted)}
+.stat .foot{margin-top:6px;font-size:12px}
+.meter{height:8px;background:#e6e6e6;border-radius:4px;overflow:hidden;margin-top:8px}
+.meter i{display:block;height:100%}
+.up{color:#a4262c}
+.down{color:#0d5f0d}
+.warn{color:#a4262c}
+.callout{border-left:3px solid var(--accent);background:var(--accent-weak);padding:8px 10px;border-radius:0 4px 4px 0;font-size:12px}
+.callout.warn{border-left-color:#c19c00;background:#fff8db;color:#4d3b00}
+.callout.ai{border-left-color:#8a5cb8;background:#f8f2fd;color:#3e1d5e}
+.note{font-size:12px;color:var(--muted);background:#f6f7f9;border:1px solid var(--border);border-radius:4px;padding:8px 10px}
+.path{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px}
+code{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;background:#f1f1f1;padding:0 4px;border-radius:3px}
+
+/* ---------- 表格 ---------- */
+table{border-collapse:collapse;width:100%}
+.tbl th{font-weight:600;text-align:left;color:var(--muted);font-size:12px;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap;background:#fafafa;position:sticky;top:0;z-index:1}
+.tbl td{padding:5px 8px;border-bottom:1px solid #f0f0f0;white-space:nowrap;vertical-align:middle}
+.tbl tbody tr:hover td{background:#f4f8fc}
+.tbl tr.sel td{background:#d9e8f8}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl tr.grp td{background:#f4f5f7;font-weight:600;color:#333;border-bottom:1px solid var(--border)}
+.tbl tr.grp td .muted{font-weight:400}
+.tbl tr.blocked td{color:#8a8a8a}
+.tbl .wrap{white-space:normal}
+.tbl.fixed{table-layout:fixed}
+.tbl.fixed td,.tbl.fixed th{overflow:hidden;text-overflow:ellipsis}
+.tbl td.hint-col{white-space:normal;font-size:12px}
+.tbl.fixed select{max-width:100%}
+
+/* ---------- 树形列表 ---------- */
+.tree td,.tree th{padding-left:6px;padding-right:6px}
+.tree td.name{padding-left:calc(6px + var(--l,0) * 16px)}
+.chev{display:inline-block;width:14px;color:#666;font-size:10px}
+.fi{display:inline-block;width:14px;height:11px;border-radius:2px;background:#e3b448;margin-right:6px;vertical-align:-1px}
+.fi.file{background:#c3c8ce;width:10px;height:13px;margin-left:2px;margin-right:8px}
+.bar{display:inline-block;width:44px;height:8px;background:#ececec;border-radius:2px;vertical-align:middle;margin-right:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:#6fa0d6}
+
+/* ---------- 空间浏览布局 ---------- */
+.p-explorer{padding:0;overflow:hidden}
+.explorer{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto minmax(0,1fr) 248px;height:100%}
+.ex-bar{grid-column:1 / 3;display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+.crumb{display:flex;align-items:center;gap:4px;color:var(--muted)}
+.crumb b{color:var(--text);font-weight:600}
+.ex-tree{overflow:auto;background:#fff;border-right:1px solid var(--border)}
+.ex-detail{grid-row:2 / 4;grid-column:2;overflow:auto;background:var(--surface);padding:14px 16px}
+.ex-map{border-top:1px solid var(--border);background:#fff;padding:8px 10px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:6px;min-height:0}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+/* ---------- 方块图 ---------- */
+.tm{display:flex;gap:2px;flex:1;min-height:0}
+.tm .col{display:flex;flex-direction:column;gap:2px;min-width:0;min-height:0}
+.tm .row{display:flex;gap:2px;min-width:0;min-height:0}
+.tm .b{min-width:0;min-height:0;overflow:hidden;padding:3px 5px;font-size:11px;line-height:14px;color:#1a1a1a;border-radius:2px;cursor:pointer}
+.tm .b b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm .b span{white-space:nowrap}
+.tm .b.sel{outline:2px solid #111;outline-offset:-2px}
+.c-system{background:#b3b9c0}
+.c-program{background:#9fb2cc}
+.c-page{background:#7d858f;color:#fff !important}
+.c-cache{background:#8dbbe8}
+.c-temp{background:#f2b072}
+.c-pkg{background:#86cbbf}
+.c-user{background:#a7d394}
+.c-unknown{background:#c3b5e3}
+.c-other{background:#dadde2}
+
+/* ---------- 详情面板 ---------- */
+.d-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.kv{display:grid;grid-template-columns:76px minmax(0,1fr);gap:6px 10px;margin:10px 0 0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.sec-t{font-size:12px;color:var(--muted);margin:16px 0 6px;font-weight:600}
+.evi{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.evi li{background:#fff;border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px}
+.evi li .tag{margin-right:6px}
+.btn-col{display:flex;flex-direction:column;gap:6px}
+.btn-col .btn{justify-content:flex-start}
+
+/* ---------- 时间线（ETW 覆盖） ---------- */
+.timeline{position:relative;height:16px;background:#eceef1;border-radius:3px}
+.timeline i{position:absolute;top:0;bottom:0;background:var(--accent);border-radius:2px}
+.tl-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--subtle);margin-top:4px}
+
+/* ---------- AI 页 ---------- */
+.ai-grid{display:grid;grid-template-columns:420px minmax(0,1fr);gap:12px;align-items:start}
+.facts{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 10px;font-size:12px}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0}
+.result-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.result-h .conf{margin-left:auto;font-size:12px;color:var(--muted)}
+.chat{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:86%;padding:8px 10px;border-radius:8px;line-height:1.6}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff}
+.msg.bot{align-self:flex-start;background:#fff;border:1px solid var(--border)}
+.toolcall{align-self:flex-start;font-size:12px;color:#5b2a86;background:#f8f2fd;border:1px dashed #d6c1ea;border-radius:4px;padding:4px 8px;font-family:"Cascadia Mono",Consolas,monospace}
+.composer{display:flex;gap:8px;margin-top:12px;align-items:flex-end}
+.composer textarea{flex:1;height:58px;resize:none;border:1px solid var(--border-strong);border-radius:6px;padding:8px;font:inherit}
+
+/* ---------- 设置页 ---------- */
+.set-wrap{display:grid;grid-template-columns:160px minmax(0,1fr);gap:16px;align-items:start}
+.set-nav{position:sticky;top:0;display:flex;flex-direction:column;gap:2px}
+.set-nav a{padding:6px 10px;border-radius:4px;color:#333;text-decoration:none}
+.set-nav a:hover{background:#eaecef}
+.form-row{display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0}
+.form-row:last-child{border-bottom:0}
+.form-row .lbl{color:#333}
+.form-row .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.opt{display:flex;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;background:#fff}
+.opt.on{border-color:#8db8e3;background:var(--accent-weak)}
+.opt input{margin-top:3px}
+.opt .t{font-weight:600}
+.opt .d{font-size:12px;color:var(--muted);margin-top:2px}
+pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;overflow:auto;margin:0;line-height:1.5}
+
+/* ---------- 对话框 ---------- */
+.p-dlg{padding:0;place-items:center;background:rgba(40,40,40,.40)}
+.dlg{width:580px;max-height:calc(100% - 40px);display:flex;flex-direction:column;background:#fff;border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.30);border:1px solid #c9c9c9;overflow:hidden}
+.dlg.wide{width:720px}
+.dlg-h{padding:18px 22px 6px;font-size:16px;font-weight:600}
+.dlg-b{padding:6px 22px 16px;overflow:auto}
+.dlg-f{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px;background:#f5f5f5;border-top:1px solid var(--border)}
+.dlg-f .left{margin-right:auto;font-size:12px;color:var(--muted)}
+
+/* ---------- 原型说明 ---------- */
+.proto-note{margin-top:16px;border:1px dashed #d4b106;background:#fffbe6;border-radius:6px;padding:8px 12px;font-size:12px;color:#4d3d00}
+.proto-note summary{cursor:pointer;font-weight:600}
+.proto-note ul{margin:6px 0 2px;padding-left:18px}
+.proto-note li{margin:2px 0}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 视图切换用的单选框（必须位于 .shell 之前） -->
+  <input type="radio" name="view" id="v-overview" class="view-radio" checked aria-label="概览">
+  <input type="radio" name="view" id="v-explorer" class="view-radio" aria-label="空间浏览">
+  <input type="radio" name="view" id="v-growth" class="view-radio" aria-label="增长分析">
+  <input type="radio" name="view" id="v-ai" class="view-radio" aria-label="AI 分析">
+  <input type="radio" name="view" id="v-cleanup" class="view-radio" aria-label="清理计划">
+  <input type="radio" name="view" id="v-quarantine" class="view-radio" aria-label="操作记录">
+  <input type="radio" name="view" id="v-settings" class="view-radio" aria-label="设置">
+  <input type="radio" name="view" id="v-dlg-etw" class="view-radio" aria-label="对话框：开启写入监控">
+  <input type="radio" name="view" id="v-dlg-send" class="view-radio" aria-label="对话框：AI 发送内容预览">
+  <input type="radio" name="view" id="v-dlg-clean" class="view-radio" aria-label="对话框：确认清理">
+
+  <div class="shell">
+
+    <!-- 标题栏 -->
+    <header class="titlebar">
+      <span class="logo" aria-hidden="true"></span>
+      <span class="title">DiskThinner</span>
+      <span class="muted small">C: 本地磁盘</span>
+      <span class="proto-badge">UI 原型 v0.2 · 示例数据</span>
+      <div class="winbtns" aria-hidden="true">
+        <span><svg class="ico" viewBox="0 0 16 16"><path d="M3 8h10"/></svg></span>
+        <span><svg class="ico" viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg></span>
+        <span><svg class="ico" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+      </div>
+    </header>
+
+    <!-- 工具栏 -->
+    <div class="toolbar" role="toolbar" aria-label="主工具栏">
+      <select class="select" aria-label="选择磁盘">
+        <option>C: 本地磁盘 · 可用 13.2 GB / 200 GB</option>
+        <option>D: 数据 · 可用 412 GB / 1 TB</option>
+      </select>
+      <button class="btn primary" type="button">
+        <svg class="ico" viewBox="0 0 16 16"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>重新扫描
+      </button>
+      <button class="btn" type="button">
+        <svg class="ico" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="9" rx="1.5"/><circle cx="8" cy="8.5" r="2.3"/><path d="M5.5 4l1-1.5h3l1 1.5"/></svg>创建快照
+      </button>
+      <span class="sep" aria-hidden="true"></span>
+      <label class="search">
+        <svg class="ico" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+        <input type="search" placeholder="搜索路径、应用或文件名" aria-label="搜索路径、应用或文件名">
+      </label>
+      <span style="margin-left:auto"></span>
+      <label class="pill" for="v-dlg-etw" title="开启写入监控后，可以看到是哪个程序在写 C 盘">
+        <span class="dot"></span>写入监控：关闭<span class="subtle">·</span><span style="color:var(--accent)">开启诊断</span>
+      </label>
+      <label class="btn ai" for="v-ai">
+        <svg class="ico" viewBox="0 0 16 16"><path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg>AI 分析
+      </label>
+    </div>
+
+    <div class="body">
+
+      <!-- 左侧导航 -->
+      <nav class="nav" aria-label="主导航">
+        <label for="v-overview">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>概览
+        </label>
+        <label for="v-explorer">
+          <svg class="ico" viewBox="0 0 16 16"><path d="M1.5 4v8.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H8L6.5 3h-4a1 1 0 0 0-1 1z"/></svg>空间浏览
+        </label>
+        <label for="v-growth">
+          <svg class="ico" viewBox="0 0 16 16"><path d="M1.5 12.5l4-4 3 3 6-6"/><path d="M10.5 5.5h4v4"/></svg>增长分析
+        </label>
+        <label for="v-ai">
+          <svg class="ico" viewBox="0 0 16 16"><path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg>AI 分析<span class="badge" style="background:#7a49a8">37</span>
+        </label>
+        <label for="v-cleanup">
+          <svg class="ico" viewBox="0 0 16 16"><path d="M2.5 4h11"/><path d="M6 4V2.5h4V4"/><path d="M3.5 4l.8 9.5h7.4l.8-9.5"/></svg>清理计划<span class="badge">10</span>
+        </label>
+        <label for="v-quarantine">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="3" rx="1"/><path d="M2.5 5.5v8h11v-8"/><path d="M6 8.5h4"/></svg>操作记录
+        </label>
+        <label for="v-settings">
+          <svg class="ico" viewBox="0 0 16 16"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5" cy="4" r="1.6" fill="#f9f9f9"/><circle cx="10.5" cy="8" r="1.6" fill="#f9f9f9"/><circle cx="6.5" cy="12" r="1.6" fill="#f9f9f9"/></svg>设置
+        </label>
+        <div class="group proto">原型：对话框</div>
+        <label for="v-dlg-etw">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>开启写入监控
+        </label>
+        <label for="v-dlg-send">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>AI 发送预览
+        </label>
+        <label for="v-dlg-clean">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>确认清理
+        </label>
+      </nav>
+
+      <main class="main">
+
+        <!-- ============================== 概览 ============================== -->
+        <section class="page p-overview" aria-labelledby="h-overview">
+          <div class="page-head">
+            <h1 id="h-overview">概览</h1>
+            <span class="sub">上次扫描：今天 10:41（MFT，4.8 秒）· 最近快照：今天 09:00</span>
+          </div>
+
+          <div class="grid4">
+            <div class="card stat">
+              <div class="k">C 盘已用</div>
+              <div class="v">186.8 GB <small>/ 200 GB</small></div>
+              <div class="meter"><i style="width:93.4%;background:#c42b1c"></i></div>
+              <div class="foot warn">可用 13.2 GB，低于 15 GB 提醒线</div>
+            </div>
+            <div class="card stat">
+              <div class="k">近 7 天净增长</div>
+              <div class="v up">+12.4 GB</div>
+              <div class="foot muted">按此速度约 7 天后写满</div>
+            </div>
+            <div class="card stat">
+              <div class="k">可释放（规则判定）</div>
+              <div class="v">31.6 GB</div>
+              <div class="foot"><span class="tag r-safe">安全 25.0 GB</span> <span class="tag r-low">需重新下载 6.6 GB</span></div>
+            </div>
+            <div class="card stat">
+              <div class="k">未识别</div>
+              <div class="v">9.8 GB <small>· 37 个目录</small></div>
+              <div class="foot"><label class="btn sm ai" for="v-ai">逐个用 AI 分析</label></div>
+            </div>
+          </div>
+
+          <div class="grid2 mt12" style="grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)">
+            <div class="card">
+              <h2>C 盘可用空间（近 30 天）<span class="more muted">数据来自每日快照</span></h2>
+              <svg viewBox="0 0 620 175" width="100%" height="175" role="img" aria-label="近 30 天可用空间从 31.0 GB 降到 13.2 GB，10 月 15 日单日减少 8.4 GB">
+                <g stroke="#ececec" stroke-width="1">
+                  <line x1="40" y1="10" x2="600" y2="10"/><line x1="40" y1="45" x2="600" y2="45"/><line x1="40" y1="80" x2="600" y2="80"/><line x1="40" y1="115" x2="600" y2="115"/><line x1="40" y1="150" x2="600" y2="150"/>
+                </g>
+                <g font-size="10" fill="#808080" text-anchor="end">
+                  <text x="34" y="13">40 GB</text><text x="34" y="48">30</text><text x="34" y="83">20</text><text x="34" y="118">10</text><text x="34" y="153">0</text>
+                </g>
+                <line x1="40" y1="97.5" x2="600" y2="97.5" stroke="#c42b1c" stroke-dasharray="4 3" stroke-width="1"/>
+                <text x="44" y="93" font-size="10" fill="#c42b1c">提醒线 15 GB</text>
+                <polygon fill="#0a5fb4" fill-opacity=".08" points="40,150 40,41.5 58.7,42.2 77.3,43.3 96,43.6 114.7,45 133.3,46.1 152,46.8 170.7,48.2 189.3,48.9 208,42.9 226.7,44 245.3,45 264,46.4 282.7,47.5 301.3,48.9 320,49.9 338.7,51.3 357.3,52.4 376,53.8 394.7,54.8 413.3,56.2 432,57.6 450.7,59 469.3,60.4 488,62.5 506.7,66.4 525.3,95.8 544,98.9 562.7,100 581.3,101.7 600,103.8 600,150"/>
+                <polyline fill="none" stroke="#0a5fb4" stroke-width="2" points="40,41.5 58.7,42.2 77.3,43.3 96,43.6 114.7,45 133.3,46.1 152,46.8 170.7,48.2 189.3,48.9 208,42.9 226.7,44 245.3,45 264,46.4 282.7,47.5 301.3,48.9 320,49.9 338.7,51.3 357.3,52.4 376,53.8 394.7,54.8 413.3,56.2 432,57.6 450.7,59 469.3,60.4 488,62.5 506.7,66.4 525.3,95.8 544,98.9 562.7,100 581.3,101.7 600,103.8"/>
+                <circle cx="525.3" cy="95.8" r="3.5" fill="#c42b1c"/>
+                <text x="520" y="84" font-size="10" fill="#c42b1c" text-anchor="end">10-15 崩溃转储 +8.05 GB</text>
+                <circle cx="208" cy="42.9" r="3" fill="#0d5f0d"/>
+                <text x="212" y="35" font-size="10" fill="#0d5f0d">09-28 清理 +1.7 GB</text>
+                <g font-size="10" fill="#808080" text-anchor="middle">
+                  <text x="40" y="166">09-19</text><text x="226.7" y="166">09-29</text><text x="413.3" y="166">10-09</text><text x="600" y="166">10-19</text>
+                </g>
+              </svg>
+            </div>
+            <div class="card">
+              <h2>建议先处理</h2>
+              <table class="tbl">
+                <tbody>
+                  <tr><td class="wrap">崩溃转储 3 个文件<div class="small muted">程序和系统崩溃时的内存快照</div></td><td class="num">11.6 GB</td><td><span class="tag r-safe">安全</span></td><td><label class="btn sm" for="v-cleanup">加入清理</label></td></tr>
+                  <tr><td class="wrap">C 盘分页文件<div class="small muted">D 盘已有分页文件，C 盘这份可能是重复配置</div></td><td class="num">13.6 GB</td><td><span class="tag r-sys">系统设置</span></td><td><button class="btn sm" type="button">查看步骤</button></td></tr>
+                  <tr><td class="wrap">开发工具缓存<div class="small muted">uv、NuGet、npm，用官方命令清理</div></td><td class="num">6.6 GB</td><td><span class="tag r-low">需重新下载</span></td><td><label class="btn sm" for="v-cleanup">加入清理</label></td></tr>
+                  <tr><td class="wrap path">%LOCALAPPDATA%\ms-playwright<div class="small muted" style="font-family:inherit">未识别，47 天没有写入</div></td><td class="num">2.4 GB</td><td><span class="tag s-ai">未识别</span></td><td><label class="btn sm ai" for="v-ai">AI 分析</label></td></tr>
+                </tbody>
+              </table>
+              <div class="callout mt12">写入监控未开启，增长只能按快照对比，看不到是哪个程序写的。<label for="v-dlg-etw" style="color:var(--accent);cursor:pointer;text-decoration:underline">开启 4 小时诊断</label></div>
+            </div>
+          </div>
+
+          <div class="grid2 mt12">
+            <div class="card">
+              <h2>占用最多<span class="more"><label for="v-explorer" style="color:var(--accent);cursor:pointer">在空间浏览中查看</label></span></h2>
+              <table class="tbl fixed">
+                <colgroup><col style="width:40%"><col style="width:78px"><col style="width:31%"><col></colgroup>
+                <thead><tr><th scope="col">目录</th><th scope="col" class="num">大小</th><th scope="col">归属</th><th scope="col">风险</th></tr></thead>
+                <tbody>
+                  <tr><td class="path" title="C:\Windows\WinSxS">C:\Windows\WinSxS</td><td class="num">16.9 GB</td><td>Windows <span class="tag s-rule">规则</span></td><td><span class="tag r-sys">用 DISM 清理</span></td></tr>
+                  <tr><td class="path" title="C:\pagefile.sys">C:\pagefile.sys</td><td class="num">13.6 GB</td><td>Windows <span class="tag s-rule">规则</span></td><td><span class="tag r-sys">系统设置</span></td></tr>
+                  <tr><td class="path" title="%USERPROFILE%\.nuget\packages">%USERPROFILE%\.nuget\packages</td><td class="num">6.93 GB</td><td>NuGet <span class="tag s-rule">规则</span></td><td><span class="tag r-low">需重新下载</span></td></tr>
+                  <tr><td class="path" title="C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Temporary ASP.NET Files">…\Temporary ASP.NET Files</td><td class="num">5.89 GB</td><td>ASP.NET <span class="tag s-rule">规则</span></td><td><span class="tag r-safe">安全</span></td></tr>
+                  <tr><td class="path" title="C:\ProgramData\Microsoft\VisualStudio\Packages">C:\ProgramData\…\VisualStudio\Packages</td><td class="num">4.52 GB</td><td>Visual Studio <span class="tag s-rule">规则</span></td><td><span class="tag r-sys">用 VS Installer</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\uv\cache">%LOCALAPPDATA%\uv\cache</td><td class="num">4.37 GB</td><td>uv <span class="tag s-obs">实测</span></td><td><span class="tag r-low">需重新下载</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\Microsoft\Edge\User Data\Crashpad\reports">…\Edge\User Data\Crashpad\reports</td><td class="num">4.07 GB</td><td>Microsoft Edge <span class="tag s-rule">规则</span></td><td><span class="tag r-safe">安全</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\Perplexity">%LOCALAPPDATA%\Perplexity</td><td class="num">2.96 GB</td><td>Perplexity Comet <span class="tag s-infer">推断</span></td><td><span class="tag r-medium">丢失登录态</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h2>增长最快（近 7 天）<span class="more"><label for="v-growth" style="color:var(--accent);cursor:pointer">查看增长分析</label></span></h2>
+              <table class="tbl fixed">
+                <colgroup><col style="width:47%"><col style="width:84px"><col></colgroup>
+                <thead><tr><th scope="col">目录</th><th scope="col" class="num">变化</th><th scope="col">写入者</th></tr></thead>
+                <tbody>
+                  <tr><td class="path" title="C:\Windows\ServiceProfiles\LocalService\AppData\Local\Temp">C:\Windows\ServiceProfiles\…\Temp</td><td class="num up">+8.05 GB</td><td>崩溃转储 <span class="tag s-rule">规则</span> <span class="subtle small">未监控时段</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx">…\Docker\wsl\disk\docker_data.vhdx</td><td class="num up">+3.10 GB</td><td>vmmem（WSL2）<span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="C:\Windows\SoftwareDistribution\Download">C:\Windows\SoftwareDistribution\Download</td><td class="num up">+1.40 GB</td><td>Windows 更新 <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\uv\cache">%LOCALAPPDATA%\uv\cache</td><td class="num up">+1.20 GB</td><td>uv.exe ← Code.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\Microsoft\Edge\User Data\Crashpad\reports">…\Edge\User Data\Crashpad\reports</td><td class="num up">+0.90 GB</td><td>msedge.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="%USERPROFILE%\.claude\projects">%USERPROFILE%\.claude\projects</td><td class="num up">+0.62 GB</td><td>node.exe ← claude.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="%APPDATA%\Code\User\workspaceStorage">%APPDATA%\Code\User\workspaceStorage</td><td class="num up">+0.41 GB</td><td>Code.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\Temp">%LOCALAPPDATA%\Temp</td><td class="num down">−1.90 GB</td><td>多个程序 <span class="tag s-rule">规则</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="proto-note">
+            <summary>原型说明：概览</summary>
+            <ul>
+              <li>四张卡片回答四个问题：还剩多少、涨得多快、能清多少、还有多少不认识。</li>
+              <li>"按此速度约 N 天后写满"用最近 7 天快照的平均增速计算；没有快照历史时隐藏。</li>
+              <li>标签区分来源：<span class="tag s-obs">实测</span> 来自 ETW 或文件占用查询，<span class="tag s-rule">规则</span> 来自内置规则，<span class="tag s-infer">推断</span> 来自路径和签名匹配，<span class="tag s-ai">AI 推断</span> 来自 AI 分析。</li>
+              <li>WinForms 实现：卡片用 Panel 自绘，趋势图用 GDI 自绘，表格用 ListView（Details 视图）。</li>
+            </ul>
+          </details>
+        </section>
+
+        <!-- ============================== 空间浏览 ============================== -->
+        <section class="page p-explorer" aria-labelledby="h-explorer">
+          <div class="explorer">
+            <div class="ex-bar">
+              <h1 id="h-explorer" style="font-size:15px;margin:0">空间浏览</h1>
+              <div class="crumb path">C:\ › Users › demo › AppData › <b>Local</b></div>
+              <div class="seg" role="group" aria-label="视图" style="margin-left:12px">
+                <span class="on">按目录</span><span>按归属汇总</span><span>按类别汇总</span>
+              </div>
+              <div class="chips" style="margin-left:auto">
+                <span class="chip">只看可清理</span><span class="chip">只看未识别</span><span class="chip on">显示 7 天变化</span>
+              </div>
+            </div>
+
+            <div class="ex-tree">
+              <table class="tbl tree">
+                <thead>
+                  <tr><th scope="col">名称</th><th scope="col" class="num">大小</th><th scope="col">占上级</th><th scope="col">最后写入</th><th scope="col" class="num">7 天变化</th><th scope="col">归属</th><th scope="col">类别 / 风险</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="name" style="--l:0"><span class="chev">▼</span><span class="fi"></span><b>C:\</b></td><td class="num"><b>186.8 GB</b></td><td><span class="bar"><i style="width:100%"></i></span>100%</td><td>刚刚</td><td class="num up">+12.4 GB</td><td></td><td></td></tr>
+                  <tr><td class="name" style="--l:1"><span class="chev">▶</span><span class="fi"></span>Windows</td><td class="num">60.2 GB</td><td><span class="bar"><i style="width:32.2%"></i></span>32.2%</td><td>今天 08:12</td><td class="num up">+9.6 GB</td><td>Windows</td><td><span class="tag r-sys">系统目录</span></td></tr>
+                  <tr><td class="name" style="--l:1"><span class="chev">▼</span><span class="fi"></span>Users</td><td class="num">56.1 GB</td><td><span class="bar"><i style="width:30%"></i></span>30.0%</td><td>刚刚</td><td class="num up">+2.7 GB</td><td></td><td></td></tr>
+                  <tr><td class="name" style="--l:2"><span class="chev">▼</span><span class="fi"></span>demo</td><td class="num">54.8 GB</td><td><span class="bar"><i style="width:97.7%"></i></span>97.7%</td><td>刚刚</td><td class="num up">+2.7 GB</td><td>当前用户</td><td></td></tr>
+                  <tr><td class="name" style="--l:3"><span class="chev">▼</span><span class="fi"></span>AppData</td><td class="num">38.9 GB</td><td><span class="bar"><i style="width:71%"></i></span>71.0%</td><td>刚刚</td><td class="num up">+1.9 GB</td><td></td><td></td></tr>
+                  <tr><td class="name" style="--l:4"><span class="chev">▼</span><span class="fi"></span>Local</td><td class="num">31.2 GB</td><td><span class="bar"><i style="width:80.2%"></i></span>80.2%</td><td>刚刚</td><td class="num up">+1.3 GB</td><td></td><td></td></tr>
+                  <tr class="sel" aria-selected="true"><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>uv</td><td class="num">4.37 GB</td><td><span class="bar"><i style="width:14%"></i></span>14.0%</td><td>2 小时前</td><td class="num up">+1.2 GB</td><td>uv（Astral）<span class="tag s-obs">实测</span></td><td>包缓存 <span class="tag r-low">需重新下载</span></td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>Microsoft</td><td class="num">7.90 GB</td><td><span class="bar"><i style="width:25.3%"></i></span>25.3%</td><td>今天 10:02</td><td class="num up">+1.1 GB</td><td>多个微软应用</td><td>混合</td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>Temp</td><td class="num">4.07 GB</td><td><span class="bar"><i style="width:13%"></i></span>13.0%</td><td>刚刚</td><td class="num down">−1.9 GB</td><td>多个程序 <span class="tag s-rule">规则</span></td><td>临时文件 <span class="tag r-safe">安全</span></td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>Perplexity</td><td class="num">2.96 GB</td><td><span class="bar"><i style="width:9.5%"></i></span>9.5%</td><td>昨天</td><td class="num up">+0.2 GB</td><td>Perplexity Comet <span class="tag s-infer">推断</span></td><td>浏览器数据 <span class="tag r-medium">丢失登录态</span></td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>ms-playwright</td><td class="num">2.41 GB</td><td><span class="bar"><i style="width:7.7%"></i></span>7.7%</td><td>47 天前</td><td class="num">0</td><td><span class="subtle">未识别</span> <label class="btn sm ai" for="v-ai">AI 分析</label></td><td></td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>NuGet</td><td class="num">1.78 GB</td><td><span class="bar"><i style="width:5.7%"></i></span>5.7%</td><td>3 天前</td><td class="num up">+0.1 GB</td><td>NuGet <span class="tag s-rule">规则</span></td><td>下载缓存 <span class="tag r-low">需重新下载</span></td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>AWSToolkit</td><td class="num">1.71 GB</td><td><span class="bar"><i style="width:5.5%"></i></span>5.5%</td><td>21 天前</td><td class="num">0</td><td>AWS Toolkit <span class="tag s-infer">推断</span></td><td>缓存 <span class="tag r-low">需重新下载</span></td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span><span class="muted">其他 296 项</span></td><td class="num">6.00 GB</td><td><span class="bar"><i style="width:19.2%"></i></span>19.2%</td><td></td><td class="num">−0.2 GB</td><td></td><td></td></tr>
+                  <tr><td class="name" style="--l:4"><span class="chev">▶</span><span class="fi"></span>Roaming</td><td class="num">5.90 GB</td><td><span class="bar"><i style="width:15.2%"></i></span>15.2%</td><td>刚刚</td><td class="num up">+0.6 GB</td><td></td><td></td></tr>
+                  <tr><td class="name" style="--l:4"><span class="chev">▶</span><span class="fi"></span>LocalLow</td><td class="num">1.80 GB</td><td><span class="bar"><i style="width:4.6%"></i></span>4.6%</td><td>5 天前</td><td class="num">0</td><td></td><td></td></tr>
+                  <tr><td class="name" style="--l:3"><span class="chev">▶</span><span class="fi"></span>.nuget</td><td class="num">6.93 GB</td><td><span class="bar"><i style="width:12.6%"></i></span>12.6%</td><td>3 天前</td><td class="num up">+0.1 GB</td><td>NuGet <span class="tag s-rule">规则</span></td><td>包仓库 <span class="tag r-low">需重新下载</span></td></tr>
+                  <tr><td class="name" style="--l:3"><span class="chev">▶</span><span class="fi"></span>.claude</td><td class="num">1.24 GB</td><td><span class="bar"><i style="width:2.3%"></i></span>2.3%</td><td>刚刚</td><td class="num up">+0.6 GB</td><td>Claude Code <span class="tag s-obs">实测</span></td><td>混合 · 含凭据</td></tr>
+                  <tr><td class="name" style="--l:3"><span class="chev">▶</span><span class="fi"></span>.codex</td><td class="num">0.81 GB</td><td><span class="bar"><i style="width:1.5%"></i></span>1.5%</td><td>1 小时前</td><td class="num up">+0.3 GB</td><td>Codex CLI <span class="tag s-obs">实测</span></td><td>混合 · 含凭据</td></tr>
+                  <tr><td class="name" style="--l:1"><span class="chev">▶</span><span class="fi"></span>Program Files</td><td class="num">27.0 GB</td><td><span class="bar"><i style="width:14.5%"></i></span>14.5%</td><td>昨天</td><td class="num">+0.1 GB</td><td></td><td><span class="tag r-sys">程序目录</span></td></tr>
+                  <tr><td class="name" style="--l:1"><span class="chev"></span><span class="fi file"></span>pagefile.sys</td><td class="num">13.6 GB</td><td><span class="bar"><i style="width:7.3%"></i></span>7.3%</td><td>今天 08:01</td><td class="num">0</td><td>Windows <span class="tag s-rule">规则</span></td><td>分页文件 <span class="tag r-sys">系统设置</span></td></tr>
+                  <tr><td class="name" style="--l:1"><span class="chev">▶</span><span class="fi"></span>Program Files (x86)</td><td class="num">11.0 GB</td><td><span class="bar"><i style="width:5.9%"></i></span>5.9%</td><td>4 天前</td><td class="num">0</td><td></td><td><span class="tag r-sys">程序目录</span></td></tr>
+                  <tr><td class="name" style="--l:1"><span class="chev">▶</span><span class="fi"></span>ProgramData</td><td class="num">9.00 GB</td><td><span class="bar"><i style="width:4.8%"></i></span>4.8%</td><td>刚刚</td><td class="num">+0.2 GB</td><td></td><td></td></tr>
+                  <tr><td class="name" style="--l:1"><span class="chev">▶</span><span class="fi"></span>System Volume Information</td><td class="num">6.50 GB</td><td><span class="bar"><i style="width:3.5%"></i></span>3.5%</td><td>3 天前</td><td class="num">0</td><td>系统还原 <span class="tag s-rule">规则</span></td><td><span class="tag r-sys">系统设置</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="ex-map">
+              <div class="legend" aria-label="方块图颜色说明">
+                <span><i class="c-system"></i>系统</span><span><i class="c-program"></i>程序</span><span><i class="c-cache"></i>缓存</span><span><i class="c-temp"></i>临时 / 转储</span><span><i class="c-pkg"></i>包缓存</span><span><i class="c-user"></i>用户数据</span><span><i class="c-unknown"></i>未识别</span><span><i class="c-other"></i>其他</span>
+                <span style="margin-left:auto">点击方块定位到树形列表 · 双击进入下一级</span>
+              </div>
+              <div class="tm" role="img" aria-label="C 盘方块图：Windows 60.2 GB，Users 56.1 GB，Program Files 27.0 GB，分页文件 13.6 GB 等">
+                <div class="b c-system" style="flex:60.2"><b>Windows</b><span>60.2 GB</span></div>
+                <div class="col" style="flex:56.1">
+                  <div class="col" style="flex:31.2">
+                    <div class="row" style="flex:13.9">
+                      <div class="b c-cache" style="flex:7.9"><b>Microsoft</b><span>7.90 GB</span></div>
+                      <div class="b c-other" style="flex:6.0"><b>Local 其他</b><span>6.00 GB</span></div>
+                    </div>
+                    <div class="row" style="flex:17.3">
+                      <div class="b c-pkg sel" style="flex:4.37"><b>uv</b><span>4.37 GB</span></div>
+                      <div class="b c-temp" style="flex:4.07"><b>Temp</b><span>4.07 GB</span></div>
+                      <div class="b c-user" style="flex:2.96"><b>Perplexity</b><span>2.96 GB</span></div>
+                      <div class="b c-unknown" style="flex:2.41"><b>ms-playwright</b><span>2.41 GB</span></div>
+                      <div class="b c-pkg" style="flex:1.78"><b>NuGet</b></div>
+                      <div class="b c-cache" style="flex:1.71"><b>AWS</b></div>
+                    </div>
+                  </div>
+                  <div class="row" style="flex:12.8">
+                    <div class="b c-pkg" style="flex:6.93"><b>.nuget</b><span>6.93 GB</span></div>
+                    <div class="b c-other" style="flex:5.9"><b>Roaming</b><span>5.90 GB</span></div>
+                  </div>
+                  <div class="row" style="flex:12.1">
+                    <div class="b c-other" style="flex:10.05"><b>用户目录其他</b><span>10.1 GB</span></div>
+                    <div class="b c-user" style="flex:1.24"><b>.claude</b></div>
+                    <div class="b c-user" style="flex:0.81"><b>.codex</b></div>
+                  </div>
+                </div>
+                <div class="col" style="flex:38">
+                  <div class="b c-program" style="flex:27"><b>Program Files</b><span>27.0 GB</span></div>
+                  <div class="b c-program" style="flex:11"><b>Program Files (x86)</b><span>11.0 GB</span></div>
+                </div>
+                <div class="col" style="flex:32.5">
+                  <div class="b c-page" style="flex:13.6"><b>pagefile.sys</b><span>13.6 GB</span></div>
+                  <div class="b c-program" style="flex:9"><b>ProgramData</b><span>9.00 GB</span></div>
+                  <div class="b c-system" style="flex:6.5"><b>System Volume Information</b><span>6.50 GB</span></div>
+                  <div class="b c-other" style="flex:3.4"><b>其他</b></div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="ex-detail" aria-label="目录详情">
+              <div class="d-title">uv <span class="tag r-low">需重新下载</span></div>
+              <div class="path muted" style="margin-top:2px">C:\Users\demo\AppData\Local\uv</div>
+              <dl class="kv">
+                <dt>大小</dt><dd><b>4.37 GB</b> · 98,231 个文件 · 7 天 <span class="up">+1.2 GB</span></dd>
+                <dt>可释放</dt><dd>约 2.97 GB<div class="small muted">另有 1.40 GB 和虚拟环境用硬链接共享，删缓存不会释放</div></dd>
+                <dt>归属</dt><dd>uv（Python 包管理器）· Astral <span class="tag s-obs">实测</span> <span class="tag s-rule">规则</span></dd>
+                <dt>类别</dt><dd>包缓存</dd>
+                <dt>作用</dt><dd>uv 下载、解压过的 Python 包，多个虚拟环境共用</dd>
+                <dt>删除后</dt><dd>已建好的虚拟环境不受影响，下次装包需要重新下载</dd>
+              </dl>
+
+              <div class="sec-t">证据</div>
+              <ul class="evi">
+                <li><span class="tag s-obs">ETW</span>最近一次诊断中，uv.exe 在这里新建了 8,921 个文件；上级进程：Code.exe → pwsh.exe</li>
+                <li><span class="tag s-obs">程序</span>uv.exe 位于 <span class="path">%USERPROFILE%\.local\bin</span>，产品名 uv</li>
+                <li><span class="tag s-infer">已装软件</span>匹配到 winget 包 astral-sh.uv</li>
+                <li><span class="tag s-rule">规则</span>dev.uv.cache（官方文档：缓存目录与 UV_CACHE_DIR）</li>
+              </ul>
+
+              <div class="sec-t">操作</div>
+              <div class="btn-col">
+                <button class="btn primary" type="button">运行 uv cache clean（推荐）</button>
+                <button class="btn" type="button">运行 uv cache prune（只删不再使用的）</button>
+                <label class="btn" for="v-cleanup">加入清理计划</label>
+                <button class="btn" type="button">打开所在位置，自己清理</button>
+              </div>
+
+              <div class="sec-t">从根上解决</div>
+              <div class="callout">设置环境变量 <code>UV_CACHE_DIR</code>，把缓存放到 D 盘，以后不再占 C 盘。<div style="margin-top:6px"><button class="btn sm" type="button">生成设置命令</button></div></div>
+
+              <details class="proto-note">
+                <summary>原型说明：空间浏览</summary>
+                <ul>
+                  <li>布局参考 WizTree：上方树形列表，下方方块图，右侧详情。三者联动选中。</li>
+                  <li>树形列表用虚拟模式 ListView 模拟树，支持百万级条目；方块图用 GDI 自绘。</li>
+                  <li>"按归属汇总"把同一个应用分散在多处的目录合并统计（比如 VS Code 的缓存、扩展、工作区存储）。</li>
+                  <li>"可释放"要扣掉硬链接共享的部分，和"大小"不一定相等。</li>
+                  <li>未识别目录的归属列直接给出"AI 分析"入口。</li>
+                </ul>
+              </details>
+            </aside>
+          </div>
+        </section>
+
+        <!-- ============================== 增长分析 ============================== -->
+        <section class="page p-growth" aria-labelledby="h-growth">
+          <div class="page-head">
+            <h1 id="h-growth">增长分析</h1>
+            <span class="sub">对比两个快照，结合写入监控数据，找出谁在让 C 盘变大</span>
+            <div class="actions">
+              <div class="chips"><span class="chip">24 小时</span><span class="chip on">7 天</span><span class="chip">30 天</span><span class="chip">自定义</span></div>
+              <select class="select" aria-label="起始快照"><option>10-12 09:00 快照</option></select>
+              <span class="muted">→</span>
+              <select class="select" aria-label="结束快照"><option>10-19 10:41 当前扫描</option></select>
+            </div>
+          </div>
+
+          <div class="grid4">
+            <div class="card stat"><div class="k">净增长</div><div class="v up">+12.4 GB</div><div class="foot muted">增加 15.9 GB · 减少 3.5 GB</div></div>
+            <div class="card stat"><div class="k">新建文件</div><div class="v">38,214</div><div class="foot muted">删除 9,102 个</div></div>
+            <div class="card stat"><div class="k">增长最多的应用</div><div class="v" style="font-size:18px;margin-top:6px">崩溃转储 8.05 GB</div><div class="foot muted">其次 Docker 3.10 GB</div></div>
+            <div class="card stat"><div class="k">写入监控覆盖</div><div class="v">14 <small>/ 168 小时</small></div><div class="foot"><label for="v-dlg-etw" style="color:var(--accent);cursor:pointer">开启常驻监控可覆盖全天</label></div></div>
+          </div>
+
+          <div class="grid2 mt12">
+            <div class="card">
+              <h2>每日净增长</h2>
+              <svg viewBox="0 0 430 160" width="100%" height="160" role="img" aria-label="每日净增长：10-13 0.6 GB，10-14 1.1 GB，10-15 8.4 GB，10-16 0.9 GB，10-17 0.3 GB，10-18 0.5 GB，10-19 0.6 GB">
+                <line x1="30" y1="130" x2="420" y2="130" stroke="#d0d0d0"/>
+                <g fill="#6fa0d6">
+                  <rect x="40" y="122" width="36" height="8"/><rect x="96" y="115.3" width="36" height="14.7"/>
+                  <rect x="152" y="18" width="36" height="112" fill="#e07b6a"/>
+                  <rect x="208" y="118" width="36" height="12"/><rect x="264" y="126" width="36" height="4"/><rect x="320" y="123.3" width="36" height="6.7"/><rect x="376" y="122" width="36" height="8"/>
+                </g>
+                <g font-size="10" fill="#444" text-anchor="middle">
+                  <text x="58" y="117">0.6</text><text x="114" y="110">1.1</text><text x="170" y="13">8.4 GB</text><text x="226" y="113">0.9</text><text x="282" y="121">0.3</text><text x="338" y="118">0.5</text><text x="394" y="117">0.6</text>
+                </g>
+                <g font-size="10" fill="#808080" text-anchor="middle">
+                  <text x="58" y="145">10-13</text><text x="114" y="145">10-14</text><text x="170" y="145">10-15</text><text x="226" y="145">10-16</text><text x="282" y="145">10-17</text><text x="338" y="145">10-18</text><text x="394" y="145">10-19</text>
+                </g>
+              </svg>
+            </div>
+            <div class="card">
+              <h2>写入监控覆盖时段<span class="more muted">14 / 168 小时</span></h2>
+              <div class="timeline" role="img" aria-label="写入监控覆盖：10-14 14:00 到 18:00，10-16 09:00 到 17:00，10-19 08:00 到 10:00">
+                <i style="left:22.6%;width:2.4%"></i><i style="left:48.2%;width:4.8%"></i><i style="left:90.5%;width:1.2%"></i>
+              </div>
+              <div class="tl-labels"><span>10-13</span><span>10-15</span><span>10-17</span><span>10-19</span></div>
+              <table class="tbl mt12">
+                <tbody>
+                  <tr><td>10-14 14:00 – 18:00</td><td>诊断 · 轻量模式</td><td class="num">4 小时</td></tr>
+                  <tr><td>10-16 09:00 – 17:00</td><td>诊断 · 轻量模式</td><td class="num">8 小时</td></tr>
+                  <tr><td>10-19 08:00 – 10:00</td><td>诊断 · 精确模式</td><td class="num">2 小时</td></tr>
+                </tbody>
+              </table>
+              <div class="note mt12">蓝色时段有写入进程记录。其余时段只有快照对比，只知道哪里变了，不知道是谁写的。10-15 的 8.4 GB 崩溃转储就发生在未监控时段。</div>
+              <div style="margin-top:10px"><label class="btn" for="v-dlg-etw">开启诊断</label></div>
+            </div>
+          </div>
+
+          <div class="card mt12">
+              <h2>变化最大的目录</h2>
+              <table class="tbl">
+                <thead><tr><th scope="col">目录</th><th scope="col" class="num">变化</th><th scope="col" class="num">当前</th><th scope="col">写入进程</th><th scope="col">归属判断</th></tr></thead>
+                <tbody>
+                  <tr><td class="path">C:\Windows\ServiceProfiles\LocalService\…\Temp</td><td class="num up">+8.05 GB</td><td class="num">8.62 GB</td><td><span class="subtle">未监控时段</span></td><td>崩溃转储 *.dmp <span class="tag s-rule">规则</span></td></tr>
+                  <tr><td class="path">%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx</td><td class="num up">+3.10 GB</td><td class="num">41.2 GB</td><td>vmmem（WSL2 虚拟机）</td><td>Docker Desktop <span class="tag s-obs">实测</span> <span class="tag r-medium">虚拟磁盘内部不可见</span></td></tr>
+                  <tr><td class="path">C:\Windows\SoftwareDistribution\Download</td><td class="num up">+1.40 GB</td><td class="num">1.57 GB</td><td>svchost.exe（服务 wuauserv）</td><td>Windows 更新 <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%LOCALAPPDATA%\uv\cache</td><td class="num up">+1.20 GB</td><td class="num">4.37 GB</td><td>uv.exe ← pwsh.exe ← Code.exe</td><td>uv <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">…\Edge\User Data\Crashpad\reports</td><td class="num up">+0.90 GB</td><td class="num">4.07 GB</td><td>msedge.exe</td><td>Microsoft Edge <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%USERPROFILE%\.claude\projects</td><td class="num up">+0.62 GB</td><td class="num">1.08 GB</td><td>node.exe ← claude.exe</td><td>Claude Code <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%APPDATA%\Code\User\workspaceStorage</td><td class="num up">+0.41 GB</td><td class="num">1.92 GB</td><td>Code.exe</td><td>VS Code <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%USERPROFILE%\.codex\sessions</td><td class="num up">+0.26 GB</td><td class="num">0.64 GB</td><td>codex.exe</td><td>Codex CLI <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%LOCALAPPDATA%\Temp</td><td class="num down">−1.90 GB</td><td class="num">4.07 GB</td><td>多个进程</td><td>临时文件 <span class="tag s-rule">规则</span></td></tr>
+                </tbody>
+              </table>
+          </div>
+
+          <div class="card mt12">
+            <h2>写入进程排行<span class="more muted">仅统计有监控的 14 小时</span></h2>
+            <table class="tbl">
+              <thead><tr><th scope="col">进程</th><th scope="col">产品 · 签名</th><th scope="col">上级应用</th><th scope="col" class="num">新建文件</th><th scope="col" class="num">写入量</th><th scope="col">主要目录</th></tr></thead>
+              <tbody>
+                <tr><td>vmmem</td><td>WSL2 虚拟机 · Microsoft</td><td>Docker Desktop</td><td class="num">0</td><td class="num">3.10 GB</td><td class="path">…\docker_data.vhdx（看不到 Linux 内部是谁写的）</td></tr>
+                <tr><td>svchost.exe</td><td>服务 wuauserv · Microsoft</td><td>Windows 更新</td><td class="num">210</td><td class="num">1.40 GB</td><td class="path">C:\Windows\SoftwareDistribution\Download</td></tr>
+                <tr><td>uv.exe</td><td>uv · Astral</td><td>Code.exe → pwsh.exe</td><td class="num">8,921</td><td class="num">1.20 GB</td><td class="path">%LOCALAPPDATA%\uv\cache</td></tr>
+                <tr><td>node.exe</td><td>Node.js · OpenJS Foundation</td><td>claude.exe（Claude Code）</td><td class="num">12,408</td><td class="num">1.10 GB</td><td class="path">%USERPROFILE%\.claude\projects、%TEMP%</td></tr>
+                <tr><td>msedge.exe</td><td>Microsoft Edge · Microsoft</td><td></td><td class="num">3,310</td><td class="num">0.64 GB</td><td class="path">…\Edge\User Data</td></tr>
+                <tr><td>codex.exe</td><td>Codex CLI · OpenAI</td><td>WindowsTerminal.exe</td><td class="num">1,240</td><td class="num">0.26 GB</td><td class="path">%USERPROFILE%\.codex\sessions</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <details class="proto-note">
+            <summary>原型说明：增长分析</summary>
+            <ul>
+              <li>"变化量"来自快照对比，任何时候都有；"写入进程"只在写入监控开启的时段才有。</li>
+              <li>写入进程会沿父进程链显示到顶层应用，比如 node.exe ← claude.exe。</li>
+              <li>系统服务代写、虚拟磁盘、未监控时段都要明确标出来，不能猜一个进程填进去。</li>
+              <li>点击任意目录跳到空间浏览的对应位置。</li>
+            </ul>
+          </details>
+        </section>
+
+        <!-- ============================== AI 分析 ============================== -->
+        <section class="page p-ai" aria-labelledby="h-ai">
+          <div class="page-head">
+            <h1 id="h-ai">AI 分析</h1>
+            <span class="sub path">%LOCALAPPDATA%\ms-playwright</span>
+            <div class="actions">
+              <select class="select" aria-label="AI 提供方">
+                <option>我的 DeepSeek（OpenAI 兼容接口）</option>
+                <option>通过 MCP：Claude Code</option>
+                <option>本地 Ollama</option>
+              </select>
+              <button class="btn" type="button">重新分析</button>
+            </div>
+          </div>
+
+          <div class="ai-grid">
+            <div class="stack">
+              <div class="card">
+                <h2>工具已查到的事实<span class="more"><label for="v-dlg-send" style="color:var(--accent);cursor:pointer">查看将发送的内容</label></span></h2>
+                <dl class="facts">
+                  <dt>大小</dt><dd>2.41 GB · 4,127 个文件</dd>
+                  <dt>时间</dt><dd>创建于 03-02 · 最后写入 47 天前</dd>
+                  <dt>子目录</dt><dd>chromium-1148（618 MB）、chromium-1140（612 MB）、webkit-2092（515 MB）、firefox-1466（402 MB）、chromium_headless_shell-1148（290 MB）、ffmpeg-1010（2 MB）</dd>
+                  <dt>扩展名</dt><dd>.dll 41% · .exe 18% · .pak 16% · 其他 25%</dd>
+                  <dt>可执行文件</dt><dd>chrome.exe，产品名 Chromium，无数字签名</dd>
+                  <dt>写入记录</dt><dd>监控期间无写入</dd>
+                  <dt>当前占用</dt><dd>没有进程打开</dd>
+                  <dt>已装软件</dt><dd>无直接匹配；本机装有 Node.js 22</dd>
+                  <dt>规则</dt><dd>未命中</dd>
+                </dl>
+                <div class="note mt12">发送前会把用户名替换为 %USERPROFILE%，只发送目录结构和统计信息，不发送文件内容。</div>
+              </div>
+
+              <div class="card">
+                <h2>其他未识别目录<span class="more muted">9.8 GB · 37 个</span></h2>
+                <table class="tbl">
+                  <tbody>
+                    <tr class="sel"><td class="path">%LOCALAPPDATA%\ms-playwright</td><td class="num">2.41 GB</td><td><span class="tag s-ai">已分析</span></td></tr>
+                    <tr><td class="path">%APPDATA%\Electron</td><td class="num">0.96 GB</td><td><button class="btn sm ai" type="button">分析</button></td></tr>
+                    <tr><td class="path">%LOCALAPPDATA%\0c5e2a9f</td><td class="num">0.74 GB</td><td><button class="btn sm ai" type="button">分析</button></td></tr>
+                    <tr><td class="muted">其余 34 个</td><td class="num">5.69 GB</td><td></td></tr>
+                  </tbody>
+                </table>
+                <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+                  <button class="btn ai" type="button">全部分析</button><span class="small muted">约 36 次请求，每次发送前可预览</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="card">
+                <div class="result-h">
+                  <h2 style="margin:0">分析结果</h2>
+                  <span class="tag s-ai">AI 推断 · 未经实测</span>
+                  <span class="conf">置信度：高 · 用时 6.2 秒 · 约 1,850 tokens</span>
+                </div>
+                <dl class="kv" style="grid-template-columns:76px minmax(0,1fr)">
+                  <dt>归属</dt><dd><b>Playwright</b>（微软的浏览器自动化测试框架）下载的浏览器</dd>
+                  <dt>作用</dt><dd>运行 Playwright 测试时使用的 Chromium、Firefox、WebKit，每个版本一个目录</dd>
+                  <dt>风险</dt><dd><span class="tag r-low">需重新下载</span></dd>
+                  <dt>建议</dt><dd>保留最新的 chromium-1148，删除旧版 chromium-1140，可释放 612 MB。全部删除也不会损坏项目，下次运行测试前执行 <code>npx playwright install</code> 重新下载。</dd>
+                  <dt>依据</dt><dd>
+                    <ul style="margin:0;padding-left:18px">
+                      <li>目录名和 Playwright 默认的浏览器下载位置一致</li>
+                      <li>子目录按"浏览器-构建号"命名，同一浏览器有新旧两个版本</li>
+                      <li>chrome.exe 没有 Google 签名，是 Chromium 构建，不是 Chrome 浏览器本体</li>
+                    </ul>
+                  </dd>
+                  <dt>根治</dt><dd>设置环境变量 <code>PLAYWRIGHT_BROWSERS_PATH</code> 把浏览器下载到 D 盘</dd>
+                </dl>
+                <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                  <label class="btn primary" for="v-cleanup">按建议加入清理计划</label>
+                  <button class="btn" type="button">保存为本地规则</button>
+                  <button class="btn" type="button">结论不对</button>
+                </div>
+                <div class="callout ai mt12">AI 结论仅供参考。清理仍然经过保护名单检查和二次确认，AI 建议的项目默认不勾选，需要逐项确认后才会删除。</div>
+              </div>
+
+              <div class="card">
+                <h2>继续追问</h2>
+                <div class="chat" aria-live="polite">
+                  <div class="msg user">我最近没跑过测试，全删了会影响什么？</div>
+                  <div class="toolcall">调用 search_files：在 D:\Projects 中查找依赖 playwright 的项目 → 2 个结果</div>
+                  <div class="msg bot">找到两个依赖 Playwright 的项目：<span class="path">D:\Projects\web-e2e</span> 和 <span class="path">D:\Projects\scraper</span>。全部删除不会损坏它们，只是下次运行测试时要先执行 <code>npx playwright install</code>，重新下载约 1.4 GB。如果近期不跑测试，可以全删。</div>
+                </div>
+                <div class="composer">
+                  <textarea aria-label="输入追问" placeholder="继续追问，比如：这个目录还会再变大吗？"></textarea>
+                  <button class="btn primary" type="button">发送</button>
+                </div>
+                <div class="small muted" style="margin-top:6px">AI 只能调用只读工具：列出子目录、查写入历史、搜索文件、查已装软件。不能删除任何东西。</div>
+              </div>
+            </div>
+          </div>
+
+          <details class="proto-note">
+            <summary>原型说明：AI 分析</summary>
+            <ul>
+              <li>"一键分析"使用固定的技能提示词，要求 AI 按固定 JSON 返回（归属、作用、风险、建议、依据、置信度），工具校验后显示成结果卡片。</li>
+              <li>"保存为本地规则"后，同一目录下次不再请求 AI；以后可以选择匿名分享到社区规则库。</li>
+              <li>提供方支持 OpenAI 兼容接口（DeepSeek、通义、Kimi、Ollama 等）、Anthropic 接口和 MCP。API Key 用 DPAPI 加密保存。</li>
+              <li>AI 推断的风险等级不能低于"需重新下载"，也就是 AI 不能把任何东西直接标成"安全"。（待确认）</li>
+            </ul>
+          </details>
+        </section>
+
+        <!-- ============================== 清理计划 ============================== -->
+        <section class="page p-cleanup" aria-labelledby="h-cleanup">
+          <div class="page-head">
+            <h1 id="h-cleanup">清理计划</h1>
+            <span class="sub">按风险分组，每组有默认的处理方式，可以逐项修改</span>
+            <div class="actions"><button class="btn" type="button">清空计划</button></div>
+          </div>
+
+          <div class="card" style="padding:0;overflow:hidden">
+            <table class="tbl fixed">
+              <colgroup><col style="width:42px"><col style="width:196px"><col><col style="width:80px"><col style="width:96px"><col style="width:250px"><col style="width:240px"></colgroup>
+              <thead><tr><th scope="col"><span class="subtle">选</span></th><th scope="col">项目</th><th scope="col">路径</th><th scope="col" class="num">大小</th><th scope="col">来源</th><th scope="col">处理方式</th><th scope="col">提示</th></tr></thead>
+              <tbody>
+                <tr class="grp"><td colspan="7"><span class="tag r-safe">安全</span> 会自动重建 · 默认直接删除 <span class="muted">· 5 项 · 25.0 GB</span></td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：系统服务崩溃转储"></td><td>系统服务崩溃转储</td><td class="path">C:\Windows\ServiceProfiles\…\Temp\cc301dba….dmp</td><td class="num">8.05 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>直接删除</option><option>手动清理（打开所在位置）</option></select></td><td></td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：ASP.NET 临时编译文件"></td><td>ASP.NET 临时编译文件</td><td class="path">C:\Windows\Microsoft.NET\…\Temporary ASP.NET Files</td><td class="num">5.89 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>直接删除</option><option>手动清理（打开所在位置）</option></select></td><td class="hint-col">Visual Studio 正在运行，被占用的 312 个文件会跳过</td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：Edge 崩溃报告"></td><td>Edge 崩溃报告</td><td class="path" title="%LOCALAPPDATA%\Microsoft\Edge\User Data\Crashpad\reports">…\Edge\User Data\Crashpad\reports</td><td class="num">4.07 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>直接删除</option><option>手动清理（打开所在位置）</option></select></td><td></td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：用户临时文件"></td><td>用户临时文件</td><td class="path">%LOCALAPPDATA%\Temp</td><td class="num">4.07 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>直接删除</option><option>手动清理（打开所在位置）</option></select></td><td class="hint-col">只删 24 小时前的文件</td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：内核崩溃转储"></td><td>内核崩溃转储</td><td class="path">C:\Windows\LiveKernelReports\GreLKD-20260529-0913.dmp</td><td class="num">2.96 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>直接删除</option><option>手动清理（打开所在位置）</option></select></td><td></td></tr>
+
+                <tr class="grp"><td colspan="7"><span class="tag r-low">需重新下载</span> 默认运行官方清理命令 <span class="muted">· 3 项 · 6.6 GB</span></td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：uv 缓存"></td><td>uv 缓存</td><td class="path">%LOCALAPPDATA%\uv\cache</td><td class="num">4.37 GB</td><td><span class="tag s-obs">实测</span> <span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>uv cache clean</option><option>uv cache prune</option><option>手动清理（打开所在位置）</option></select></td><td class="hint-col">1.40 GB 与虚拟环境共享，实际释放约 2.97 GB</td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：NuGet 下载缓存"></td><td>NuGet 下载缓存</td><td class="path">%LOCALAPPDATA%\NuGet\v3-cache</td><td class="num">1.78 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>dotnet nuget locals http-cache --clear</option><option>手动清理（打开所在位置）</option></select></td><td></td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：npm 缓存"></td><td>npm 缓存</td><td class="path">%LOCALAPPDATA%\npm-cache</td><td class="num">0.48 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>npm cache clean --force</option><option>手动清理（打开所在位置）</option></select></td><td></td></tr>
+
+                <tr class="grp"><td colspan="7"><span class="tag r-medium">无法恢复</span> 删除后不可恢复，确认时列出明细 <span class="muted">· 1 项 · 0.62 GB</span></td></tr>
+                <tr><td><input type="checkbox" checked aria-label="选择：Claude Code 旧会话"></td><td>Claude Code 30 天前的会话</td><td class="path">%USERPROFILE%\.claude\projects（214 个文件）</td><td class="num">0.62 GB</td><td><span class="tag s-rule">规则</span></td><td><select class="select" aria-label="处理方式"><option>直接删除</option><option>手动清理（打开所在位置）</option></select></td><td class="hint-col">最早一条 08-02。更推荐在 Claude Code 设置里调小 cleanupPeriodDays，让它自己清理</td></tr>
+
+                <tr class="grp"><td colspan="7"><span class="tag s-ai">AI 建议</span> 默认不勾选，确认时逐项勾选 <span class="muted">· 1 项 · 0.61 GB</span></td></tr>
+                <tr><td><input type="checkbox" aria-label="选择：Playwright 旧版 Chromium"></td><td>Playwright 旧版 Chromium</td><td class="path">%LOCALAPPDATA%\ms-playwright\chromium-1140</td><td class="num">0.61 GB</td><td><span class="tag s-ai">AI 推断</span></td><td><select class="select" aria-label="处理方式"><option>直接删除</option><option>手动清理（打开所在位置）</option></select></td><td class="hint-col">保留最新的 chromium-1148</td></tr>
+
+                <tr class="grp"><td colspan="7"><span class="tag r-never">已拦截</span> 不会执行 <span class="muted">· 2 项</span></td></tr>
+                <tr class="blocked"><td><input type="checkbox" disabled aria-label="已拦截：Claude Code 凭据"></td><td>Claude Code 凭据</td><td class="path">%USERPROFILE%\.claude\.credentials.json</td><td class="num">4 KB</td><td><span class="tag r-never">保护名单</span></td><td>不可删除</td><td class="hint-col">登录凭据，删除后需要重新登录</td></tr>
+                <tr class="blocked"><td><input type="checkbox" disabled aria-label="已拦截：分页文件"></td><td>C 盘分页文件</td><td class="path">C:\pagefile.sys</td><td class="num">13.6 GB</td><td><span class="tag r-sys">系统文件</span></td><td>系统设置中处理</td><td class="hint-col"><button class="btn sm" type="button">查看步骤</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card mt12" style="display:flex;align-items:center;gap:16px">
+            <div>
+              <div><b>已选 9 项 · 32.3 GB</b> <span class="muted">· 预计释放 30.9 GB</span></div>
+              <div class="small muted">删除是永久的，不经过回收站（C 盘的回收站不释放空间）。每一项都会写入操作记录。</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="btn" type="button">导出清单</button>
+              <label class="btn primary" for="v-dlg-clean">执行清理</label>
+            </div>
+          </div>
+
+          <details class="proto-note">
+            <summary>原型说明：清理计划</summary>
+            <ul>
+              <li>默认处理方式按风险决定：安全直接删；需重新下载优先用官方命令；无法恢复的项目在确认框里列出明细；AI 建议默认不勾选，确认框里逐项勾选。不设隔离区。</li>
+              <li>每一项都可以改成"手动清理（打开所在位置）"：工具只用资源管理器打开目录（文件则选中它），不删除任何东西。用户处理完后点"重新测量"，操作记录里记一条"手动清理"和实际释放量。</li>
+              <li>保护名单拦截的项目始终显示但不能勾选，让用户知道为什么没删。</li>
+              <li>需要关闭的程序在提示列列出，执行时提供"关闭并继续"或"跳过被占用的文件"。</li>
+              <li>"预计释放"扣除硬链接共享、被占用而跳过的部分。</li>
+            </ul>
+          </details>
+        </section>
+
+        <!-- ============================== 操作记录 ============================== -->
+        <section class="page p-quarantine" aria-labelledby="h-quarantine">
+          <div class="page-head">
+            <h1 id="h-quarantine">操作记录</h1>
+            <span class="sub">每次删除、运行命令、手动清理、拦截都会记录，只追加不修改</span>
+            <div class="actions">
+              <div class="chips"><span class="chip on">全部</span><span class="chip">删除</span><span class="chip">运行命令</span><span class="chip">手动清理</span><span class="chip">拦截</span></div>
+              <button class="btn" type="button">导出</button>
+            </div>
+          </div>
+
+          <div class="grid4">
+            <div class="card stat"><div class="k">累计释放</div><div class="v">48.6 GB</div><div class="foot muted">共 12 次清理</div></div>
+            <div class="card stat"><div class="k">最近一次</div><div class="v" style="font-size:18px;margin-top:6px">10-18 21:02</div><div class="foot muted">释放 5.88 GB</div></div>
+            <div class="card stat"><div class="k">被拦截</div><div class="v">3 <small>次</small></div><div class="foot muted">都是凭据文件</div></div>
+            <div class="card stat"><div class="k">AI 建议被采纳</div><div class="v">5 <small>/ 7 项</small></div><div class="foot muted">已保存为本地规则</div></div>
+          </div>
+
+          <div class="card mt12" style="padding:0;overflow:hidden">
+            <table class="tbl">
+              <thead><tr><th scope="col">时间</th><th scope="col">操作</th><th scope="col">对象</th><th scope="col" class="num">大小</th><th scope="col">依据</th><th scope="col">结果</th></tr></thead>
+              <tbody>
+                <tr><td>10-18 21:04</td><td>删除</td><td class="path">.claude\projects 中 214 个旧会话</td><td class="num">0.62 GB</td><td>规则 claude-code.projects · 用户确认了明细</td><td>成功</td></tr>
+                <tr><td>10-18 21:03</td><td>运行命令</td><td class="path">uv cache clean</td><td class="num">3.10 GB</td><td>规则 dev.uv.cache</td><td>成功，释放 2.30 GB</td></tr>
+                <tr><td>10-18 21:02</td><td>删除</td><td class="path">C:\Windows\LiveKernelReports\GreLKD-….dmp</td><td class="num">2.96 GB</td><td>规则 sys.crashdump</td><td>成功</td></tr>
+                <tr><td>10-15 20:11</td><td>删除</td><td class="path">ms-playwright\chromium-1129</td><td class="num">0.60 GB</td><td>AI 推断 · 用户逐项确认（已保存为本地规则）</td><td>成功</td></tr>
+                <tr><td>10-15 20:10</td><td>手动清理</td><td class="path">%LOCALAPPDATA%\Perplexity</td><td class="num">2.96 GB</td><td>用户自行处理 · 打开所在位置后重新测量</td><td>释放 1.84 GB</td></tr>
+                <tr><td>10-15 20:10</td><td>拦截</td><td class="path">.codex\auth.json</td><td class="num">2 KB</td><td>保护名单：凭据文件</td><td class="warn">未执行</td></tr>
+                <tr><td>10-15 20:09</td><td>删除</td><td class="path">Temporary ASP.NET Files</td><td class="num">5.89 GB</td><td>规则 dotnet.aspnet-temp</td><td>部分成功，312 个文件被占用已跳过</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <details class="proto-note">
+            <summary>原型说明：操作记录</summary>
+            <ul>
+              <li>不设隔离区。删除是永久的，所以记录要完整：对象、大小、依据（哪条规则、AI 还是手动）、结果。</li>
+              <li>记录只追加不修改，方便以后排查"是谁删的、为什么删"。</li>
+              <li>运行官方命令的项目，记录命令本身和实际释放量（扫描前后对比）。</li>
+            </ul>
+          </details>
+        </section>
+
+        <!-- ============================== 设置 ============================== -->
+        <section class="page p-settings" aria-labelledby="h-settings">
+          <div class="page-head"><h1 id="h-settings">设置</h1></div>
+          <div class="set-wrap">
+            <nav class="set-nav" aria-label="设置分类">
+              <a href="#set-monitor">写入监控</a><a href="#set-snapshot">快照</a><a href="#set-ai">AI</a><a href="#set-clean">清理</a><a href="#set-rules">规则</a>
+            </nav>
+            <div class="stack">
+
+              <div class="card" id="set-monitor">
+                <h2>写入监控（ETW）</h2>
+                <label class="opt"><input type="radio" name="mon" aria-label="关闭"><div><div class="t">关闭</div><div class="d">只用扫描和每日快照，看得到哪里变了，看不到是谁写的。不需要管理员权限。</div></div></label>
+                <label class="opt on"><input type="radio" name="mon" checked aria-label="临时诊断"><div><div class="t">临时诊断（推荐）</div><div class="d">需要时手动开启 1 到 24 小时，到时自动停止。不安装后台服务。</div></div></label>
+                <label class="opt"><input type="radio" name="mon" aria-label="常驻服务"><div><div class="t">常驻服务</div><div class="d">安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。开销以实测为准。</div></div></label>
+                <div class="form-row"><div class="lbl">记录模式</div><div><div class="seg"><span class="on">轻量</span><span>精确</span></div><div class="hint">轻量：只记录新建、删除、重命名。精确：额外记录每次写入，编译、npm install 时开销更大。</div></div></div>
+              </div>
+
+              <div class="card" id="set-snapshot">
+                <h2>快照</h2>
+                <div class="form-row"><div class="lbl">自动快照</div><div><input type="checkbox" class="toggle" checked aria-label="自动快照"> <span style="margin-left:8px">每天 12:00</span></div></div>
+                <div class="form-row"><div class="lbl">只记录大于</div><div><select class="select" aria-label="最小记录目录"><option>50 MB 的目录</option></select></div></div>
+                <div class="form-row"><div class="lbl">保留</div><div><select class="select" aria-label="快照保留时长"><option>180 天</option></select> <span class="small muted" style="margin-left:8px">当前占用 18 MB</span></div></div>
+              </div>
+
+              <div class="card" id="set-ai">
+                <h2>AI</h2>
+                <div class="form-row"><div class="lbl">接口类型</div><div><select class="select" aria-label="接口类型"><option>OpenAI 兼容（DeepSeek、通义、Kimi、Ollama 等）</option><option>Anthropic</option></select></div></div>
+                <div class="form-row"><div class="lbl">接口地址</div><div><input class="input" value="https://api.deepseek.com/v1" aria-label="接口地址"></div></div>
+                <div class="form-row"><div class="lbl">模型</div><div><input class="input" value="deepseek-chat" aria-label="模型"></div></div>
+                <div class="form-row"><div class="lbl">API Key</div><div><input class="input" type="password" value="sk-xxxxxxxxxxxxxxxx" aria-label="API Key"><div class="hint">用 Windows DPAPI 加密保存在本机，只有当前用户能解密。</div></div></div>
+                <div class="form-row"><div class="lbl"></div><div><button class="btn" type="button">测试连接</button></div></div>
+                <div class="form-row"><div class="lbl">发送前预览</div><div><input type="checkbox" class="toggle" checked aria-label="发送前预览"><div class="hint">每次发送前显示完整内容。用户名替换和不发送文件内容这两条不能关闭。</div></div></div>
+                <div class="form-row"><div class="lbl">MCP 服务</div><div><input type="checkbox" class="toggle" checked aria-label="启用 MCP 服务"><div class="hint">让 Claude Code、Codex、Kiro、Cursor 等工具调用 DiskThinner 的只读功能。把下面的配置加到对应工具的 MCP 设置里：</div>
+                  <pre class="code" style="margin-top:8px">{
+  "mcpServers": {
+    "diskthinner": {
+      "command": "C:\\Program Files\\DiskThinner\\DiskThinner.exe",
+      "args": ["mcp"]
+    }
+  }
+}</pre></div></div>
+              </div>
+
+              <div class="card" id="set-clean">
+                <h2>清理</h2>
+                <div class="form-row"><div class="lbl">临时文件</div><div><select class="select" aria-label="临时文件最小年龄"><option>只删 24 小时前的</option><option>只删 7 天前的</option></select><div class="hint">避免删掉正在安装或运行的程序刚写的临时文件。</div></div></div>
+                <div class="form-row"><div class="lbl">被占用的文件</div><div><select class="select" aria-label="被占用文件处理"><option>跳过并记录</option><option>询问是否关闭程序</option></select></div></div>
+                <div class="form-row"><div class="lbl">保护名单</div><div><button class="btn" type="button">查看内置保护名单</button> <button class="btn" type="button">添加我的保护目录</button><div class="hint">内置名单不能删除，只能追加。</div></div></div>
+              </div>
+
+              <div class="card" id="set-rules">
+                <h2>规则</h2>
+                <div class="form-row"><div class="lbl">内置通用规则</div><div>42 条 · 随程序更新</div></div>
+                <div class="form-row"><div class="lbl">本地规则</div><div>6 条（其中 5 条来自采纳的 AI 结论） <button class="btn sm" type="button">管理</button> <button class="btn sm" type="button">导出</button> <button class="btn sm" type="button">导入</button></div></div>
+              </div>
+
+              <details class="proto-note">
+                <summary>原型说明：设置</summary>
+                <ul>
+                  <li>写入监控三档：关闭、临时诊断、常驻服务。默认临时诊断，需要时才开。</li>
+                  <li>MCP 只暴露只读工具，删除永远只能在 DiskThinner 界面里由用户确认。</li>
+                  <li>社区规则共享、远程规则更新属于第 4 阶段，这里暂不出现。</li>
+                </ul>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== 对话框：开启写入监控 ============================== -->
+        <section class="page p-dlg p-dlg-etw" role="dialog" aria-modal="true" aria-labelledby="h-dlg-etw">
+          <div class="dlg">
+            <div class="dlg-h" id="h-dlg-etw">开启写入监控（临时诊断）</div>
+            <div class="dlg-b">
+              <p style="margin:4px 0 12px">监控期间会记录哪个程序在 C 盘新建、删除、重命名了哪些文件，结束后在"增长分析"里查看。</p>
+              <div class="form-row"><div class="lbl">时长</div><div class="chips"><span class="chip">1 小时</span><span class="chip on">4 小时</span><span class="chip">8 小时</span><span class="chip">24 小时</span></div></div>
+              <div class="form-row"><div class="lbl">模式</div><div><div class="seg"><span class="on">轻量（推荐）</span><span>精确</span></div><div class="hint">精确模式额外记录每次写入，能统计每个程序写了多少字节，但编译、npm install 时开销更大。</div></div></div>
+              <div class="note mt12">
+                <div>· 需要管理员权限，会弹出系统的权限确认。</div>
+                <div>· 数据只保存在本机，按目录汇总，不保存文件内容。</div>
+                <div>· 到时间自动停止；程序退出时也会停止并清理监控会话。</div>
+              </div>
+            </div>
+            <div class="dlg-f">
+              <label class="btn" for="v-overview">取消</label>
+              <label class="btn primary" for="v-growth">以管理员身份开始</label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== 对话框：AI 发送预览 ============================== -->
+        <section class="page p-dlg p-dlg-send" role="dialog" aria-modal="true" aria-labelledby="h-dlg-send">
+          <div class="dlg wide">
+            <div class="dlg-h" id="h-dlg-send">发送给 AI 的内容</div>
+            <div class="dlg-b">
+              <p style="margin:4px 0 10px">将发送到 <b>我的 DeepSeek</b>（api.deepseek.com）。用户名已替换，不包含任何文件内容。</p>
+<pre class="code">{
+  "skill": "diskthinner.analyze-directory/v1",
+  "path": "%LOCALAPPDATA%\\ms-playwright",
+  "size_bytes": 2587754086,
+  "file_count": 4127,
+  "created": "2026-03-02",
+  "last_write": "2026-09-02",
+  "children": [
+    { "name": "chromium-1148", "size": "618 MB" },
+    { "name": "chromium-1140", "size": "612 MB" },
+    { "name": "webkit-2092", "size": "515 MB" },
+    { "name": "firefox-1466", "size": "402 MB" },
+    { "name": "chromium_headless_shell-1148", "size": "290 MB" },
+    { "name": "ffmpeg-1010", "size": "2 MB" }
+  ],
+  "extensions": { ".dll": 0.41, ".exe": 0.18, ".pak": 0.16, "other": 0.25 },
+  "executables": [
+    {
+      "file": "chromium-1148\\chrome-win\\chrome.exe",
+      "product": "Chromium",
+      "signer": null
+    }
+  ],
+  "etw_writers": [],
+  "open_by": [],
+  "installed_matches": ["Node.js 22 (winget)"],
+  "rule_hits": []
+}</pre>
+            </div>
+            <div class="dlg-f">
+              <span class="left">约 1,200 tokens · 发送记录会写入操作日志</span>
+              <label class="btn" for="v-ai">取消</label>
+              <label class="btn primary" for="v-ai">发送</label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== 对话框：确认清理 ============================== -->
+        <section class="page p-dlg p-dlg-clean" role="dialog" aria-modal="true" aria-labelledby="h-dlg-clean">
+          <div class="dlg">
+            <div class="dlg-h" id="h-dlg-clean">确认清理 9 项，共 32.3 GB · 另有 1 项 AI 建议待确认</div>
+            <div class="dlg-b">
+              <table class="tbl" style="margin-top:6px">
+                <tbody>
+                  <tr><td>直接删除（会自动重建的缓存、临时文件、崩溃转储）</td><td class="num">5 项</td><td class="num">25.0 GB</td></tr>
+                  <tr><td>运行官方清理命令（uv、dotnet nuget、npm）</td><td class="num">3 项</td><td class="num">6.6 GB</td></tr>
+                  <tr><td>删除后无法恢复</td><td class="num">1 项</td><td class="num">0.62 GB</td></tr>
+                  <tr><td>AI 建议</td><td class="num">1 项</td><td class="num">0.61 GB</td></tr>
+                </tbody>
+              </table>
+              <div class="callout warn mt12">
+                <b>以下内容删除后无法恢复</b>
+                <div style="margin-top:4px">Claude Code 30 天前的会话：214 个，涉及 6 个项目，最早 08-02、最晚 09-19。<button class="btn sm" type="button" style="margin-left:6px">查看明细</button></div>
+              </div>
+              <div class="callout ai mt12">
+                <b>AI 建议，需要逐项确认</b>
+                <label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px"><input type="checkbox" style="margin-top:3px"><span><span class="path">ms-playwright\chromium-1140</span>（0.61 GB）<br><span class="small">依据：Playwright 旧版浏览器，已有新版 chromium-1148。删除后需要时可用 npx playwright install 重新下载。</span></span></label>
+              </div>
+              <div class="callout mt12">Visual Studio 正在运行，Temporary ASP.NET Files 中被占用的 312 个文件会跳过。</div>
+              <div class="small muted" style="margin-top:8px">删除是永久的，不经过回收站。预计释放 30.9 GB，所有操作都会写入操作记录。未勾选的 AI 建议项会跳过。</div>
+            </div>
+            <div class="dlg-f">
+              <label class="btn" for="v-cleanup">返回修改</label>
+              <label class="btn primary" for="v-quarantine">开始清理</label>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- 状态栏 -->
+    <footer class="statusbar">
+      <span>C: NTFS · MFT 扫描 1,284,502 个文件，用时 4.8 秒</span>
+      <span>最近快照：今天 09:00</span>
+      <span>通用规则 42 条 · 本地规则 6 条</span>
+      <span><span class="dot" style="display:inline-block;vertical-align:middle;margin-right:4px"></span>写入监控：关闭</span>
+      <span class="right">管理员模式</span>
+    </footer>
+
+  </div>
+</div>
+</body>
+</html>

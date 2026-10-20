@@ -1,0 +1,6 @@
+# 统一用 CRLF 签出文本文件（Windows 项目，与 .editorconfig 一致）
+* text=auto eol=crlf
+
+*.png binary
+*.ico binary
+*.db binary

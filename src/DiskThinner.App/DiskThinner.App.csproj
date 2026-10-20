@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>DiskThinner</AssemblyName>
+    <RootNamespace>DiskThinner.App</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
+    <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+  </ItemGroup>
+</Project>

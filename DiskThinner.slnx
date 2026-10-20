@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/spikes/">
+    <Project Path="spikes/RuleCoverage/RuleCoverage.csproj" />
+    <Project Path="spikes/ScanBench/ScanBench.csproj" />
+    <Project Path="spikes/UiBench/UiBench.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/DiskThinner.App/DiskThinner.App.csproj" />
+    <Project Path="src/DiskThinner.Core/DiskThinner.Core.csproj" />
+    <Project Path="src/DiskThinner.Scanner/DiskThinner.Scanner.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DiskThinner.Scanner.Tests/DiskThinner.Scanner.Tests.csproj" />
+  </Folder>
+</Solution>
