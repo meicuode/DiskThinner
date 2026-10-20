@@ -16,7 +16,8 @@ public static class MftScanner
     private const int ChunkBytes = 4 * 1024 * 1024;
 
     /// <param name="volume">盘符，例如 "C:"。</param>
-    public static ScanResult Scan(string volume, IProgress<ScanProgress>? progress = null, CancellationToken cancellationToken = default)
+    public static ScanResult Scan(string volume, IProgress<ScanProgress>? progress = null, CancellationToken cancellationToken = default,
+        HardLinkAttribution attribution = HardLinkAttribution.FirstName)
     {
         var drive = NormalizeDrive(volume);
         var stopwatch = Stopwatch.StartNew();
@@ -91,13 +92,20 @@ public static class MftScanner
         var readDuration = stopwatch.Elapsed;
         stopwatch.Restart();
 
-        var tree = tables.BuildTree(drive + @"\", out var hardLinks);
+        var tree = tables.BuildTree(drive + @"\", out var hardLinks, attribution);
         var inUse = tables.InUseRecords;
         var bad = tables.BadRecords;
         var malformed = tables.MalformedRuns;
         var ads = tables.AlternateStreamBytes;
         var dirIndex = tables.DirectoryIndexBytes;
-        tables = null!; // 按记录号累积的临时数组不再需要，尽早释放
+        var nameCapacity = tables.NameCapacity;
+        tables = null!;
+        buffer = null!;
+
+        // 按记录号累积的临时数组有上百 MB（都在大对象堆上），要等到完整回收才会释放。
+        // 在汇总和整理之前主动回收一次，把峰值内存压下来；扫描是一次性操作，这点开销可以接受。
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: false);
+
         var buildDuration = stopwatch.Elapsed;
         stopwatch.Restart();
 
@@ -130,6 +138,8 @@ public static class MftScanner
             HardLinkSecondaryNames = hardLinks,
             Nodes = tree.Count,
             Unreachable = tree.UnreachableCount,
+            NameChars = tree.NameChars,
+            NameCharsCapacity = nameCapacity,
         };
         return new ScanResult(tree, stats);
     }

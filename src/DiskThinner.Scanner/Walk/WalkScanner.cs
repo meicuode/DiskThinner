@@ -68,6 +68,7 @@ public static class WalkScanner
         var queue = new BlockingCollection<(int Node, string Path)>(new ConcurrentQueue<(int, string)>());
         var pending = 1;
         var directoriesDone = 0L;
+        var bytesSeen = 0L;
         int denied = 0, reparse = 0, errors = 0;
         var treeLock = new object();
 
@@ -126,6 +127,7 @@ public static class WalkScanner
                     Interlocked.Increment(ref errors);
                 }
 
+                long dirBytes = 0;
                 lock (treeLock)
                 {
                     tree[node].Flags |= failure;
@@ -135,6 +137,7 @@ public static class WalkScanner
                         var isDir = (e.Attributes & FileAttributes.Directory) != 0;
                         var flags = MapFlags(e.Attributes);
                         var alloc = isDir || (flags & NodeFlags.CloudPlaceholder) != 0 ? 0 : RoundUp(e.Length, clusterSize);
+                        dirBytes += alloc;
                         var child = tree.Add(node, name, flags, isDir ? 0 : e.Length, alloc, e.LastWrite);
 
                         if (isDir)
@@ -157,10 +160,11 @@ public static class WalkScanner
                     queue.Add(item, cancellationToken);
                 }
 
+                var bytes = Interlocked.Add(ref bytesSeen, dirBytes);
                 var done = Interlocked.Increment(ref directoriesDone);
                 if ((done & 0x3FF) == 0)
                 {
-                    progress?.Report(new ScanProgress(done, 0, "列出目录"));
+                    progress?.Report(new ScanProgress(done, 0, "列出目录", bytes));
                 }
 
                 if (Interlocked.Decrement(ref pending) == 0)

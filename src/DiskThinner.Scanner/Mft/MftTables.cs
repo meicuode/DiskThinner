@@ -38,8 +38,7 @@ internal sealed class MftTables
 
     private NameEntry[] _names;
     private int _nameCount;
-    private char[] _chars;
-    private int _charCount;
+    private readonly NamePool _pool = new();
 
     private readonly long _clusterSize;
 
@@ -54,7 +53,6 @@ internal sealed class MftTables
         _attributes = new uint[recordCount];
         _nonDosNames = new byte[recordCount];
         _names = new NameEntry[Math.Max(1024, recordCount + recordCount / 4)];
-        _chars = new char[Math.Max(4096, recordCount * 20)];
     }
 
     public int RecordCount { get; }
@@ -206,12 +204,8 @@ internal sealed class MftTables
             Array.Resize(ref _names, _names.Length * 2);
         }
 
-        if (_charCount + length > _chars.Length)
-        {
-            Array.Resize(ref _chars, Math.Max(_chars.Length * 2, _charCount + length));
-        }
-
-        var dest = _chars.AsSpan(_charCount, length);
+        // 直接解码到分块名称池里，建树时节点引用同一个池，不再复制
+        var dest = _pool.Reserve(length, out var offset);
         for (var i = 0; i < length; i++)
         {
             dest[i] = (char)BinaryPrimitives.ReadUInt16LittleEndian(v[(0x42 + i * 2)..]);
@@ -221,11 +215,10 @@ internal sealed class MftTables
         {
             Record = owner,
             ParentRecord = (int)Math.Min(parent, int.MaxValue),
-            CharOffset = _charCount,
+            CharOffset = offset,
             Length = length,
             Namespace = ns,
         };
-        _charCount += length;
 
         if (ns != MftRecord.NamespaceDos && _nonDosNames[owner] < byte.MaxValue)
         {
@@ -233,34 +226,54 @@ internal sealed class MftTables
         }
     }
 
+    public int NameCount => _nameCount;
+    public long NameChars => _pool.Used;
+    public long NameCapacity => _pool.Capacity;
+
+    private bool IsNodeName(in NameEntry e) =>
+        (_state[e.Record] & StateInUse) != 0
+        // DOS 8.3 短名总是伴随一个 Win32 长名，只在没有其他名字时才使用
+        && !(e.Namespace == MftRecord.NamespaceDos && _nonDosNames[e.Record] > 0);
+
     /// <summary>
     /// 生成文件树。每个非 DOS 文件名生成一个节点；同一记录的第二个及以后的文件名标为硬链接。
     /// 记录 5 是根目录，0–15 中的其他记录是 NTFS 元数据。
     /// </summary>
-    public NodeTree BuildTree(string rootName, out int hardLinkSecondaries)
+    public NodeTree BuildTree(string rootName, out int hardLinkSecondaries, HardLinkAttribution attribution = HardLinkAttribution.FirstName)
     {
-        var tree = new NodeTree(_nameCount + 16, _chars, _charCount);
+        // 先数出节点数，节点数组一次分配到位，后面不再扩容或截短
+        var nodeCount = 0;
+        for (var i = 0; i < _nameCount; i++)
+        {
+            if (IsNodeName(_names[i]))
+            {
+                nodeCount++;
+            }
+        }
+
+        var tree = new NodeTree(nodeCount, _pool);
         var recordToNode = new int[RecordCount];
         Array.Fill(recordToNode, -1);
-        var parentRecord = new int[_nameCount];
+        var parentRecord = new int[nodeCount];
+        var nodeRecord = attribution == HardLinkAttribution.FirstName ? [] : new int[nodeCount];
         hardLinkSecondaries = 0;
 
         for (var i = 0; i < _nameCount; i++)
         {
             ref var e = ref _names[i];
-            var r = e.Record;
-            if ((_state[r] & StateInUse) == 0)
+            if (!IsNodeName(e))
             {
                 continue;
             }
 
-            // DOS 8.3 短名总是伴随一个 Win32 长名，只在没有其他名字时才使用
-            if (e.Namespace == MftRecord.NamespaceDos && _nonDosNames[r] > 0)
-            {
-                continue;
-            }
+            var r = e.Record;
 
             var flags = MapFlags(r);
+            if (_nonDosNames[r] > 1)
+            {
+                flags |= NodeFlags.HardLinked;
+            }
+
             var primary = recordToNode[r] < 0;
             if (!primary)
             {
@@ -272,6 +285,11 @@ internal sealed class MftTables
             var index = tree.AddPooled(-1, e.CharOffset, e.Length, flags,
                 isDir ? 0 : _logical[r], isDir ? 0 : _alloc[r], _lastWrite[r]);
             parentRecord[index] = e.ParentRecord;
+            if (nodeRecord.Length > 0)
+            {
+                nodeRecord[index] = r;
+            }
+
             if (primary)
             {
                 recordToNode[r] = index;
@@ -310,7 +328,82 @@ internal sealed class MftTables
             }
         }
 
+        if (attribution != HardLinkAttribution.FirstName && hardLinkSecondaries > 0)
+        {
+            ReassignPrimaryLinks(tree, attribution, recordToNode, parentRecord, nodeRecord);
+        }
+
         return tree;
+    }
+
+    /// <summary>
+    /// 按策略重新挑选硬链接的"主名字"（大小算在它所在的目录里）。目录没有硬链接，所以只涉及文件，
+    /// 不影响上面用 recordToNode 解析父目录。
+    /// </summary>
+    private static void ReassignPrimaryLinks(NodeTree tree, HardLinkAttribution attribution, int[] recordToNode, int[] parentRecord, int[] nodeRecord)
+    {
+        var store = FindComponentStore(tree);
+        for (var i = 0; i < tree.Count; i++)
+        {
+            if ((tree[i].Flags & NodeFlags.HardLinkSecondary) == 0)
+            {
+                continue;
+            }
+
+            var r = nodeRecord[i];
+            var current = recordToNode[r];
+            var better = attribution switch
+            {
+                HardLinkAttribution.LastName => i > current,
+                HardLinkAttribution.LowestParentRecord => parentRecord[i] < parentRecord[current],
+                HardLinkAttribution.OutsideComponentStore => store >= 0 && IsUnder(tree, current, store) && !IsUnder(tree, i, store),
+                _ => false,
+            };
+
+            if (better)
+            {
+                tree[current].Flags |= NodeFlags.HardLinkSecondary;
+                tree[i].Flags &= ~NodeFlags.HardLinkSecondary;
+                recordToNode[r] = i;
+            }
+        }
+    }
+
+    /// <summary>根目录下 Windows\WinSxS 的节点；找不到返回 -1。此时子节点链表还没建立，只能按父节点和名称查找。</summary>
+    private static int FindComponentStore(NodeTree tree)
+    {
+        var windows = -1;
+        for (var i = 0; i < tree.Count && windows < 0; i++)
+        {
+            if (tree[i].Parent == tree.Root && tree[i].IsDirectory && tree.GetName(i).Equals("Windows", StringComparison.OrdinalIgnoreCase))
+            {
+                windows = i;
+            }
+        }
+
+        for (var i = 0; i < tree.Count && windows >= 0; i++)
+        {
+            if (tree[i].Parent == windows && tree[i].IsDirectory && tree.GetName(i).Equals("WinSxS", StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool IsUnder(NodeTree tree, int node, int ancestor)
+    {
+        // 层数上限防止损坏的 MFT 形成环
+        for (int n = node, depth = 0; n >= 0 && depth < 512; n = tree[n].Parent, depth++)
+        {
+            if (n == ancestor)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private NodeFlags MapFlags(int record)

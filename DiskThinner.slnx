@@ -10,6 +10,7 @@
     <Project Path="src/DiskThinner.Scanner/DiskThinner.Scanner.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DiskThinner.App.Tests/DiskThinner.App.Tests.csproj" />
     <Project Path="tests/DiskThinner.Scanner.Tests/DiskThinner.Scanner.Tests.csproj" />
   </Folder>
 </Solution>

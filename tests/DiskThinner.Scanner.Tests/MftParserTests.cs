@@ -225,6 +225,45 @@ public class MftTablesTests
     }
 
     [Fact]
+    public void BothHardLinkNamesAreMarked()
+    {
+        var tree = BuildSample(out _);
+        Assert.True((tree[tree.FindPath(@"C:\Users\link1.dll")].Flags & NodeFlags.HardLinked) != 0);
+        Assert.True((tree[tree.FindPath(@"C:\link2.dll")].Flags & NodeFlags.HardLinked) != 0);
+        Assert.True((tree[tree.FindPath(@"C:\Users\big.bin")].Flags & NodeFlags.HardLinked) == 0);
+    }
+
+    /// <summary>同一文件在 Windows\WinSxS 和 Windows\System32 下各有一个名字，WinSxS 那个排在前面。</summary>
+    private static NodeTree BuildComponentStoreSample(HardLinkAttribution attribution)
+    {
+        var t = new MftTables(64);
+        t.Parse(RecordBuilder.Directory().StandardInfo().FileName(5, ".", 3).Build(), 5);
+        t.Parse(RecordBuilder.Directory().StandardInfo().FileName(5, "Windows", 3).Build(), 30);
+        t.Parse(RecordBuilder.Directory().StandardInfo().FileName(30, "WinSxS", 3).Build(), 31);
+        t.Parse(RecordBuilder.Directory().StandardInfo().FileName(30, "System32", 3).Build(), 32);
+        t.Parse(RecordBuilder.File(linkCount: 2).StandardInfo()
+            .FileName(31, "ntdll.dll", 3).FileName(32, "ntdll.dll", 3)
+            .NonResidentData(40_960, 40_960).Build(), 33);
+        var tree = t.BuildTree(@"C:\", out _, attribution);
+        tree.Finalize();
+        return tree;
+    }
+
+    [Theory]
+    [InlineData(HardLinkAttribution.FirstName, @"C:\Windows\WinSxS")]
+    [InlineData(HardLinkAttribution.LastName, @"C:\Windows\System32")]
+    [InlineData(HardLinkAttribution.LowestParentRecord, @"C:\Windows\WinSxS")]
+    [InlineData(HardLinkAttribution.OutsideComponentStore, @"C:\Windows\System32")]
+    public void HardLinkAttributionChoosesDirectory(HardLinkAttribution attribution, string expectedOwner)
+    {
+        var tree = BuildComponentStoreSample(attribution);
+        var other = expectedOwner.EndsWith("WinSxS", StringComparison.Ordinal) ? @"C:\Windows\System32" : @"C:\Windows\WinSxS";
+        Assert.Equal(40_960, tree[tree.FindPath(expectedOwner)].AllocSize);
+        Assert.Equal(0, tree[tree.FindPath(other)].AllocSize);
+        Assert.Equal(40_960, tree[tree.Root].AllocSize); // 总量不受归属方式影响
+    }
+
+    [Fact]
     public void HardLinkCanBeCountedPerName()
     {
         var tree = BuildSample(out _, countHardLinksOnce: false);

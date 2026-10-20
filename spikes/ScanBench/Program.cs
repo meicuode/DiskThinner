@@ -1,4 +1,4 @@
-﻿// 阶段 0.2：MFT 扫描与目录遍历扫描的对比验证。
+// 阶段 0.2：MFT 扫描与目录遍历扫描的对比验证。
 //
 //   ScanBench walk <路径> --out <目录>     普通权限即可
 //   ScanBench mft  <盘符> --out <目录>     需要管理员
@@ -26,6 +26,7 @@ if (args.Length < 1)
 var command = args[0];
 var outDir = GetOption("--out") ?? Path.Combine(Environment.CurrentDirectory, "artifacts", "scanbench");
 Directory.CreateDirectory(outDir);
+long peakAfterScan = 0;
 
 try
 {
@@ -42,6 +43,12 @@ try
             return 0;
         case "all":
             return RunAll(args[1]);
+        case "wiztree":
+            CompareWizTree(args[1]);
+            return 0;
+        case "linkpolicy":
+            CompareLinkPolicies(args[1], args.Length > 2 && !args[2].StartsWith("--") ? args[2] : "C:");
+            return 0;
         default:
             Console.WriteLine($"未知命令 {command}");
             return 2;
@@ -72,6 +79,11 @@ void RunWalk(string root)
 void RunMft(string drive)
 {
     var result = MftScanner.Scan(drive);
+    using (var p = Process.GetCurrentProcess())
+    {
+        // 扫描器本身的峰值（之后的对比汇总和导出还会再占内存）
+        peakAfterScan = p.PeakWorkingSet64;
+    }
 
     // 再按"每个硬链接名都计大小"汇总一次，用于和遍历扫描对比
     var sw = Stopwatch.StartNew();
@@ -121,6 +133,9 @@ void Report(string mode, ScanResult result, List<string>? allLinks, TimeSpan? re
         $"working_set_before_trim_bytes={workingSetBeforeTrim}",
         $"working_set_bytes={proc.WorkingSet64}",
         $"peak_working_set_bytes={proc.PeakWorkingSet64}",
+        $"peak_after_scan_bytes={peakAfterScan}",
+        $"name_chars={stats.NameChars}",
+        $"name_chars_capacity={stats.NameCharsCapacity}",
         $"private_bytes={proc.PrivateMemorySize64}",
         $"tree_bytes={tree.ApproximateBytes}",
     };
@@ -178,10 +193,33 @@ static long SumRootChildren(NodeTree tree, NodeFlags flag, Func<Node, long> valu
     return sum;
 }
 
-// 深度不超过 3 的目录：路径、逻辑大小、分配大小、文件数、目录数、标记
+// 每个目录子树里"有多个硬链接名"的文件占用（每个名字都按完整大小算）。这部分在不同工具之间怎么分配到目录是约定问题，
+// 用来判断两个工具的差异是不是来自硬链接归属。
+static long[] LinkedBytes(NodeTree tree)
+{
+    var linked = new long[tree.Count];
+    for (var i = 0; i < tree.Count; i++)
+    {
+        ref var n = ref tree[i];
+        if (n.IsDirectory || (n.Flags & NodeFlags.HardLinked) == 0)
+        {
+            continue;
+        }
+
+        for (int p = n.Parent, depth = 0; p >= 0 && depth < 512; p = p == tree.Root ? -1 : tree[p].Parent, depth++)
+        {
+            linked[p] += n.AllocSize;
+        }
+    }
+
+    return linked;
+}
+
+// 深度不超过 3 的目录：路径、逻辑大小、分配大小、文件数、目录数、标记、硬链接文件占用
 List<string> Dump(NodeTree tree)
 {
-    var lines = new List<string> { "path\tlogical\talloc\tfiles\tdirs\tflags" };
+    var linked = LinkedBytes(tree);
+    var lines = new List<string> { "path\tlogical\talloc\tfiles\tdirs\tflags\tlinked" };
     var stack = new Stack<(int Node, int Depth)>();
     stack.Push((tree.Root, 0));
     while (stack.Count > 0)
@@ -194,7 +232,7 @@ List<string> Dump(NodeTree tree)
         }
 
         lines.Add(string.Join('\t', tree.GetPath(n), node.LogicalSize.ToString(inv), node.AllocSize.ToString(inv),
-            node.FileCount.ToString(inv), node.DirCount.ToString(inv), ((int)node.Flags).ToString(inv)));
+            node.FileCount.ToString(inv), node.DirCount.ToString(inv), ((int)node.Flags).ToString(inv), linked[n].ToString(inv)));
         if (depth < 3)
         {
             foreach (var c in tree.Children(n))
@@ -335,6 +373,83 @@ void Compare()
 
     void Row(string name, Func<Dictionary<string, string>, string> f) =>
         md.AppendLine($"| {name} | {f(walkSummary)} | {f(mftSummary)} |");
+}
+
+// M1 验收：和 WizTree 比较主要目录的占用。WizTree 用 /exportfiles=0 只导出目录；本程序用 mft 命令导出的 mft-dirs-dedup.tsv（硬链接只算一次）。
+void CompareWizTree(string csvPath)
+{
+    var rows = ScanBench.WizTreeCompare.Rows(ScanBench.WizTreeCompare.ReadOurs(Path.Combine(outDir, "mft-dirs-dedup.tsv")), ScanBench.WizTreeCompare.ReadWizTree(csvPath));
+    var report = ScanBench.WizTreeCompare.Report(File.ReadLines(csvPath).First().Trim(), rows);
+    File.WriteAllText(Path.Combine(outDir, "wiztree-compare.md"), report);
+    Console.WriteLine($"对比报告：{Path.Combine(outDir, "wiztree-compare.md")}");
+}
+
+// 用不同的硬链接归属策略各扫一次，分别和 WizTree 比较（需要管理员）
+void CompareLinkPolicies(string csvPath, string drive)
+{
+    var wiz = ReadWizTreeDirs(csvPath);
+    string[] watch = [@"C:\Windows\WinSxS", @"C:\Windows\System32", @"C:\Windows\SysWOW64", @"C:\Windows\assembly", @"C:\Program Files (x86)\Microsoft\Edge", @"C:\Program Files (x86)\Microsoft\EdgeCore"];
+    var md = new StringBuilder();
+    md.AppendLine("# 硬链接归属策略与 WizTree 对比");
+    md.AppendLine();
+    md.AppendLine("| 策略 | 深度 ≤ 2 且 ≥ 1 GB：误差 < 1% | 最大误差 | 深度 ≤ 3 且 ≥ 100 MB：误差 < 1% | " + string.Join(" | ", watch.Select(w => "`" + w[3..] + "`")) + " |");
+    md.AppendLine("|---|---|---|---|" + string.Concat(watch.Select(_ => "---|")));
+    md.AppendLine($"| WizTree | | | | {string.Join(" | ", watch.Select(w => wiz.TryGetValue(w, out var v) ? ByteSize.Format(v) : "-"))} |");
+    foreach (var policy in Enum.GetValues<HardLinkAttribution>())
+    {
+        var result = MftScanner.Scan(drive, attribution: policy);
+        var ours = DumpToDict(result.Tree);
+        var (mainCount, mainOk, mainMax, allCount, allOk, _) = Score(ours, wiz);
+        md.AppendLine($"| {policy} | {mainOk} / {mainCount} | {mainMax:F2}% | {allOk} / {allCount} | " +
+                      string.Join(" | ", watch.Select(w => ours.TryGetValue(w, out var v) ? ByteSize.Format(v) : "-")) + " |");
+        Console.WriteLine($"{policy}: {mainOk}/{mainCount}, max {mainMax:F2}%, {allOk}/{allCount}");
+    }
+
+    File.WriteAllText(Path.Combine(outDir, "linkpolicy.md"), md.ToString());
+}
+
+Dictionary<string, long> DumpToDict(NodeTree tree) =>
+    Dump(tree).Skip(1).Select(l => l.Split('\t')).ToDictionary(p => p[0], p => long.Parse(p[2], inv), StringComparer.OrdinalIgnoreCase);
+
+Dictionary<string, long> ReadWizTreeDirs(string csvPath)
+{
+    var wiz = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+    foreach (var line in File.ReadLines(csvPath).Skip(1))
+    {
+        if (!line.StartsWith('"'))
+        {
+            continue;
+        }
+
+        var end = line.IndexOf("\",", 1, StringComparison.Ordinal);
+        var path = line[1..end].Replace("\"\"", "\"");
+        var fields = line[(end + 2)..].Split(',');
+        if (path.EndsWith('\\') && long.TryParse(fields[1], inv, out var alloc))
+        {
+            wiz[path.Length == 3 ? path : path.TrimEnd('\\')] = alloc;
+        }
+    }
+
+    return wiz;
+}
+
+static (int MainCount, int MainOk, double MainMax, int AllCount, int AllOk, List<(string Path, int Depth, long Ours, long Wiz)> Rows)
+    Score(Dictionary<string, long> ours, Dictionary<string, long> wiz)
+{
+    static double Rel(long a, long b) => b == 0 ? 0 : Math.Abs(a - b) * 100.0 / b;
+    var rows = new List<(string Path, int Depth, long Ours, long Wiz)>();
+    foreach (var (path, alloc) in ours)
+    {
+        var depth = path.TrimEnd('\\').Count(c => c == '\\');
+        if (depth <= 3 && alloc >= 100L << 20 && wiz.TryGetValue(path, out var w))
+        {
+            rows.Add((path, depth, alloc, w));
+        }
+    }
+
+    var main = rows.Where(r => r.Depth <= 2 && r.Wiz >= 1L << 30).ToList();
+    return (main.Count, main.Count(r => Rel(r.Ours, r.Wiz) < 1), main.Count == 0 ? 0 : main.Max(r => Rel(r.Ours, r.Wiz)),
+        rows.Count, rows.Count(r => Rel(r.Ours, r.Wiz) < 1), rows);
 }
 
 static string Pct(long delta, long total) => total == 0 ? "-" : (delta * 100.0 / total).ToString("+0.000;-0.000;0", CultureInfo.InvariantCulture) + "%";

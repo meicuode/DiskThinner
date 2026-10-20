@@ -353,6 +353,8 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 
 **M1 扫描与空间浏览（8 到 12 人日）**
 
+> 2026-10-20 已完成，验收结果见 `docs/m1-report.md`。硬链接按 MFT 记录里的第一个名字归属；和 WizTree 的差异只出现在共用文件的目录之间（WinSxS 与 System32 等），总量一致。
+
 - Scanner 的 MFT 路径和遍历回退、节点树、取消和进度（阶段 0 已完成主体，M1 补进度上报和取消的界面接入）。
 - 降低 MFT 扫描的峰值内存：阶段 0 实测约 416 MB，目标 ≤ 300 MB。
 - 主框架：导航、状态栏、管理员检测和"以管理员身份重启"。

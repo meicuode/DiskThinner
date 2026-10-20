@@ -9,21 +9,19 @@ public sealed class NodeTree
 {
     private Node[] _nodes;
     private int _count;
-    private char[] _names;
-    private int _namesLength;
+    private readonly NamePool _names;
 
     public NodeTree(int initialCapacity = 1 << 16)
     {
         _nodes = new Node[Math.Max(16, initialCapacity)];
-        _names = new char[Math.Max(256, initialCapacity * 16)];
+        _names = new NamePool();
     }
 
-    /// <summary>直接使用已有的名称池（MFT 解析时已经把所有文件名解码到一个数组里），避免再复制一份。</summary>
-    internal NodeTree(int initialCapacity, char[] namePool, int namePoolLength)
+    /// <summary>直接使用已有的名称池（MFT 解析时已经把所有文件名解码到池里），避免再复制一份。</summary>
+    internal NodeTree(int initialCapacity, NamePool namePool)
     {
         _nodes = new Node[Math.Max(16, initialCapacity)];
         _names = namePool;
-        _namesLength = namePoolLength;
     }
 
     /// <summary>添加一个名称已在名称池中的节点。</summary>
@@ -66,24 +64,19 @@ public sealed class NodeTree
     public ReadOnlySpan<char> GetName(int index)
     {
         ref var node = ref _nodes[index];
-        return _names.AsSpan(node.NameOffset, node.NameLength);
+        return _names.Get(node.NameOffset, node.NameLength);
     }
 
     public string GetNameString(int index) => new(GetName(index));
 
     /// <summary>节点数组与名称池占用的字节数（不含临时结构）。</summary>
-    public long ApproximateBytes => (long)_nodes.Length * System.Runtime.CompilerServices.Unsafe.SizeOf<Node>() + (long)_names.Length * sizeof(char);
+    public long ApproximateBytes => (long)_nodes.Length * System.Runtime.CompilerServices.Unsafe.SizeOf<Node>() + _names.Capacity * sizeof(char);
 
-    public void EnsureCapacity(int nodes, int nameChars)
+    public void EnsureCapacity(int nodes)
     {
         if (_nodes.Length < nodes)
         {
             Array.Resize(ref _nodes, nodes);
-        }
-
-        if (_names.Length < nameChars)
-        {
-            Array.Resize(ref _names, nameChars);
         }
     }
 
@@ -123,24 +116,7 @@ public sealed class NodeTree
         _nodes[index].NameLength = (ushort)name.Length;
     }
 
-    private int AppendName(ReadOnlySpan<char> name)
-    {
-        if (_namesLength + name.Length > _names.Length)
-        {
-            var size = _names.Length;
-            while (_namesLength + name.Length > size)
-            {
-                size *= 2;
-            }
-
-            Array.Resize(ref _names, size);
-        }
-
-        var offset = _namesLength;
-        name.CopyTo(_names.AsSpan(offset));
-        _namesLength += name.Length;
-        return offset;
-    }
+    private int AppendName(ReadOnlySpan<char> name) => _names.Append(name);
 
     /// <summary>
     /// 建立子节点链表，自底向上汇总大小、文件数、目录数和最后写入时间，再把每个目录的子项按占用降序排列。
@@ -271,29 +247,38 @@ public sealed class NodeTree
     /// </summary>
     public void TrimExcess()
     {
-        long used = 0;
+        // 按名称在池中的位置排序后原地前移（见 NamePool.Compact），只需要几个下标数组，不用再分配一整份名称池。
+        var order = new int[_count];
         for (var i = 0; i < _count; i++)
         {
-            used += _nodes[i].NameLength;
+            order[i] = i;
         }
 
-        var names = new char[Math.Max(1, used)];
-        var offset = 0;
-        for (var i = 0; i < _count; i++)
+        var nodes = _nodes;
+        Array.Sort(order, (a, b) => nodes[a].NameOffset.CompareTo(nodes[b].NameOffset));
+
+        var offsets = new int[_count];
+        var lengths = new int[_count];
+        for (var k = 0; k < _count; k++)
         {
-            ref var node = ref _nodes[i];
-            _names.AsSpan(node.NameOffset, node.NameLength).CopyTo(names.AsSpan(offset));
-            node.NameOffset = offset;
-            offset += node.NameLength;
+            offsets[k] = nodes[order[k]].NameOffset;
+            lengths[k] = nodes[order[k]].NameLength;
         }
 
-        _names = names;
-        _namesLength = offset;
-        if (_nodes.Length > _count)
+        _names.Compact(offsets, lengths);
+        for (var k = 0; k < _count; k++)
+        {
+            nodes[order[k]].NameOffset = offsets[k];
+        }
+
+        if (_nodes.Length > _count + _count / 10 + 1024)
         {
             Array.Resize(ref _nodes, Math.Max(16, _count));
         }
     }
+
+    public long NameChars => _names.Used;
+    public long NameCapacity => _names.Capacity;
 
     /// <summary>把 <paramref name="flag"/> 从带有它的节点传播到整棵子树。需在 <see cref="Finalize"/> 之后调用。</summary>
     public void PropagateFlagToDescendants(NodeFlags flag)

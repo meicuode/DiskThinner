@@ -11,4 +11,7 @@
     <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
     <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.App.Tests" />
+  </ItemGroup>
 </Project>

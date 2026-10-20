@@ -18,6 +18,7 @@ public enum NodeFlags : ushort
     AccessDenied = 1 << 9,      // 遍历扫描时无法列出内容的目录
     Incomplete = 1 << 10,       // 子树里有无法列出的目录，汇总值偏小
     Orphan = 1 << 11,           // MFT 中找不到父目录的记录
+    HardLinked = 1 << 12,       // 这个文件有多个硬链接名（主名字和其他名字都带这个标记；只有 MFT 扫描能识别）
 }
 
 /// <summary>

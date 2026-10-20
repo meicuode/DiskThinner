@@ -1,0 +1,482 @@
+using System.Globalization;
+using DiskThinner.App.Controls;
+using DiskThinner.App.Formatting;
+using DiskThinner.Core;
+using DiskThinner.Scanner;
+
+namespace DiskThinner.App.Explorer;
+
+/// <summary>
+/// 树形列表（原型 .tbl.tree）：虚拟模式 ListView + 自绘。只为屏幕上可见的行取数据，百万级节点也不卡。
+/// 键盘：→ 展开 / 进入第一个子项，← 折叠 / 回到上级，Enter 展开或折叠，Backspace 回到上级，Ctrl+C 复制路径。
+/// </summary>
+internal sealed class TreeListView : ListView
+{
+    private const int IndentWidth = 16;
+
+    // 96 DPI 下的列宽；句柄创建和 DPI 变化时按 DeviceDpi 换算
+    private static readonly int[] BaseColumnWidths = [380, 92, 124, 110];
+
+    private readonly DerivedFonts _fonts = new();
+    private TreeRows? _rows;
+    private bool _suppressSelection;
+    private DateTime _now = DateTime.Now;
+    private int _hoverRow = -1;
+
+    public TreeListView()
+    {
+        View = View.Details;
+        VirtualMode = true;
+        FullRowSelect = true;
+        HideSelection = false;
+        MultiSelect = false;
+        OwnerDraw = true;
+        DoubleBuffered = true;
+        BorderStyle = BorderStyle.None;
+        HeaderStyle = ColumnHeaderStyle.Nonclickable;
+        Font = Theme.Ui;
+        AccessibleName = "文件树";
+
+        Columns.Add("名称", BaseColumnWidths[0]);
+        Columns.Add("大小", BaseColumnWidths[1], HorizontalAlignment.Right);
+        Columns.Add("占上级", BaseColumnWidths[2]);
+        Columns.Add("最后写入", BaseColumnWidths[3]);
+
+        RetrieveVirtualItem += OnRetrieveVirtualItem;
+        DrawColumnHeader += (_, e) => e.DrawDefault = true;
+        DrawItem += (_, e) => e.DrawDefault = false;
+        DrawSubItem += OnDrawSubItem;
+        SelectedIndexChanged += OnSelectedIndexChanged;
+    }
+
+    /// <summary>用户在列表里选中了一个节点。</summary>
+    public event EventHandler<int>? NodeSelected;
+
+    public event EventHandler<int>? CopyPathRequested;
+
+    public NodeTree? Tree => _rows?.Tree;
+
+    public int SelectedNode => _rows is not null && SelectedIndices.Count > 0 ? _rows.NodeAt(SelectedIndices[0]) : -1;
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ApplyRowHeight();
+        ApplyColumnWidths();
+    }
+
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
+        ApplyRowHeight();
+        ApplyColumnWidths();
+    }
+
+    private void ApplyColumnWidths()
+    {
+        for (var i = 1; i < Columns.Count && i < BaseColumnWidths.Length; i++)
+        {
+            Columns[i].Width = Ui.Scale(this, BaseColumnWidths[i]);
+        }
+
+        FitNameColumn();
+    }
+
+    private const int GwlStyle = -16;
+    private const int WsVScroll = 0x00200000;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong(IntPtr hWnd, int index);
+
+    /// <summary>
+    /// 名称列占满剩余宽度（不小于默认宽度），其他列保持固定。
+    /// 竖直滚动条出现时 ListView 不一定触发尺寸变化，所以滚动条还没出现时先把它的宽度留出来，避免出现横向滚动条。
+    /// </summary>
+    private void FitNameColumn()
+    {
+        if (Columns.Count == 0 || !IsHandleCreated)
+        {
+            return;
+        }
+
+        var others = 0;
+        for (var i = 1; i < Columns.Count; i++)
+        {
+            others += Columns[i].Width;
+        }
+
+        var hasVScroll = (GetWindowLong(Handle, GwlStyle) & WsVScroll) != 0;
+        var reserve = hasVScroll ? 0 : SystemInformation.GetVerticalScrollBarWidthForDpi(DeviceDpi);
+        var width = Math.Max(Ui.Scale(this, 260), ClientSize.Width - others - reserve - 1);
+        if (Math.Abs(Columns[0].Width - width) > 1)
+        {
+            Columns[0].Width = width;
+        }
+    }
+
+    protected override void OnClientSizeChanged(EventArgs e)
+    {
+        base.OnClientSizeChanged(e);
+        if (IsHandleCreated)
+        {
+            FitNameColumn();
+        }
+    }
+
+    /// <summary>ListView 的行高由小图标列表决定：用一个 1 像素宽的空图标把行高撑到 24。</summary>
+    private void ApplyRowHeight()
+    {
+        SmallImageList?.Dispose();
+        SmallImageList = new ImageList { ImageSize = new Size(1, Ui.Scale(this, 24)) };
+    }
+
+    public void SetTree(NodeTree? tree)
+    {
+        _suppressSelection = true;
+        try
+        {
+            VirtualListSize = 0;
+            _rows = tree is null ? null : new TreeRows(tree);
+            _now = DateTime.Now;
+            if (_rows is not null)
+            {
+                _rows.Expand(0);
+                VirtualListSize = _rows.Count;
+        FitNameColumn();
+                SelectRow(0);
+            }
+        }
+        finally
+        {
+            _suppressSelection = false;
+        }
+
+        Invalidate();
+    }
+
+    /// <summary>展开祖先并选中节点（不触发 NodeSelected）。</summary>
+    public void SelectNode(int node)
+    {
+        if (_rows is null || node < 0)
+        {
+            return;
+        }
+
+        _suppressSelection = true;
+        try
+        {
+            var row = _rows.Reveal(node);
+            VirtualListSize = _rows.Count;
+        FitNameColumn();
+            if (row >= 0)
+            {
+                SelectRow(row);
+            }
+        }
+        finally
+        {
+            _suppressSelection = false;
+        }
+    }
+
+    private void SelectRow(int row)
+    {
+        SelectedIndices.Clear();
+        SelectedIndices.Add(row);
+        FocusedItem = Items[row];
+        EnsureVisible(row);
+        Invalidate();
+    }
+
+    private void Toggle(int row)
+    {
+        if (_rows is null)
+        {
+            return;
+        }
+
+        _rows.Toggle(row);
+        VirtualListSize = _rows.Count;
+        FitNameColumn();
+        Invalidate();
+    }
+
+    private void OnSelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (!_suppressSelection && SelectedNode >= 0)
+        {
+            NodeSelected?.Invoke(this, SelectedNode);
+        }
+    }
+
+    private void OnRetrieveVirtualItem(object? sender, RetrieveVirtualItemEventArgs e)
+    {
+        var rows = _rows!;
+        var tree = rows.Tree;
+        var n = rows.NodeAt(e.ItemIndex);
+        ref var node = ref tree[n];
+        var item = new ListViewItem(DisplayName(tree, n));
+        item.SubItems.Add(ByteSize.Format(node.AllocSize));
+        item.SubItems.Add(PercentOfParent(tree, n).ToString("0.0", CultureInfo.InvariantCulture) + "%");
+        item.SubItems.Add(TimeText.Relative(node.LastWriteUtc, _now));
+        e.Item = item;
+    }
+
+    internal static string DisplayName(NodeTree tree, int n)
+    {
+        var name = tree.GetNameString(n);
+        var flags = tree[n].Flags;
+        if ((flags & NodeFlags.AccessDenied) != 0)
+        {
+            return name + "（无法列出）";
+        }
+
+        if ((flags & NodeFlags.ReparsePoint) != 0 && tree[n].IsDirectory)
+        {
+            return name + "（链接，未展开）";
+        }
+
+        return name;
+    }
+
+    internal static double PercentOfParent(NodeTree tree, int n)
+    {
+        var parent = tree[n].Parent;
+        if (n == tree.Root || parent < 0 || tree[parent].AllocSize <= 0)
+        {
+            return 100;
+        }
+
+        return Math.Min(100, tree[n].AllocSize * 100.0 / tree[parent].AllocSize);
+    }
+
+    private void OnDrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+    {
+        if (e.Item is null || e.SubItem is null || _rows is null)
+        {
+            return;
+        }
+
+        var g = e.Graphics;
+        var row = e.ItemIndex;
+        var selected = SelectedIndices.Count > 0 && SelectedIndices[0] == row;
+        var back = selected ? Theme.RowSelected : row == _hoverRow ? Theme.RowHover : Color.White;
+        using (var b = new SolidBrush(back))
+        {
+            g.FillRectangle(b, e.Bounds);
+        }
+
+        using (var line = new Pen(Theme.RowLine))
+        {
+            g.DrawLine(line, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+        }
+
+        var tree = _rows.Tree;
+        var n = _rows.NodeAt(row);
+        var depth = _rows.DepthAt(row);
+        var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
+        var s = (float)DeviceDpi / 96;
+        var muted = (tree[n].Flags & (NodeFlags.AccessDenied | NodeFlags.ReparsePoint | NodeFlags.Metadata)) != 0;
+        var textColor = muted ? Theme.Muted : Theme.Text;
+        _fonts.Update(Font);
+
+        switch (e.ColumnIndex)
+        {
+            case 0:
+            {
+                var x = e.Bounds.X + (int)((6 + depth * IndentWidth) * s);
+                if (_rows.HasChildren(n))
+                {
+                    var chevron = new Rectangle(x, e.Bounds.Y + (e.Bounds.Height - (int)(14 * s)) / 2, (int)(14 * s), (int)(14 * s));
+                    Ui.DrawChevron(g, chevron, _rows.IsExpanded(n), ColorTranslator.FromHtml("#666666"));
+                }
+
+                x += (int)(14 * s);
+                var isDir = tree[n].IsDirectory;
+                var iconW = (int)((isDir ? 14 : 10) * s);
+                var iconH = (int)((isDir ? 11 : 13) * s);
+                var icon = new Rectangle(x + (isDir ? 0 : (int)(2 * s)), e.Bounds.Y + (e.Bounds.Height - iconH) / 2, iconW, iconH);
+                using (var ib = new SolidBrush(isDir ? Theme.FolderIcon : Theme.FileIcon))
+                {
+                    g.FillRectangle(ib, icon);
+                }
+
+                x += (int)(20 * s);
+                var font = n == tree.Root ? _fonts.Bold : _fonts.Regular;
+                TextRenderer.DrawText(g, e.SubItem.Text, font, Rectangle.FromLTRB(x, e.Bounds.Y, e.Bounds.Right - 2, e.Bounds.Bottom), textColor, flags);
+                break;
+            }
+
+            case 2:
+            {
+                var pct = PercentOfParent(tree, n);
+                var barW = (int)(44 * s);
+                var barH = (int)(8 * s);
+                var bar = new Rectangle(e.Bounds.X + (int)(6 * s), e.Bounds.Y + (e.Bounds.Height - barH) / 2, barW, barH);
+                using (var bb = new SolidBrush(Theme.BarBack))
+                {
+                    g.FillRectangle(bb, bar);
+                }
+
+                using (var fb = new SolidBrush(Theme.BarFill))
+                {
+                    g.FillRectangle(fb, bar.X, bar.Y, (int)Math.Round(barW * pct / 100), barH);
+                }
+
+                TextRenderer.DrawText(g, e.SubItem.Text, _fonts.Regular, Rectangle.FromLTRB(bar.Right + (int)(6 * s), e.Bounds.Y, e.Bounds.Right - 2, e.Bounds.Bottom), textColor, flags);
+                break;
+            }
+
+            default:
+            {
+                var align = Columns[e.ColumnIndex].TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left;
+                var font = e.ColumnIndex == 1 && n == tree.Root ? _fonts.Bold : _fonts.Regular;
+                TextRenderer.DrawText(g, e.SubItem.Text, font, Rectangle.Inflate(e.Bounds, -(int)(6 * s), 0), textColor, flags | align);
+                break;
+            }
+        }
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (_rows is not null && e.Button == MouseButtons.Left)
+        {
+            var hit = HitTest(e.Location);
+            if (hit.Item is not null && hit.SubItem == hit.Item.SubItems[0])
+            {
+                var row = hit.Item.Index;
+                var s = (float)DeviceDpi / 96;
+                var chevronLeft = hit.Item.Bounds.X + (int)((6 + _rows.DepthAt(row) * IndentWidth) * s);
+                if (e.X >= chevronLeft && e.X < chevronLeft + (int)(16 * s) && _rows.HasChildren(_rows.NodeAt(row)))
+                {
+                    Toggle(row);
+                }
+            }
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        base.OnMouseDoubleClick(e);
+        var hit = HitTest(e.Location);
+        if (hit.Item is not null)
+        {
+            Toggle(hit.Item.Index);
+        }
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var row = HitTest(e.Location).Item?.Index ?? -1;
+        if (row != _hoverRow)
+        {
+            var old = _hoverRow;
+            _hoverRow = row;
+            if (old >= 0 && old < VirtualListSize)
+            {
+                RedrawItems(old, old, true);
+            }
+
+            if (row >= 0)
+            {
+                RedrawItems(row, row, true);
+            }
+        }
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        var old = _hoverRow;
+        _hoverRow = -1;
+        if (old >= 0 && old < VirtualListSize)
+        {
+            RedrawItems(old, old, true);
+        }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (HandleKey(e.KeyData))
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
+
+        base.OnKeyDown(e);
+    }
+
+    /// <summary>处理树形列表的快捷键，返回是否已处理。单独拆出来便于测试。</summary>
+    internal bool HandleKey(Keys keyData)
+    {
+        if (_rows is null || SelectedIndices.Count == 0)
+        {
+            return false;
+        }
+
+        var row = SelectedIndices[0];
+        var node = _rows.NodeAt(row);
+        var handled = true;
+        switch (keyData & Keys.KeyCode)
+        {
+            case Keys.Right when _rows.HasChildren(node) && !_rows.IsExpanded(node):
+                Toggle(row);
+                break;
+            case Keys.Right when _rows.HasChildren(node):
+                SelectAndNotify(row + 1);
+                break;
+            case Keys.Left when _rows.IsExpanded(node):
+                Toggle(row);
+                break;
+            case Keys.Left:
+            case Keys.Back:
+                var parent = _rows.ParentRow(row);
+                if (parent >= 0)
+                {
+                    SelectAndNotify(parent);
+                }
+
+                break;
+            case Keys.Enter:
+                Toggle(row);
+                break;
+            case Keys.C when (keyData & Keys.Control) != 0:
+                CopyPathRequested?.Invoke(this, node);
+                break;
+            default:
+                handled = false;
+                break;
+        }
+
+        return handled;
+    }
+
+    /// <summary>模拟用户点选一行（测试用）。</summary>
+    internal void SelectRowAsUser(int row) => SelectAndNotify(row);
+
+    internal int RowCount => _rows?.Count ?? 0;
+
+    internal int RowOf(int node) => _rows?.FindVisibleRow(node) ?? -1;
+
+    internal bool IsExpanded(int node) => _rows?.IsExpanded(node) ?? false;
+
+    private void SelectAndNotify(int row)
+    {
+        SelectRow(row);
+        NodeSelected?.Invoke(this, _rows!.NodeAt(row));
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            SmallImageList?.Dispose();
+            _fonts.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+}
