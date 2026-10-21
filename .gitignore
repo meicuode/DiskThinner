@@ -23,6 +23,8 @@ mono_crash.*
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
+# 上一行会把打包脚本的目录也忽略掉，这里放开
+!tools/release/
 [Rr]eleases/
 x64/
 x86/
