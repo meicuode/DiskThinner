@@ -30,9 +30,10 @@ internal sealed class ConfirmCleanupDialog : Form
     private readonly List<Control> _fullWidth = [];
     private readonly List<Label> _wrapped = [];
 
-    public ConfirmCleanupDialog(IReadOnlyList<PlanItem> toRun, int manualCount)
+    public ConfirmCleanupDialog(IReadOnlyList<PlanItem> toRun, int manualCount, bool askWhenLocked = false)
     {
         Items = toRun;
+        _ask.Checked = askWhenLocked;
         var total = toRun.Sum(i => i.Bytes);
         var estimate = toRun.Sum(i => i.EstimatedBytes);
         Text = "确认清理";

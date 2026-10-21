@@ -12,6 +12,6 @@
     <Product>DiskThinner</Product>
     <Company>DiskThinner contributors</Company>
     <Copyright>Copyright (c) 2026 DiskThinner contributors</Copyright>
-    <Version>0.0.1</Version>
+    <Version>0.1.0</Version>
   </PropertyGroup>
 </Project>

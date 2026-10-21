@@ -37,6 +37,9 @@ public sealed record PlanMethod(MethodKind Kind, string Display)
 
     public DeleteAction? Delete { get; init; }
 
+    /// <summary>实际使用的"只删 N 天前的"：规则的 older_than_days，或者设置里更严格的值。只能比规则更严格。</summary>
+    public int? MinAgeDays { get; init; }
+
     public KnownCommand? Command { get; init; }
 
     /// <summary>官方命令的程序路径：已装软件探测到的那个。</summary>

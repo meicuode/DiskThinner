@@ -41,7 +41,8 @@ internal sealed class GrowthModel
     /// 后台线程上：读快照列表；整个盘扫描完、离上次快照超过 6 小时就自动保存一次（并执行保留策略）；
     /// 再和 7 天前的快照对比。
     /// </summary>
-    public static GrowthModel Build(SnapshotStore store, ScanResult result, Classification? classification, bool autoSave, DateTime nowUtc, bool forceSave = false)
+    public static GrowthModel Build(SnapshotStore store, ScanResult result, Classification? classification, bool autoSave, DateTime nowUtc, bool forceSave = false,
+        SnapshotOptions? options = null, int keepDays = 180)
     {
         var tree = result.Tree;
         var volume = tree.GetPath(tree.Root);
@@ -51,14 +52,14 @@ internal sealed class GrowthModel
         var saved = false;
         if (forceSave || autoSave && isVolume && (snapshots.Count == 0 || nowUtc - snapshots[^1].TakenAtUtc >= AutoSnapshotInterval))
         {
-            current = store.Save(tree, result.Stats, nowUtc);
-            store.ApplyRetention(nowUtc);
+            current = store.Save(tree, result.Stats, nowUtc, options);
+            store.ApplyRetention(nowUtc, keepDays);
             snapshots = store.List(volume);
             saved = true;
         }
         else
         {
-            current = store.Preview(tree, result.Stats, nowUtc);
+            current = store.Preview(tree, result.Stats, nowUtc, options);
         }
 
         var earlier = snapshots.Where(s => !saved || s.Id != current.Info.Id).ToList();
@@ -69,7 +70,7 @@ internal sealed class GrowthModel
         {
             // 对比用的当前快照按起点快照记录过的路径重新剪一次，两边的值都是实测的
             var from = store.Load(baseline.Id);
-            diff = SnapshotDiff.Compute(from, store.Preview(tree, result.Stats, nowUtc, compareWith: from));
+            diff = SnapshotDiff.Compute(from, store.Preview(tree, result.Stats, nowUtc, options, compareWith: from));
             hot = diff.Hotspots(stopAt: StopAt(tree, classification));
         }
 
@@ -103,6 +104,7 @@ internal sealed class GrowthModel
     }
 
     /// <summary>保存当前扫描（界面上的"立即创建快照"，文件夹扫描也可以），返回新的模型。</summary>
-    public static GrowthModel SaveCurrent(SnapshotStore store, ScanResult result, Classification? classification, DateTime nowUtc) =>
-        Build(store, result, classification, autoSave: false, nowUtc, forceSave: true);
+    public static GrowthModel SaveCurrent(SnapshotStore store, ScanResult result, Classification? classification, DateTime nowUtc,
+        SnapshotOptions? options = null, int keepDays = 180) =>
+        Build(store, result, classification, autoSave: false, nowUtc, forceSave: true, options, keepDays);
 }

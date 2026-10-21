@@ -14,6 +14,7 @@ namespace DiskThinner.App;
 ///   --snapshot-db a.db   快照库的位置
 ///   --no-auto-snapshot   扫描完整个盘后不自动保存快照
 ///   --user-db u.db       操作记录库的位置
+///   --settings s.json    设置文件的位置
 ///   --show-confirm       截图后再截一张"确认清理"对话框（只显示，不执行）
 ///   --view owner         空间浏览的视图（dir / owner / kind，对应按目录、按归属汇总、按类别汇总）
 ///   --no-rules           不加载规则和已装软件（对比内存用）
@@ -54,6 +55,9 @@ internal sealed record AppOptions
     /// <summary>截图后再打开"确认清理"对话框截一张（不会执行，截完就关掉）。</summary>
     public bool ShowConfirm { get; init; }
 
+    /// <summary>设置文件的位置（默认 %LOCALAPPDATA%\DiskThinner\settings.json；验证时指向别处）。</summary>
+    public string? SettingsFile { get; init; }
+
     public static AppOptions Parse(string[] args)
     {
         string? Value(string name)
@@ -74,7 +78,8 @@ internal sealed record AppOptions
             ExitAfterScan = Flag("--exit-after-scan"),
             PrimaryScreen = Flag("--primary-screen"),
             SecondaryScreen = Flag("--secondary-screen"),
-            StartPage = Value("--page") is { } page && page is "overview" or "explorer" or "growth" or "cleanup" or "log" ? page : null,
+            StartPage = Value("--page") is { } page && page is "overview" or "explorer" or "growth" or "cleanup" or "log" or "settings" ? page : null,
+            SettingsFile = Value("--settings"),
             SnapshotDb = Value("--snapshot-db"),
             NoAutoSnapshot = Flag("--no-auto-snapshot"),
             UserDb = Value("--user-db"),

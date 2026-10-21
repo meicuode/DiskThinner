@@ -62,6 +62,8 @@ internal static class Verifier
         {
             case MethodKind.Delete when method.Delete is null || !rule.Actions.Contains(method.Delete):
                 return VerifyResult.Refuse("删除方式不是规则给出的");
+            case MethodKind.Delete when method.Delete.OlderThanDays is { } ruleDays && (method.MinAgeDays is not { } days || days < ruleDays):
+                return VerifyResult.Refuse("时间条件比规则宽松");
             case MethodKind.Command when method.Command is null || !CommandRunner.IsWhitelisted(method.Command) ||
                                          !rule.Actions.OfType<CommandAction>().Any(a => a.CommandId == method.Command.Id):
                 return VerifyResult.Refuse("命令不在白名单里，或不是规则给出的");

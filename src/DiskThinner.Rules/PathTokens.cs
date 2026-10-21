@@ -60,6 +60,14 @@ public static class PathTokens
         return null;
     }
 
+    /// <summary>
+    /// 保护名单的模式：内置项和规则一样以令牌开头；用户在设置里追加的保护目录可以是任意盘上的绝对路径（不含通配符）。
+    /// </summary>
+    public static string ExpandProtection(string pattern, PathContext ctx) =>
+        LeadingToken(pattern) is null && Path.IsPathFullyQualified(pattern) && !pattern.StartsWith(@"\\", StringComparison.Ordinal)
+            ? pattern.TrimEnd('\\')
+            : Expand(pattern, ctx);
+
     /// <summary>把开头的令牌展开成绝对路径模式；没有已知令牌时抛出异常。</summary>
     public static string Expand(string pattern, PathContext ctx)
     {

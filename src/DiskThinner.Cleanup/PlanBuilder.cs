@@ -33,6 +33,11 @@ public sealed record PlanOptions
 
     /// <summary>"已拦截"最多列出多少项。</summary>
     public int MaxBlocked { get; init; } = 30;
+
+    /// <summary>
+    /// 设置里的"临时文件只删 N 天前的"：临时文件类规则本来就带时间条件时，取规则和设置里更严格的那个（只会更保守）。
+    /// </summary>
+    public int? MinTempAgeDays { get; init; }
 }
 
 /// <summary>
@@ -110,16 +115,18 @@ public static class PlanBuilder
                 switch (action)
                 {
                     case DeleteAction d:
-                        var est = Simulate(tree, c, node, d, allowSoft, o.NowUtc, methods.Any(m => m.Kind == MethodKind.Delete) ? null : protectedNodes);
+                        var minAge = d.OlderThanDays is { } ruleDays && rule.Kind == Kind.Temp && o.MinTempAgeDays is { } setting && setting > ruleDays ? setting : d.OlderThanDays;
+                        var est = Simulate(tree, c, node, d with { OlderThanDays = minAge }, allowSoft, o.NowUtc, methods.Any(m => m.Kind == MethodKind.Delete) ? null : protectedNodes);
                         methods.Add(new PlanMethod(MethodKind.Delete, "直接删除")
                         {
                             Delete = d,
+                            MinAgeDays = minAge,
                             EstimatedBytes = est.Bytes,
                             Files = est.Files,
                             OldestUtc = est.Oldest,
                             NewestUtc = est.Newest,
                         });
-                        if (CleanupText.Filters(d) is { } filters)
+                        if (CleanupText.Filters(d with { OlderThanDays = minAge }) is { } filters)
                         {
                             hints.Add(filters);
                         }

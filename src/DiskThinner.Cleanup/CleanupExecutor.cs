@@ -23,6 +23,9 @@ public sealed record ExecutorOptions
     public Func<PlanItem, IReadOnlyList<FileHolder>, bool>? AskCloseApps { get; init; }
 
     public Func<DateTime> UtcNow { get; init; } = static () => DateTime.UtcNow;
+
+    /// <summary>用户在设置里追加的保护目录。执行时立即生效（计划是在添加之前生成的也一样）。</summary>
+    public IReadOnlyList<ProtectionEntry> ExtraProtection { get; init; } = [];
 }
 
 /// <summary>执行时的进度：第几项、这一项删了多少。</summary>
@@ -40,7 +43,7 @@ public sealed record CleanupRun(string RunId, IReadOnlyList<ItemResult> Results,
 /// </summary>
 public sealed class CleanupExecutor(RuleEngine engine, AuditLog? audit, ExecutorOptions options)
 {
-    private readonly ProtectionCheck _protection = engine.CreateProtectionCheck();
+    private readonly ProtectionCheck _protection = engine.CreateProtectionCheck(options.ExtraProtection);
 
     public CleanupRun Execute(IReadOnlyList<PlanItem> items, IProgress<ExecProgress>? progress, CancellationToken token)
     {
@@ -108,7 +111,7 @@ public sealed class CleanupExecutor(RuleEngine engine, AuditLog? audit, Executor
         }
 
         var d = method.Delete!;
-        var cutoff = d.OlderThanDays is { } days ? options.UtcNow().AddDays(-days) : (DateTime?)null;
+        var cutoff = (method.MinAgeDays ?? d.OlderThanDays) is { } days ? options.UtcNow().AddDays(-days) : (DateTime?)null;
         var outcome = Delete(item, d, verify, cutoff, progress, token);
         if (outcome.LockedCount > 0 && !outcome.Cancelled && options.AskCloseApps is { } ask)
         {

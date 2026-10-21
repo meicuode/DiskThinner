@@ -1,0 +1,32 @@
+# 研发方案第 6 节：构建、单元测试、规则校验。MFT 扫描和测试盘上的删除验收需要管理员，在本机用 tools/verify 下的脚本跑。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      DOTNET_CLI_UI_LANGUAGE: en
+      DOTNET_NOLOGO: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: 规则校验
+        run: dotnet run --project tools/dtrule -c Release -- validate rules
+
+      - name: 构建
+        run: dotnet build DiskThinner.slnx -c Release
+
+      - name: 测试
+        run: dotnet test DiskThinner.slnx -c Release --no-build --blame-hang-timeout 90s

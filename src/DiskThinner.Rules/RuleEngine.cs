@@ -43,7 +43,13 @@ public sealed class RuleEngine
 
         for (var i = 0; i < Protections.Count - 1; i++)
         {
-            entries.Add(new Entry(Compile(Protections[i].Pattern, context), -1, i, MatchMode.Dir, []));
+            var pattern = CompiledPattern.Compile(PathTokens.ExpandProtection(Protections[i].Pattern, context));
+            if (pattern.Segments.Count > MaxSegments)
+            {
+                throw new FormatException($"路径层数过多：{Protections[i].Pattern}");
+            }
+
+            entries.Add(new Entry(pattern, -1, i, MatchMode.Dir, []));
         }
 
         _entries = [.. entries];
@@ -358,8 +364,8 @@ public sealed class RuleEngine
         }
     }
 
-    /// <summary>和这个引擎同一套保护名单（内置 + 追加）的逐路径检查。</summary>
-    public ProtectionCheck CreateProtectionCheck() => new(Context, _extraProtection);
+    /// <summary>和这个引擎同一套保护名单（内置 + 追加），可以再加几项（用户刚刚在设置里添加的）。</summary>
+    public ProtectionCheck CreateProtectionCheck(IEnumerable<ProtectionEntry>? more = null) => new(Context, [.. _extraProtection, .. more ?? []]);
 
     /// <summary>
     /// 执行清理前的复核：规则 <paramref name="ruleIndex"/> 现在是否仍然命中 <paramref name="path"/>。

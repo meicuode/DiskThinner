@@ -31,6 +31,9 @@ internal sealed class MainForm : Form
     private readonly GrowthPage _growthPage = new() { Dock = DockStyle.Fill };
     private readonly CleanupPage _cleanupPage = new() { Dock = DockStyle.Fill };
     private readonly HistoryPage _historyPage = new() { Dock = DockStyle.Fill };
+    private readonly SettingsPage _settingsPage = new() { Dock = DockStyle.Fill };
+    private readonly string _settingsPath;
+    private Settings.AppSettings _settings;
     private readonly AccountInfo _account = AccountInfo.Current();
     private AuditLog? _audit;
     private string? _auditError;
@@ -53,6 +56,12 @@ internal sealed class MainForm : Form
     public MainForm(AppOptions options)
     {
         _options = options;
+        _settingsPath = options.SettingsFile ?? Settings.AppSettings.DefaultPath;
+        _settings = Settings.AppSettings.Load(_settingsPath, out var settingsError);
+        if (settingsError is not null)
+        {
+            AppLog.Write("设置文件读不了，用默认值：" + settingsError);
+        }
 
         // 所有在构造函数里给出的尺寸都按 96 DPI 写，由 WinForms 按窗口所在显示器的 DPI 统一缩放。
         // 和设计器生成的代码一样，必须包在 SuspendLayout / ResumeLayout 里，自动缩放才会在布局恢复时执行。
@@ -95,7 +104,7 @@ internal sealed class MainForm : Form
         _pages["growth"] = _growthPage;
         _pages["cleanup"] = _cleanupPage;
         _pages["log"] = _historyPage;
-        _pages["settings"] = new PlaceholderPage("设置", "M5", "快照、清理、保护名单和规则设置。");
+        _pages["settings"] = _settingsPage;
         foreach (var page in _pages.Values)
         {
             page.Dock = DockStyle.Fill;
@@ -129,6 +138,10 @@ internal sealed class MainForm : Form
         _cleanupPage.ExecuteRequested += (_, _) => ExecuteCleanup();
         _cleanupPage.ExportRequested += (_, _) => ExportPlan();
         _historyPage.SetLog(EnsureAudit(), _auditError);
+        _settingsPage.SetSettings(_settings);
+        _settingsPage.SetInfo(0, null, 0);
+        _settingsPage.SettingsChanged += (_, s) => ApplySettings(s);
+        _settingsPage.ScheduleChanged += (_, e) => SetSchedule(e.Enabled, e.Time);
         _rescan.Click += (_, _) => StartScan(SelectedDrive());
         _drives.SelectedIndexChanged += (_, _) =>
         {
@@ -399,6 +412,8 @@ internal sealed class MainForm : Form
             : _engine is { } eng && analysis is not null
                 ? $"规则 {eng.Rules.Locations.Count} 条 · 已装软件 {analysis.Owners.Inventory.Apps.Count} 项 · 匹配和归属 {(analysis.C.Duration + analysis.Owners.Duration).TotalSeconds:F1} 秒"
                 : "规则没有加载：" + _rulesError;
+        _settingsPage.SetInfo(_engine?.Rules.Locations.Count ?? 0, _rulesError, _store?.FileBytes ?? 0);
+        AppLog.Write($"扫描完成：{drive}，{result.Stats.Mode}，{result.Tree.Count} 项，{result.Stats.TotalDuration.TotalSeconds:F1} 秒；清理计划 {analysis?.Plan.Items.Count ?? 0} 项");
         LoadDrives();
         SelectDriveInCombo(drive);
         await AfterScanAutomation(result, peakAfterScan, renderWatch);
@@ -473,7 +488,36 @@ internal sealed class MainForm : Form
             RunningExes = running,
             HardLinksKnown = r.Stats.Mode == ScanMode.Mft,
             OwnerOf = owners.OwnerOf,
+            MinTempAgeDays = _settings.Cleanup.TempMinAgeDays,
         });
+    }
+
+    /// <summary>设置页改了设置：保存，再把能立即生效的部分应用上。</summary>
+    private void ApplySettings(Settings.AppSettings next)
+    {
+        var previous = _settings;
+        _settings = next;
+        try
+        {
+            next.Save(_settingsPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "保存设置失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        AppLog.Write("设置已更新");
+        if (!previous.Cleanup.ProtectedPaths.SequenceEqual(next.Cleanup.ProtectedPaths, StringComparer.OrdinalIgnoreCase))
+        {
+            // 执行清理时立即按新名单复核；规则引擎重新加载后，下次扫描的计划和标签也会更新
+            _engine = null;
+            _cleanupPage.RefreshItems("保护名单已更新：执行清理时立即生效；重新扫描后清理计划会更新。");
+        }
+        else if (previous.Cleanup.TempMinAgeDays != next.Cleanup.TempMinAgeDays && _analysis is { } a && _lastResult is { } r
+                 && _cleanupPage.Plan.Items.All(i => i.State == PlanItemState.Pending))
+        {
+            _cleanupPage.SetPlan(BuildPlan(r, a.C, a.Owners, a.Owners.Inventory), null);
+        }
     }
 
     /// <summary>操作记录库（user.db）。打不开时返回 null：这时不允许执行清理（没有记录就不删）。</summary>
@@ -548,7 +592,7 @@ internal sealed class MainForm : Form
 
         var manual = plan.Items.Count(i => i.Selectable && i.Selected && i.Method?.Kind == MethodKind.Manual && i.State == PlanItemState.Pending);
         bool askWhenLocked;
-        using (var confirm = new ConfirmCleanupDialog(toRun, manual))
+        using (var confirm = new ConfirmCleanupDialog(toRun, manual, _settings.Cleanup.AskWhenLocked))
         {
             if (confirm.ShowDialog(this) != DialogResult.OK)
             {
@@ -569,7 +613,8 @@ internal sealed class MainForm : Form
                     "要请它们正常关闭后再试一次吗？不会强制结束，程序可能会提示保存。选\u201c否\u201d则跳过这些文件。",
                     "有文件被占用", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
                 : null;
-            var executor = new CleanupExecutor(engine, audit, new ExecutorOptions { Account = _account, AskCloseApps = ask });
+            var executor = new CleanupExecutor(engine, audit, new ExecutorOptions { Account = _account, AskCloseApps = ask, ExtraProtection = _settings.ProtectionEntries() });
+            AppLog.Write($"开始清理 {toRun.Count} 项，预计释放 {toRun.Sum(i => i.EstimatedBytes)} 字节");
             progressDialog.Shown += async (_, _) =>
             {
                 try
@@ -586,6 +631,7 @@ internal sealed class MainForm : Form
             progressDialog.ShowDialog(this);
         }
 
+        AppLog.Write(run is null ? "清理出错：" + error?.Message : $"清理结束：释放 {run.FreedBytes} 字节，{run.Results.Count} 项，用时 {run.Duration.TotalSeconds:F1} 秒{(run.Cancelled ? "（被停止）" : "")}");
         _cleanupPage.RefreshItems("已执行清理，结果见操作记录。磁盘上的内容已经变了，重新扫描后会生成新的计划。");
         _historyPage.Reload();
         if (error is not null)
@@ -701,7 +747,9 @@ internal sealed class MainForm : Form
         {
             _store ??= new SnapshotStore(_options.SnapshotDb ?? SnapshotStore.DefaultPath);
             _storeError = null;
-            return GrowthModel.Build(_store, r, c, autoSave: !_options.NoAutoSnapshot, nowUtc);
+            var s = _settings;
+            return GrowthModel.Build(_store, r, c, autoSave: !_options.NoAutoSnapshot && s.Snapshot.AutoAfterScan, nowUtc,
+                options: s.SnapshotOptions(), keepDays: s.Snapshot.KeepDays);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException
                                        or ArgumentException or KeyNotFoundException or Microsoft.Data.Sqlite.SqliteException)
@@ -727,7 +775,8 @@ internal sealed class MainForm : Form
         var classification = _explorer.Classification;
         try
         {
-            var model = await Task.Run(() => GrowthModel.SaveCurrent(store, result, classification, DateTime.UtcNow));
+            var s = _settings;
+            var model = await Task.Run(() => GrowthModel.SaveCurrent(store, result, classification, DateTime.UtcNow, s.SnapshotOptions(), s.Snapshot.KeepDays));
             if (ReferenceEquals(result, _lastResult))
             {
                 ApplyGrowth(model);
@@ -758,11 +807,19 @@ internal sealed class MainForm : Form
         if (!IsDisposed)
         {
             _growthPage.SetSchedule(status);
+            _settingsPage.SetSchedule(status);
         }
     }
 
-    /// <summary>开启或关闭每日快照。管理员模式下注册的任务用最高权限（MFT 扫描）；普通权限下注册的任务用遍历扫描。</summary>
+    /// <summary>增长分析页的"开启 / 关闭每日快照"。</summary>
     private async void ToggleSchedule()
+    {
+        var registered = await Task.Run(() => ScheduledSnapshot.Query().Registered);
+        SetSchedule(!registered, _settings.Snapshot.DailyTime);
+    }
+
+    /// <summary>开启（或改时间）、关闭每日快照。管理员模式下注册的任务用最高权限（MFT 扫描）；普通权限下注册的任务用遍历扫描。</summary>
+    private async void SetSchedule(bool enabled, string time)
     {
         var exe = Environment.ProcessPath;
         if (exe is null)
@@ -774,8 +831,10 @@ internal sealed class MainForm : Form
         var (ok, message) = await Task.Run(() =>
         {
             var status = ScheduledSnapshot.Query();
-            return status.Registered ? ScheduledSnapshot.Unregister() : ScheduledSnapshot.Register(exe, ScheduledSnapshot.DefaultTime, _elevated, drive);
+            return enabled ? ScheduledSnapshot.Register(exe, time, _elevated, drive)
+                : status.Registered ? ScheduledSnapshot.Unregister() : (true, "");
         });
+        AppLog.Write(ok ? (enabled ? $"每日快照已开启（{time}）" : "每日快照已关闭") : "设置每日快照失败：" + message);
         if (!ok)
         {
             MessageBox.Show(this, "设置每日快照失败：" + message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -990,7 +1049,7 @@ internal sealed class MainForm : Form
 
         try
         {
-            _engine = new DiskThinner.Rules.RuleEngine(Rules.RuleStore.LoadBuiltIn(), DiskThinner.Rules.PathContext.FromSystem());
+            _engine = new DiskThinner.Rules.RuleEngine(Rules.RuleStore.LoadBuiltIn(), DiskThinner.Rules.PathContext.FromSystem(), _settings.ProtectionEntries());
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or FormatException or InvalidOperationException
                                        or Microsoft.Data.Sqlite.SqliteException)

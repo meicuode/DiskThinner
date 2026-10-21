@@ -164,6 +164,59 @@ public sealed class PlanTests : IDisposable
     }
 
     [Fact]
+    public void TempAgeSettingCanOnlyMakeTheFilterStricter()
+    {
+        _f.File(L(@"Temp\three-days.bin"), 128 * Kb, Now.AddDays(-3));
+        _f.File(L(@"Temp\ten-days.bin"), 64 * Kb, Now.AddDays(-10));
+        var rule = Fixture.Rule("t.temp", @"%LOCALAPPDATA%\Temp", Risk.Safe, new DeleteAction(DeleteScope.Children, OlderThanDays: 1)) with { Kind = Kind.Temp };
+        var env = _f.Plan([rule], new PlanOptions { NowUtc = Now, MinTempAgeDays = 7 });
+        var item = env.Item(L("Temp"));
+        Assert.Equal(7, item.Method!.MinAgeDays);
+        Assert.Equal(64 * Kb, item.EstimatedBytes);
+        Assert.Contains("只删 7 天前的文件", item.Hint);
+
+        // 设置比规则宽松时以规则为准
+        var looser = _f.Plan([Fixture.Rule("t.temp", @"%LOCALAPPDATA%\Temp", Risk.Safe, new DeleteAction(DeleteScope.Children, OlderThanDays: 14)) with { Kind = Kind.Temp }],
+            new PlanOptions { NowUtc = Now, MinTempAgeDays = 7 });
+        Assert.Equal(14, looser.Item(L("Temp")).Method!.MinAgeDays);
+
+        // 方式被改得比规则宽松：执行前复核拒绝
+        item.Method = item.Method with { MinAgeDays = 0 };
+        var refused = Assert.Single(env.Run(item).Results);
+        Assert.Equal(AuditResult.NotRun, refused.Result);
+
+        item.Method = item.Methods[0];
+        item.State = PlanItemState.Pending;
+        env.Run(item);
+        Assert.True(File.Exists(L(@"Temp\three-days.bin")));
+        Assert.False(File.Exists(L(@"Temp\ten-days.bin")));
+    }
+
+    [Fact]
+    public void ProtectedFoldersAddedLaterAreHonouredAtExecution()
+    {
+        var keep = _f.File(L(@"Cache\keep\important.bin"), 128 * Kb);
+        var other = _f.File(L(@"Cache\other.bin"), 128 * Kb);
+        var env = _f.Plan([Fixture.Rule("t.cache", @"%LOCALAPPDATA%\Cache", Risk.Safe, new DeleteAction(DeleteScope.Contents))]);
+        var item = env.Item(L("Cache"));
+
+        // 计划生成之后用户才在设置里加了保护目录（任意绝对路径）：执行时立即生效
+        var mine = new ProtectionEntry(L(@"Cache\keep"), ProtectionLevel.Hard, "你添加的保护目录");
+        var r = Assert.Single(env.Run(new ExecutorOptions { ExtraProtection = [mine] }, item).Results);
+        Assert.True(File.Exists(keep));
+        Assert.False(File.Exists(other));
+        Assert.Equal(1, r.Delete!.ProtectedCount);
+
+        // 整个位置受保护时不执行
+        _f.File(L(@"Cache\again.bin"), 128 * Kb);
+        var again = _f.Plan([Fixture.Rule("t.cache", @"%LOCALAPPDATA%\Cache", Risk.Safe, new DeleteAction(DeleteScope.Contents))]);
+        var whole = new ProtectionEntry(L("Cache"), ProtectionLevel.Hard, "你添加的保护目录");
+        var refused = Assert.Single(again.Run(new ExecutorOptions { ExtraProtection = [whole] }, again.Item(L("Cache"))).Results);
+        Assert.Equal(AuditResult.NotRun, refused.Result);
+        Assert.Contains("你添加的保护目录", refused.Text);
+    }
+
+    [Fact]
     public void ManualItemsAreNeverExecuted()
     {
         var file = _f.File(L(@"Cache\a.bin"), 256 * Kb);
@@ -181,10 +234,9 @@ public sealed class PlanTests : IDisposable
     [Fact]
     public void CurrentAccountMatchesTheLoggedOnUser()
     {
-        // 测试和登录用户是同一个账户运行的：不应判为不一致
+        // 测试和登录用户是同一个账户运行的：不应判为不一致（CI 这类没有交互会话的环境查不到会话用户，也不算不一致）
         var account = AccountInfo.Current();
         Assert.False(string.IsNullOrEmpty(account.ProcessUser));
-        Assert.NotNull(account.SessionUser);
         Assert.False(account.Mismatch, $"{account.ProcessUser} / {account.SessionUser}");
         Assert.Null(account.MismatchText);
     }

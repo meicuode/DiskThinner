@@ -11,7 +11,7 @@ public sealed class ProtectionCheck
     public ProtectionCheck(PathContext context, IEnumerable<ProtectionEntry>? extra = null)
     {
         _entries = ProtectionList.BuiltIn.Concat(extra ?? [])
-            .Select(e => (CompiledPattern.Compile(PathTokens.Expand(e.Pattern, context)), e))
+            .Select(e => (CompiledPattern.Compile(PathTokens.ExpandProtection(e.Pattern, context)), e))
             .ToArray();
     }
 

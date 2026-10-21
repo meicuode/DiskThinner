@@ -52,7 +52,8 @@ internal static class SnapshotCommand
                 ?? (target is not null && Directory.Exists(target) ? Path.GetFullPath(target) : null)
                 ?? Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
             var store = new SnapshotStore(Value("--db") ?? SnapshotStore.DefaultPath);
-            var info = Take(store, drive, DateTime.UtcNow, CancellationToken.None);
+            var settings = Settings.AppSettings.Load(Settings.AppSettings.DefaultPath, out _);
+            var info = Take(store, drive, DateTime.UtcNow, CancellationToken.None, settings.SnapshotOptions(), settings.Snapshot.KeepDays);
             Log($"{info.Volume} 快照完成：{(info.ScanMode == "mft" ? "MFT" : "遍历")}扫描，{info.Entries:N0} 项，已用 {ByteSize.Format(info.UsedBytes)}，可用 {ByteSize.Format(info.FreeBytes)}");
             return 0;
         }
@@ -65,15 +66,15 @@ internal static class SnapshotCommand
     }
 
     /// <summary>扫描并保存一次快照，再按保留策略清理旧快照。界面里的"立即创建快照"不重新扫描，直接用 <see cref="SnapshotStore.Save"/>。</summary>
-    public static SnapshotInfo Take(SnapshotStore store, string drive, DateTime nowUtc, CancellationToken token)
+    public static SnapshotInfo Take(SnapshotStore store, string drive, DateTime nowUtc, CancellationToken token, SnapshotOptions? options = null, int keepDays = 180)
     {
         var latency = System.Runtime.GCSettings.LatencyMode;
         System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Batch;
         try
         {
             var result = VolumeScanner.Scan(drive, ScanPreference.Auto, null, token);
-            var saved = store.Save(result.Tree, result.Stats, nowUtc);
-            store.ApplyRetention(nowUtc);
+            var saved = store.Save(result.Tree, result.Stats, nowUtc, options);
+            store.ApplyRetention(nowUtc, keepDays);
             return saved.Info;
         }
         finally
@@ -83,22 +84,5 @@ internal static class SnapshotCommand
     }
 
     /// <summary>追加一行日志；日志超过 256 KB 时只保留后一半。</summary>
-    internal static void Log(string message)
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
-            if (File.Exists(LogPath) && new FileInfo(LogPath).Length > 256 * 1024)
-            {
-                var lines = File.ReadAllLines(LogPath);
-                File.WriteAllLines(LogPath, lines[(lines.Length / 2)..]);
-            }
-
-            File.AppendAllLines(LogPath, [$"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)} [{Environment.ProcessId}] {message}"]);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Debug.WriteLine(ex.Message);
-        }
-    }
+    internal static void Log(string message) => AppLog.Append(LogPath, message, 256 * 1024);
 }
