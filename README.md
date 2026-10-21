@@ -62,11 +62,25 @@ dotnet run --project src/DiskThinner.App
 dotnet run --project tools/dtrule -- validate rules
 dotnet run --project tools/dtrule -- probe rules --drive C:\ --out probe.md
 
-# 打包两个发布 zip 到 artifacts\release\<版本>\
-pwsh -File tools/release/build-release.ps1
+# 在本机打包两个发布 zip 到 artifacts\release\<版本>\（不带 -Version 时用 Directory.Build.props 里的版本号）
+pwsh -File tools/release/build-release.ps1 [-Version 0.2.0]
 ```
 
-主程序构建时会自动用 dtrule 校验 `rules/` 并编译成内置规则库；规则有错误时构建失败。GitHub Actions 跑构建、测试和规则校验。MFT 扫描和删除类验收需要管理员，用 `tools/verify/` 下的脚本在本机跑（删除类验收在新建的 VHDX 测试盘上进行）。
+主程序构建时会自动用 dtrule 校验 `rules/` 并编译成内置规则库；规则有错误时构建失败。MFT 扫描和删除类验收需要管理员，用 `tools/verify/` 下的脚本在本机跑（删除类验收在新建的 VHDX 测试盘上进行）。
+
+GitHub Actions：
+
+- `ci.yml`：推送到 main 和 PR 时跑规则校验、构建、测试。
+- `release.yml`：推送 `v主.次.修订` 形式的标签（如 `v0.2.0`，或 `v0.2.0-beta.1` 发布为预发布）时，跑同样的检查，打两个 zip，创建 GitHub Release 并上传 zip 和 `SHA256SUMS.txt`。版本号以标签为准；发布说明取 `docs/release-notes-<版本>.md`，没有就用通用说明。
+
+发布新版本：
+
+```powershell
+# 1. 改 Directory.Build.props 里的 <Version>，写 docs/release-notes-<版本>.md，提交
+# 2. 打标签并推送，Release 工作流会自动构建和发布
+git tag v0.2.0
+git push origin v0.2.0
+```
 
 ## 文档
 

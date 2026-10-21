@@ -1,0 +1,114 @@
+# 推送 v主.次.修订 形式的标签（例如 v0.1.0、v0.2.0-beta.1）时：规则校验、构建、测试，
+# 用 tools/release/build-release.ps1 打两个 zip，然后创建 GitHub Release 并上传 zip 和 SHA256SUMS.txt。
+# 版本号以标签为准；和 Directory.Build.props 不一致时只给警告。带 - 后缀的版本发布为预发布。
+# 发布说明取 docs/release-notes-<版本>.md（没有就用一段通用说明），末尾自动附上校验值。
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      DOTNET_CLI_UI_LANGUAGE: en
+      DOTNET_NOLOGO: true
+      # 标签名只通过环境变量进入脚本，不直接拼进命令行
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: 版本号
+        id: version
+        shell: pwsh
+        run: |
+          if (-not ($env:TAG -cmatch '^v(\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?)$')) {
+            throw "标签格式不对：$env:TAG（应为 v主.次.修订，可带预发布后缀，例如 v0.2.0-beta.1）"
+          }
+          $version = $Matches[1]
+          [xml] $props = Get-Content Directory.Build.props
+          $declared = $props.Project.PropertyGroup.Version
+          if ($declared -ne $version) {
+            "::warning::Directory.Build.props 里的版本号是 $declared，这次按标签 $version 构建。下次发布前记得同步。"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$(if ($version.Contains('-')) { 'true' } else { 'false' })" >> $env:GITHUB_OUTPUT
+
+      - name: 规则校验
+        run: dotnet run --project tools/dtrule -c Release -- validate rules
+
+      - name: 构建
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: dotnet build DiskThinner.slnx -c Release "-p:Version=$env:VERSION"
+
+      - name: 测试
+        run: dotnet test DiskThinner.slnx -c Release --no-build --blame-hang-timeout 90s
+
+      - name: 打包
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: pwsh -NoProfile -File tools/release/build-release.ps1 -Version $env:VERSION
+
+      - name: 保存构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiskThinner-${{ steps.version.outputs.version }}
+          path: |
+            artifacts/release/${{ steps.version.outputs.version }}/*.zip
+            artifacts/release/${{ steps.version.outputs.version }}/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: 发布说明
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # 反引号在 PowerShell 双引号字符串里是转义符：代码块标记和文件名的反引号都用单引号字面量拼
+          $v = $env:VERSION
+          $q = '`'
+          $fence = '```'
+          $out = "artifacts/release/$v"
+          $notesFile = "docs/release-notes-$v.md"
+          # 外层的 @() 不能省：if 只返回一个元素时 PowerShell 会把它拆成字符串，后面的 += 就变成字符串拼接
+          $lines = @(if (Test-Path $notesFile) { (Get-Content $notesFile -Raw -Encoding utf8).TrimEnd() } else {
+            "# DiskThinner $v", '',
+            "- ${q}DiskThinner-$v-win-x64.zip${q}：需要先装 .NET 10 桌面运行库（x64）",
+            "- ${q}DiskThinner-$v-win-x64-selfcontained.zip${q}：单个 exe，不需要装运行库", '',
+            '解压后运行 DiskThinner.exe。删除是永久的，不经过回收站。'
+          })
+          $sums = @(Get-Content "$out/SHA256SUMS.txt" | Where-Object { $_.Trim() })
+          $lines += @('', '## SHA-256', '', $fence) + $sums + @($fence, '', "构建自 $env:GITHUB_SHA")
+          Set-Content "$out/release-notes.md" (($lines -join "`n") + "`n") -Encoding utf8NoBOM -NoNewline
+
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          $out = "artifacts/release/$env:VERSION"
+          $files = @(Get-ChildItem "$out/*.zip" | ForEach-Object FullName) + (Resolve-Path "$out/SHA256SUMS.txt").Path
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            # 重新运行同一个标签：替换附件和说明，不新建
+            gh release upload $env:TAG @files --clobber
+            if ($LASTEXITCODE -ne 0) { throw '上传附件失败' }
+            gh release edit $env:TAG --notes-file "$out/release-notes.md"
+          } else {
+            $ghArgs = @('release', 'create', $env:TAG) + $files + @('--title', "DiskThinner $env:VERSION", '--notes-file', "$out/release-notes.md", '--verify-tag')
+            if ($env:PRERELEASE -eq 'true') { $ghArgs += '--prerelease' }
+            gh @ghArgs
+          }
+          if ($LASTEXITCODE -ne 0) { throw '创建 Release 失败' }
