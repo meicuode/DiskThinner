@@ -12,7 +12,7 @@ M5：设置页和 settings.json、程序日志和未处理异常的兜底、两�
 | 依赖运行库的包 | `DiskThinner-0.1.0-win-x64.zip` 1.6 MB，17 个文件，exe 0.2 MB（目标 ≤ 10 MB） |
 | 单文件自包含的包 | `DiskThinner-0.1.0-win-x64-selfcontained.zip` 44.5 MB，exe 105.6 MB（不压缩，原因见下） |
 | 发布包能运行 | 两个 zip 解压后各自扫描文件夹、加载 142 条规则、生成计划后正常退出；管理员下两个包各用 MFT 扫描一次 C 盘（3.3 秒、3.1 秒，185 项清理计划），自包含版的 snapshot 子命令正常（快照库 156 KB） |
-| 干净的 Windows 10 / 11 虚拟机（验收） | **没有做**：这台开发机是 Windows 11 家庭版，没有 Hyper-V 和 Windows 沙盒。下面列了需要在虚拟机上走的步骤 |
+| 干净的 Windows 10 / 11 虚拟机（验收） | **部分完成**：开发机是 Windows 11 家庭版，没有 Hyper-V 和沙盒。改为在 GitHub Actions 全新的 windows-2022 和 windows-2025 上冒烟测试（见"CI 和自动发布"），通过。桌面版上的普通权限流程和没装运行库时的提示还要按下面的步骤走一遍 |
 | 发布 v0.1.0（验收） | **还没做**：代码已推到 GitHub；推送 `v0.1.0` 标签后由 Release 工作流自动构建并发布（见"CI 和自动发布"）。发布说明在 `docs/release-notes-0.1.0.md` |
 | 测试 | 246 个全部通过（Rules 102，Scanner 35，Storage 20，Cleanup 30，App 59）；Debug 和 Release 构建都是 0 警告 0 错误 |
 
@@ -50,7 +50,15 @@ M5：设置页和 settings.json、程序日志和未处理异常的兜底、两�
 ## CI 和自动发布
 
 - `.github/workflows/ci.yml`：windows-latest 上规则校验、Release 构建、全部单元测试。推到 GitHub 后第一次运行（提交 `f1f930d`）通过。CI 里没有交互会话，账户检查的测试放宽为"查不到会话用户时不算不一致"。
-- `.github/workflows/release.yml`（M5 之后补充）：推送 `v*.*.*` 标签时检查标签格式、规则校验、构建、测试，用打包脚本打两个 zip（版本号以标签为准，和 `Directory.Build.props` 不一致时给警告），上传构建产物，创建 GitHub Release 并附上两个 zip 和 `SHA256SUMS.txt`；带 `-` 后缀的版本发布为预发布；同一个标签重新运行时替换附件。本地演练了标签解析（合法、预发布、缺修订号、含分号四种）、发布说明生成（有和没有说明文件两种）、打包脚本的 `-Version` 参数，各步骤的 PowerShell 都能解析，YAML 用 pyyaml 校验通过；创建 Release 这一步要等推送第一个标签才能实际验证。
+- `.github/workflows/release.yml`（M5 之后补充）：推送 `v*.*.*` 标签时检查标签格式、规则校验、构建、测试，用打包脚本打两个 zip（版本号以标签为准，和 `Directory.Build.props` 不一致时给警告），上传构建产物，创建 GitHub Release 并附上两个 zip 和 `SHA256SUMS.txt`；带 `-` 后缀的版本发布为预发布；同一个标签重新运行时替换附件。本地演练了标签解析（合法、预发布、缺修订号、含分号四种）、发布说明生成（有和没有说明文件两种）、打包脚本的 `-Version` 参数，各步骤的 PowerShell 都能解析，YAML 用 pyyaml 校验通过。
+- `.github/workflows/package.yml`：打包后在全新的 windows-2022 和 windows-2025 上运行 `tools/verify/smoke.ps1`，CI（推送到 main）和发布都会调用；发布要等冒烟测试通过。第一次运行时打包失败，暴露了一个本机没发现的问题：`dotnet publish -r win-x64` 把 RuntimeIdentifier 传给了规则编译工具 dtrule，它输出到 `win-x64` 子目录，干净的机器上主程序找不到它。本机一直有早先构建留下的 dtrule.dll，所以没暴露。修正后在新克隆的仓库里验证，CI 全部通过（提交 `abf1d13`）：
+
+| 机器 | 自包含版：MFT 扫描 C 盘 | 峰值 | 清理计划 | 快照 |
+|---|---|---|---|---|
+| windows-2022 | 1,783,411 项，15.6 秒 | 366 MB | 27 项，默认勾选 20 项，预计释放 1,285 MB | 192 KB |
+| windows-2025 | 1,403,124 项，9.8 秒 | 323 MB | 15 项，默认勾选 11 项，预计释放 1,266 MB | 128 KB |
+
+两台机器上依赖运行库的版本（装好 .NET 10 之后）和自包含版扫描测试文件夹、snapshot 子命令都正常，没有崩溃报告。CI 机器的 C 盘比开发机多 35% 到 70% 的文件，峰值内存按文件数增长（开发机约 104 万项时 264 MB），超过了 300 MB 的目标；MFT 扫描 15.6 秒也超过了 10 秒的目标（虚拟机磁盘较慢）。
 
 ## 干净虚拟机上的验收步骤（待做）
 
