@@ -136,6 +136,32 @@ public sealed class CompiledPattern
     /// <summary>直接判断完整路径是否匹配（不走树，测试和 not_under 条件用）。</summary>
     public bool Matches(string path) => MatchFrom(path.TrimEnd('\\').Split('\\'), 0, 0);
 
+    /// <summary>
+    /// 这个模式能不能匹配 <paramref name="path"/> 下面（更深处）的某个路径：路径的每一段都被模式的前几段消耗掉，
+    /// 而且模式还有剩下的段（或者停在 ** 上）。清理时用它挑出和某个目录有关的保护项，逐项检查只看这几项。
+    /// </summary>
+    public bool CouldMatchBelow(string path) => PartialFrom(path.TrimEnd('\\').Split('\\'), 0, 0);
+
+    private bool PartialFrom(string[] parts, int pi, int si)
+    {
+        if (si == Segments.Count)
+        {
+            return false;
+        }
+
+        if (Segments[si].AnyDepth)
+        {
+            return true; // ** 能吞掉剩下的所有段，并且继续匹配更深处
+        }
+
+        if (pi == parts.Length)
+        {
+            return true;
+        }
+
+        return Segments[si].Matches(parts[pi]) && PartialFrom(parts, pi + 1, si + 1);
+    }
+
     /// <summary>路径本身或它的某个上级目录匹配。</summary>
     public bool MatchesSelfOrAncestor(string path)
     {

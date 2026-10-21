@@ -10,9 +10,11 @@ namespace DiskThinner.App;
 ///   --report r.txt       扫描完成后写入耗时和内存
 ///   --exit-after-scan    完成上面几步后退出
 ///   --primary-screen     窗口放在主显示器上（--secondary-screen 放在另一个显示器上）
-///   --page explorer      启动后打开的页面（overview / explorer / growth）
+///   --page explorer      启动后打开的页面（overview / explorer / growth / cleanup / log）
 ///   --snapshot-db a.db   快照库的位置
 ///   --no-auto-snapshot   扫描完整个盘后不自动保存快照
+///   --user-db u.db       操作记录库的位置
+///   --show-confirm       截图后再截一张"确认清理"对话框（只显示，不执行）
 ///   --view owner         空间浏览的视图（dir / owner / kind，对应按目录、按归属汇总、按类别汇总）
 ///   --no-rules           不加载规则和已装软件（对比内存用）
 /// </summary>
@@ -46,6 +48,12 @@ internal sealed record AppOptions
     /// <summary>扫描完整个盘后不自动保存快照。</summary>
     public bool NoAutoSnapshot { get; init; }
 
+    /// <summary>操作记录库的位置（默认 %LOCALAPPDATA%\DiskThinner\user.db）。</summary>
+    public string? UserDb { get; init; }
+
+    /// <summary>截图后再打开"确认清理"对话框截一张（不会执行，截完就关掉）。</summary>
+    public bool ShowConfirm { get; init; }
+
     public static AppOptions Parse(string[] args)
     {
         string? Value(string name)
@@ -66,9 +74,11 @@ internal sealed record AppOptions
             ExitAfterScan = Flag("--exit-after-scan"),
             PrimaryScreen = Flag("--primary-screen"),
             SecondaryScreen = Flag("--secondary-screen"),
-            StartPage = Value("--page") is { } page && page is "overview" or "explorer" or "growth" ? page : null,
+            StartPage = Value("--page") is { } page && page is "overview" or "explorer" or "growth" or "cleanup" or "log" ? page : null,
             SnapshotDb = Value("--snapshot-db"),
             NoAutoSnapshot = Flag("--no-auto-snapshot"),
+            UserDb = Value("--user-db"),
+            ShowConfirm = Flag("--show-confirm"),
             StartView = Value("--view")?.ToLowerInvariant() switch
             {
                 "owner" => 1,

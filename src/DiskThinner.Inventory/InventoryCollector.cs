@@ -348,7 +348,7 @@ public static class InventoryCollector
     // ---------- 命令行工具 ----------
 
     /// <summary>PATH（进程、用户、系统三处）加上常见的工具目录；Windows 目录除外。</summary>
-    internal static List<string> CommandLineDirs()
+    public static List<string> CommandLineDirs()
     {
         var profile = Folder(Environment.SpecialFolder.UserProfile);
         var local = Folder(Environment.SpecialFolder.LocalApplicationData);

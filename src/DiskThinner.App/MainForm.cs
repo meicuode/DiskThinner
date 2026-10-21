@@ -1,15 +1,18 @@
 using System.Diagnostics;
 using System.Globalization;
 using DiskThinner.App.Controls;
+using DiskThinner.App.Dialogs;
 using DiskThinner.App.Explorer;
 using DiskThinner.App.Pages;
 using DiskThinner.App.Shell;
 using DiskThinner.App.Formatting;
 using DiskThinner.App.Growth;
+using DiskThinner.Cleanup;
 using DiskThinner.Core;
 using DiskThinner.Inventory;
 using DiskThinner.Rules;
 using DiskThinner.Scanner;
+using DiskThinner.Scanner.Walk;
 using DiskThinner.Storage;
 
 namespace DiskThinner.App;
@@ -26,6 +29,11 @@ internal sealed class MainForm : Form
     private readonly ToolStripStatusLabel _statusRules = new() { TextAlign = ContentAlignment.MiddleRight };
     private readonly ToolStripStatusLabel _statusSnapshot = new() { TextAlign = ContentAlignment.MiddleRight };
     private readonly GrowthPage _growthPage = new() { Dock = DockStyle.Fill };
+    private readonly CleanupPage _cleanupPage = new() { Dock = DockStyle.Fill };
+    private readonly HistoryPage _historyPage = new() { Dock = DockStyle.Fill };
+    private readonly AccountInfo _account = AccountInfo.Current();
+    private AuditLog? _audit;
+    private string? _auditError;
     private readonly Button _snapshot = Ui.Button("创建快照", accessibleDescription: "把当前扫描结果保存为快照，以后和它对比");
     private SnapshotStore? _store;
     private string? _storeError;
@@ -85,8 +93,8 @@ internal sealed class MainForm : Form
         _pages["explorer"] = _explorer;
         _pages["overview"] = _overview;
         _pages["growth"] = _growthPage;
-        _pages["cleanup"] = new PlaceholderPage("清理计划", "M4", "按风险分组的清理清单，确认后执行。");
-        _pages["log"] = new PlaceholderPage("操作记录", "M4", "每次删除、运行命令、手动清理和拦截的记录。");
+        _pages["cleanup"] = _cleanupPage;
+        _pages["log"] = _historyPage;
         _pages["settings"] = new PlaceholderPage("设置", "M5", "快照、清理、保护名单和规则设置。");
         foreach (var page in _pages.Values)
         {
@@ -110,6 +118,17 @@ internal sealed class MainForm : Form
         };
         _explorer.RestartRequested += (_, _) => RestartElevated();
         _explorer.CancelRequested += (_, _) => _scanCts?.Cancel();
+        _explorer.AddToPlanRequested += (_, r) => AddToPlan(r.Node, r.CommandId);
+        _cleanupPage.NavigateRequested += (_, node) =>
+        {
+            _nav.Select("explorer");
+            _explorer.Reveal(node);
+        };
+        _cleanupPage.OpenRequested += (_, item) => ShellActions.OpenLocation(item.Path, item.IsDirectory, this);
+        _cleanupPage.MeasureRequested += (_, item) => Measure(item);
+        _cleanupPage.ExecuteRequested += (_, _) => ExecuteCleanup();
+        _cleanupPage.ExportRequested += (_, _) => ExportPlan();
+        _historyPage.SetLog(EnsureAudit(), _auditError);
         _rescan.Click += (_, _) => StartScan(SelectedDrive());
         _drives.SelectedIndexChanged += (_, _) =>
         {
@@ -259,6 +278,7 @@ internal sealed class MainForm : Form
         _explorer.ShowProgress(title, hint, 0, cancellable: true);
         _overview.ShowScanning();
         _growthPage.ShowScanning();
+        _cleanupPage.ShowScanning();
         _snapshot.Enabled = false;
         _rescan.Enabled = false;
         _statusScan.Text = "正在扫描…";
@@ -365,6 +385,7 @@ internal sealed class MainForm : Form
         _lastResult = result;
         _explorer.SetResult(result, analysis?.C, analysis?.Owners, analysis?.ByOwner, analysis?.ByKind);
         _overview.SetResult(result, analysis?.C, analysis?.Owners);
+        _cleanupPage.SetPlan(analysis?.Plan ?? CleanupPlan.Empty, analysis is null ? "规则没有加载，不能生成清理计划。" : null);
         ApplyGrowth(growth);
         if (_options.StartView > 0 && !_startViewApplied)
         {
@@ -385,7 +406,7 @@ internal sealed class MainForm : Form
 
     /// <summary>一次扫描的规则匹配、归属推断和两种汇总；<see cref="Memory"/> 是每一步之后的工作集（找内存峰值用）。</summary>
     private sealed record Analysis(Classification C, OwnerMap Owners, List<SpaceGroup> ByOwner, List<SpaceGroup> ByKind, TimeSpan InventoryWait, TimeSpan GroupsDuration,
-        IReadOnlyList<(string Step, long Bytes)> Memory);
+        IReadOnlyList<(string Step, long Bytes)> Memory, CleanupPlan Plan, TimeSpan PlanDuration);
 
     private Analysis? _analysis;
     private double _growthMs;
@@ -432,7 +453,242 @@ internal sealed class MainForm : Form
         var byKind = SpaceGroups.ByKind(owners);
         sw.Stop();
         memory.Add(("groups", Environment.WorkingSet));
-        return new Analysis(c, owners, byOwner, byKind, wait.Elapsed, sw.Elapsed, memory);
+        var planWatch = Stopwatch.StartNew();
+        var plan = BuildPlan(r, c, owners, inventory);
+        planWatch.Stop();
+        memory.Add(("plan", Environment.WorkingSet));
+        return new Analysis(c, owners, byOwner, byKind, wait.Elapsed, sw.Elapsed, memory, plan, planWatch.Elapsed);
+    }
+
+    /// <summary>清理计划：官方命令只认已装软件探测到的程序；正在运行的程序用来提示"会跳过被占用的文件"。</summary>
+    private CleanupPlan BuildPlan(ScanResult r, Classification c, OwnerMap owners, InventorySnapshot inventory)
+    {
+        var running = inventory.Apps.Where(a => a.Source == AppSource.Process && a.Id is not null).Select(a => a.Id!.ToLowerInvariant()).ToHashSet();
+        var resolved = new Dictionary<string, string?>();
+        return PlanBuilder.Build(r.Tree, c, new PlanOptions
+        {
+            CurrentProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            Account = _account,
+            ResolveCommand = cmd => resolved.TryGetValue(cmd.Id, out var p) ? p : resolved[cmd.Id] = CommandResolver.Resolve(cmd, inventory),
+            RunningExes = running,
+            HardLinksKnown = r.Stats.Mode == ScanMode.Mft,
+            OwnerOf = owners.OwnerOf,
+        });
+    }
+
+    /// <summary>操作记录库（user.db）。打不开时返回 null：这时不允许执行清理（没有记录就不删）。</summary>
+    private AuditLog? EnsureAudit()
+    {
+        if (_audit is not null)
+        {
+            return _audit;
+        }
+
+        try
+        {
+            _audit = new AuditLog(_options.UserDb ?? AuditLog.DefaultPath);
+            _auditError = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            _auditError = ex.Message;
+        }
+
+        return _audit;
+    }
+
+    /// <summary>空间浏览详情里的"加入清理计划""运行 X"：在计划里选中这一项（必要时换成指定的命令），切到清理计划页。</summary>
+    private void AddToPlan(int node, string? commandId)
+    {
+        var item = _cleanupPage.Plan.Items.FirstOrDefault(i => i.Node == node && i.Group != PlanGroup.Blocked);
+        if (item is null)
+        {
+            var blocked = _cleanupPage.Plan.Items.FirstOrDefault(i => i.Node == node);
+            MessageBox.Show(this, blocked?.BlockReason is { } why ? $"这个位置不能由工具清理：{why}。" : "这个位置不在清理计划里：可以清理的部分不到 1 MB，或者受保护。",
+                "清理计划", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (item.State == PlanItemState.Pending)
+        {
+            var method = commandId is null
+                ? item.Method is { Kind: not MethodKind.Manual } current ? current : item.Methods[0]
+                : item.Methods.FirstOrDefault(m => m.Command?.Id == commandId);
+            if (method is null)
+            {
+                MessageBox.Show(this, "没有找到这个命令的程序（已装软件里没有探测到），可以改用直接删除或手动清理。", "清理计划", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                item.Method = method;
+            }
+
+            item.Selected = true;
+        }
+
+        _nav.Select("cleanup");
+        _cleanupPage.Reveal(item);
+    }
+
+    /// <summary>执行清理：确认框 → 进度框（后台执行）→ 汇总 → 切到操作记录。</summary>
+    private void ExecuteCleanup()
+    {
+        var plan = _cleanupPage.Plan;
+        var toRun = plan.ToRun.ToList();
+        if (toRun.Count == 0 || _explorer.Classification?.Engine is not { } engine)
+        {
+            return;
+        }
+
+        if (EnsureAudit() is not { } audit)
+        {
+            MessageBox.Show(this, "操作记录打不开（" + _auditError + "）。为了每次删除都有记录可查，这次不执行清理。", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var manual = plan.Items.Count(i => i.Selectable && i.Selected && i.Method?.Kind == MethodKind.Manual && i.State == PlanItemState.Pending);
+        bool askWhenLocked;
+        using (var confirm = new ConfirmCleanupDialog(toRun, manual))
+        {
+            if (confirm.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            askWhenLocked = confirm.AskWhenLocked;
+        }
+
+        CleanupRun? run = null;
+        Exception? error = null;
+        using (var progressDialog = new CleanupProgressDialog(toRun.Count))
+        {
+            var progress = new Progress<ExecProgress>(progressDialog.Report);
+            Func<PlanItem, IReadOnlyList<FileHolder>, bool>? ask = askWhenLocked
+                ? (item, holders) => progressDialog.Invoke(() => MessageBox.Show(progressDialog,
+                    $"{item.Title}里有文件被这些程序占用：\n\n{string.Join("\n", holders.Select(h => h.Name).Distinct().Take(8))}\n\n" +
+                    "要请它们正常关闭后再试一次吗？不会强制结束，程序可能会提示保存。选\u201c否\u201d则跳过这些文件。",
+                    "有文件被占用", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+                : null;
+            var executor = new CleanupExecutor(engine, audit, new ExecutorOptions { Account = _account, AskCloseApps = ask });
+            progressDialog.Shown += async (_, _) =>
+            {
+                try
+                {
+                    run = await Task.Run(() => executor.Execute(toRun, progress, progressDialog.Token));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Microsoft.Data.Sqlite.SqliteException)
+                {
+                    error = ex;
+                }
+
+                progressDialog.Close();
+            };
+            progressDialog.ShowDialog(this);
+        }
+
+        _cleanupPage.RefreshItems("已执行清理，结果见操作记录。磁盘上的内容已经变了，重新扫描后会生成新的计划。");
+        _historyPage.Reload();
+        if (error is not null)
+        {
+            MessageBox.Show(this, "清理中途出错：" + error.Message + "\n\n已经完成的部分记在操作记录里。", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        else if (run is not null)
+        {
+            var ok = run.Results.Count(r => r.Result == AuditResult.Succeeded);
+            var partial = run.Results.Count(r => r.Result == AuditResult.Partial);
+            var notRun = run.Results.Count(r => r.Result is AuditResult.NotRun or AuditResult.Failed);
+            MessageBox.Show(this,
+                $"释放 {ByteSize.Format(run.FreedBytes)}（预计 {ByteSize.Format(run.EstimatedBytes)}），用时 {run.Duration.TotalSeconds:F1} 秒。\n\n" +
+                $"成功 {ok} 项" + (partial > 0 ? $"，部分完成 {partial} 项" : "") + (notRun > 0 ? $"，没有完成 {notRun} 项" : "") + "。" +
+                (run.Cancelled ? "\n清理被停止了。" : "") + "\n\n每一项的结果都记在操作记录里。建议重新扫描，更新空间占用。",
+                "清理完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        _nav.Select("log");
+    }
+
+    /// <summary>手动清理后重新测量这个位置，操作记录里写一条"手动清理"和实际释放量。</summary>
+    private async void Measure(PlanItem item)
+    {
+        if (EnsureAudit() is not { } audit)
+        {
+            MessageBox.Show(this, "操作记录打不开：" + _auditError, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var before = item.Bytes;
+        long now;
+        try
+        {
+            now = await Task.Run(() => MeasureNow(item.Path, item.IsDirectory));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "重新测量失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var freed = Math.Max(0, before - now);
+        audit.Append(new AuditEntry
+        {
+            AtUtc = DateTime.UtcNow,
+            Action = AuditAction.Manual,
+            Target = item.Path,
+            Title = item.Title,
+            Bytes = before,
+            FreedBytes = freed,
+            Basis = "用户自行处理 · 打开所在位置后重新测量",
+            Result = AuditResult.Succeeded,
+            Detail = $"扫描时 {ByteSize.Format(before)}，现在 {ByteSize.Format(now)}",
+        });
+        item.State = PlanItemState.Measured;
+        item.FreedBytes = freed;
+        item.ResultText = $"重新测量：现在 {ByteSize.Format(now)}，释放 {ByteSize.Format(freed)}";
+        _cleanupPage.RefreshItems();
+        _historyPage.Reload();
+    }
+
+    private static long MeasureNow(string path, bool isDirectory)
+    {
+        if (isDirectory)
+        {
+            return Directory.Exists(path) ? WalkScanner.Scan(path).Tree is var t ? t[t.Root].AllocSize : 0 : 0;
+        }
+
+        return File.Exists(path) ? new FileInfo(path).Length : 0;
+    }
+
+    /// <summary>导出清理清单（CSV）。</summary>
+    private void ExportPlan()
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "导出清理清单",
+            Filter = "CSV 文件 (*.csv)|*.csv",
+            FileName = $"DiskThinner-清理计划-{DateTime.Now:yyyyMMdd}.csv",
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        var lines = new List<string> { "分组,项目,路径,大小（字节）,来源,处理方式,预计释放（字节）,已选,提示" };
+        foreach (var i in _cleanupPage.Plan.Items)
+        {
+            lines.Add(string.Join(',',
+                AuditLog.Csv(CleanupText.GroupTitle(i.Group)), AuditLog.Csv(i.Title), AuditLog.Csv(i.Path),
+                i.Bytes.ToString(CultureInfo.InvariantCulture), AuditLog.Csv(i.Source), AuditLog.Csv(i.Method?.Display ?? i.BlockReason),
+                i.EstimatedBytes.ToString(CultureInfo.InvariantCulture), i.Selected && i.Selectable ? "是" : "否", AuditLog.Csv(i.ResultText ?? i.Hint)));
+        }
+
+        try
+        {
+            File.WriteAllLines(dlg.FileName, lines, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "导出失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     /// <summary>
@@ -561,6 +817,18 @@ internal sealed class MainForm : Form
                 using var bmp = CaptureClientArea();
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(shot))!);
                 bmp.Save(shot);
+
+                if (_options.ShowConfirm && _cleanupPage.Plan.ToRun.ToList() is { Count: > 0 } toRun)
+                {
+                    // 只显示确认框截图，不执行：截完直接关掉，DialogResult 不看
+                    using var confirm = new ConfirmCleanupDialog(toRun, 0);
+                    confirm.Show(this);
+                    await Task.Delay(800);
+                    confirm.Refresh();
+                    using var dlgShot = CaptureForm(confirm, confirm.ClientRectangle);
+                    dlgShot.Save(Path.ChangeExtension(shot, null) + "-confirm.png");
+                    confirm.Close();
+                }
             }
 
             TopMost = false;
@@ -627,6 +895,17 @@ internal sealed class MainForm : Form
                 $"private_bytes={proc.PrivateMemorySize64}",
                 .. (_analysis?.Memory ?? []).Select(m => $"ws_{m.Step}_bytes={m.Bytes}"),
                 $"ws_after_bind_bytes={_wsAfterBind}",
+                $"plan_items={_cleanupPage.Plan.Items.Count}",
+                $"plan_selected={_cleanupPage.Plan.ToRun.Count()}",
+                $"plan_bytes={_cleanupPage.Plan.ToRun.Sum(i => i.Bytes)}",
+                $"plan_estimated_bytes={_cleanupPage.Plan.ToRun.Sum(i => i.EstimatedBytes)}",
+                $"plan_blocked={_cleanupPage.Plan.Items.Count(i => i.Group == PlanGroup.Blocked)}",
+                $"plan_commands={_cleanupPage.Plan.Items.Count(i => i.Methods.Any(m => m.Kind == MethodKind.Command))}",
+                $"plan_ms={_analysis?.PlanDuration.TotalMilliseconds:F0}",
+                $"account={_account.ProcessUser.Length > 0}",
+                $"account_mismatch={_account.Mismatch}",
+                $"audit_entries={_audit?.List().Count}",
+                $"audit_error={_auditError}",
                 $"managed_heap_bytes={GC.GetTotalMemory(false)}",
             ];
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))!);
@@ -647,16 +926,19 @@ internal sealed class MainForm : Form
     /// 截取本窗口的客户区。用 PrintWindow 让窗口把自己画到位图上：窗口被别的程序挡住时也能截到，
     /// 而且不会截到屏幕上的其他内容。
     /// </summary>
-    private Bitmap CaptureClientArea()
+    private Bitmap CaptureClientArea() => CaptureForm(this, ClientRectangle);
+
+    private static Bitmap CaptureForm(Form form, Rectangle clientRect)
     {
         const uint PwRenderFullContent = 2;
-        using var full = new Bitmap(Bounds.Width, Bounds.Height);
+        var bounds = form.Bounds;
+        using var full = new Bitmap(bounds.Width, bounds.Height);
         using (var g = Graphics.FromImage(full))
         {
             var hdc = g.GetHdc();
             try
             {
-                PrintWindow(Handle, hdc, PwRenderFullContent);
+                PrintWindow(form.Handle, hdc, PwRenderFullContent);
             }
             finally
             {
@@ -664,8 +946,8 @@ internal sealed class MainForm : Form
             }
         }
 
-        var client = RectangleToScreen(ClientRectangle);
-        var area = new Rectangle(client.X - Bounds.X, client.Y - Bounds.Y, client.Width, client.Height);
+        var client = form.RectangleToScreen(clientRect);
+        var area = new Rectangle(client.X - bounds.X, client.Y - bounds.Y, client.Width, client.Height);
         area.Intersect(new Rectangle(Point.Empty, full.Size));
         return full.Clone(area, full.PixelFormat);
     }

@@ -128,6 +128,7 @@ internal sealed class ExplorerPage : UserControl
         _detail.CopyPathRequested += (_, n) => CopyPath(n);
         _detail.ShowInMapRequested += (_, n) => _map.SetMapRoot(n);
         _detail.SelectRequested += (_, n) => SelectFrom(n, null);
+        _detail.AddToPlanRequested += (_, r) => AddToPlanRequested?.Invoke(this, r);
         _overlay.CancelRequested += (_, _) => CancelRequested?.Invoke(this, EventArgs.Empty);
 
         var menu = new ContextMenuStrip();
@@ -220,6 +221,9 @@ internal sealed class ExplorerPage : UserControl
     }
 
     public event EventHandler? RestartRequested;
+
+    /// <summary>详情面板里的"加入清理计划""运行 X"。</summary>
+    internal event EventHandler<DetailPanel.PlanRequest>? AddToPlanRequested;
     public event EventHandler? CancelRequested;
 
     public int SelectedNode => _selected;

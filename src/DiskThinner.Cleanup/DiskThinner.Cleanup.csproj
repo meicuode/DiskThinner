@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 清理计划、执行器、官方命令白名单、Restart Manager、账户检查。不引用 WinForms，按 Native AOT 要求编写。
+       删除只通过这里的执行器：逐项复核、不跟随重解析点、按句柄删除、每项写入操作记录。 -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
+    <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+    <ProjectReference Include="..\DiskThinner.Rules\DiskThinner.Rules.csproj" />
+    <ProjectReference Include="..\DiskThinner.Inventory\DiskThinner.Inventory.csproj" />
+    <ProjectReference Include="..\DiskThinner.Storage\DiskThinner.Storage.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Cleanup.Tests" />
+    <InternalsVisibleTo Include="DiskThinner.App.Tests" />
+  </ItemGroup>
+</Project>

@@ -309,23 +309,8 @@ internal sealed class OverviewPage : UserControl
         return items;
     }
 
-    /// <summary>
-    /// 一行的标题：规则"作用"的第一句（如"npm 下载过的包""当前用户的临时文件"），比类别名更能说明是什么；
-    /// 太长时退回"归属 + 类别"。完整的作用放在提示里。
-    /// </summary>
-    private static string Title(LocationRule rule, Owner? owner)
-    {
-        // 去掉括号里的补充说明，再取第一句："ASP.NET（.NET Framework）网站的编译缓存，……" → "ASP.NET网站的编译缓存"
-        var text = System.Text.RegularExpressions.Regex.Replace(rule.Purpose, "（[^）]*）", "");
-        var cut = text.IndexOfAny(['，', '。', '、']);
-        var first = (cut > 0 ? text[..cut] : text).Trim();
-        if (first.Length is > 0 and <= 30)
-        {
-            return first;
-        }
-
-        return (owner is { Key: not "f:user" and not "f:several" and not "f:projects" } ? owner.Display + " " : "") + Names.Display(rule.Kind);
-    }
+    /// <summary>一行的标题，见 <see cref="Names.Title"/>；完整的作用放在提示里。</summary>
+    private static string Title(LocationRule rule, Owner? owner) => Names.Title(rule, owner);
 
     /// <summary>把当前用户的目录显示成 %LOCALAPPDATA%、%USERPROFILE% 等，路径更短，截图里也不暴露用户名。</summary>
     internal static string Redact(string path) => PathDisplay.Shorten(path);

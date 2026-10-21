@@ -6,6 +6,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/DiskThinner.App/DiskThinner.App.csproj" />
+    <Project Path="src/DiskThinner.Cleanup/DiskThinner.Cleanup.csproj" />
     <Project Path="src/DiskThinner.Core/DiskThinner.Core.csproj" />
     <Project Path="src/DiskThinner.Inventory/DiskThinner.Inventory.csproj" />
     <Project Path="src/DiskThinner.Rules/DiskThinner.Rules.csproj" />
@@ -14,6 +15,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DiskThinner.App.Tests/DiskThinner.App.Tests.csproj" />
+    <Project Path="tests/DiskThinner.Cleanup.Tests/DiskThinner.Cleanup.Tests.csproj" />
     <Project Path="tests/DiskThinner.Rules.Tests/DiskThinner.Rules.Tests.csproj" />
     <Project Path="tests/DiskThinner.Scanner.Tests/DiskThinner.Scanner.Tests.csproj" />
     <Project Path="tests/DiskThinner.Storage.Tests/DiskThinner.Storage.Tests.csproj" />

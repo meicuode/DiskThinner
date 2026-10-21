@@ -23,13 +23,15 @@ public sealed class RuleEngine
 
     private readonly Entry[] _entries;
     private readonly int[] _seen;
+    private readonly ProtectionEntry[] _extraProtection;
     private int _stamp;
 
     public RuleEngine(RuleSet rules, PathContext context, IEnumerable<ProtectionEntry>? extraProtection = null)
     {
         Rules = rules;
         Context = context;
-        Protections = [.. ProtectionList.BuiltIn, .. extraProtection ?? [], MetadataProtection];
+        _extraProtection = [.. extraProtection ?? []];
+        Protections = [.. ProtectionList.BuiltIn, .. _extraProtection, MetadataProtection];
         MetadataProtectionIndex = Protections.Count - 1;
 
         var entries = new List<Entry>();
@@ -354,6 +356,74 @@ public sealed class RuleEngine
 
             return;
         }
+    }
+
+    /// <summary>和这个引擎同一套保护名单（内置 + 追加）的逐路径检查。</summary>
+    public ProtectionCheck CreateProtectionCheck() => new(Context, _extraProtection);
+
+    /// <summary>
+    /// 执行清理前的复核：规则 <paramref name="ruleIndex"/> 现在是否仍然命中 <paramref name="path"/>。
+    /// 不走扫描树，直接看路径模式，条件（has_any、sibling_any、not_under）按磁盘上现在的内容判断。
+    /// 只检查这条规则本身，不考虑更具体的规则（扫描时已经决定了归属）。
+    /// </summary>
+    public bool StillMatches(int ruleIndex, string path, bool isDirectory)
+    {
+        if (ruleIndex < 0 || ruleIndex >= Rules.Locations.Count)
+        {
+            return false;
+        }
+
+        var entry = _entries[ruleIndex];
+        if (entry.Rule != ruleIndex || entry.Mode == MatchMode.Under || (entry.Mode == MatchMode.File) == isDirectory || !entry.Pattern.Matches(path))
+        {
+            return false;
+        }
+
+        foreach (var c in entry.Conditions)
+        {
+            var ok = c.Type switch
+            {
+                ConditionType.HasAny => isDirectory && AnyEntry(path, null, c.Names),
+                ConditionType.SiblingAny => Path.GetDirectoryName(path) is { } parent && AnyEntry(parent, Path.GetFileName(path), c.Names),
+                ConditionType.NotUnder => !c.Paths.Any(p => p.MatchesSelfOrAncestor(path)),
+                _ => false,
+            };
+            if (!ok)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool AnyEntry(string directory, string? except, Segment[] names)
+    {
+        try
+        {
+            foreach (var full in Directory.EnumerateFileSystemEntries(directory))
+            {
+                var name = Path.GetFileName(full.AsSpan());
+                if (except is not null && name.Equals(except, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                foreach (var n in names)
+                {
+                    if (n.Matches(name))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        return false;
     }
 
     private bool ConditionsHold(NodeTree tree, int node, CompiledCondition[] conditions)

@@ -43,7 +43,11 @@ internal sealed class DetailPanel : Panel
         Controls.Add(_content);
     }
 
+    /// <summary>"加入清理计划"或"运行 X"：要处理的节点（规则命中的位置）和指定的官方命令（null 表示默认方式）。</summary>
+    internal readonly record struct PlanRequest(int Node, string? CommandId);
+
     public event EventHandler<int>? OpenLocationRequested;
+    internal event EventHandler<PlanRequest>? AddToPlanRequested;
     public event EventHandler<int>? CopyPathRequested;
     public event EventHandler<int>? ShowInMapRequested;
     public event EventHandler<int>? SelectRequested;
@@ -321,28 +325,32 @@ internal sealed class DetailPanel : Panel
 
         // ---- 操作 ----
         _content.Controls.Add(SectionTitle("操作"));
-        if (rule is not null && Classification.IsCleanable(risk) && rule.Mode != MatchMode.Under)
+        if (rule is not null && Classification.IsCleanable(risk) && Classification.IsActionable(rule) && c!.RootOf(n) is { } matchRoot)
         {
+            // 规则的处理方式作用在规则命中的那个位置上（可能是选中项的上级）；都只是加入清理计划，确认后才执行
+            var target = matchRoot.Node;
+            var first = true;
             foreach (var action in rule.Actions)
             {
-                switch (action)
+                if (action is CommandAction cmd && KnownCommands.Find(cmd.CommandId) is { } known)
                 {
-                    case CommandAction cmd when KnownCommands.Find(cmd.CommandId) is { } known:
-                        var run = Disabled($"运行 {known.Display}");
-                        new ToolTip().SetToolTip(run, known.Description);
-                        run.AccessibleDescription = known.Description + "。清理功能在后续版本提供";
-                        _content.Controls.Add(Stretch(run, width));
-                        break;
-                    case DeleteAction del:
-                        _content.Controls.Add(Stretch(Disabled(DescribeDelete(del)), width));
-                        break;
+                    var run = Ui.Button($"运行 {known.Display}" + (first ? "（推荐）" : ""), primary: first,
+                        accessibleDescription: known.Description + "。加入清理计划，确认后才运行");
+                    new ToolTip().SetToolTip(run, known.Description);
+                    var id = known.Id;
+                    run.Click += (_, _) => AddToPlanRequested?.Invoke(this, new PlanRequest(target, id));
+                    _content.Controls.Add(Stretch(run, width));
+                    first = false;
                 }
             }
 
-            if (rule.Actions.Any(a => a is CommandAction or DeleteAction))
-            {
-                _content.Controls.Add(Wrap(Ui.Label("清理计划和自动执行会在 M4 加入；现在可以打开所在位置自己处理。", Theme.Small, Theme.Subtle), new Padding(0, 0, 0, 6)));
-            }
+            var delete = rule.Actions.OfType<DeleteAction>().FirstOrDefault();
+            var add = Ui.Button("加入清理计划" + (delete is null ? "" : $"：{DescribeDelete(delete)}"), primary: first,
+                accessibleDescription: "加入清理计划，确认后才执行");
+            add.Click += (_, _) => AddToPlanRequested?.Invoke(this, new PlanRequest(target, null));
+            _content.Controls.Add(Stretch(add, width));
+            var scope = target == n ? "" : $"按规则处理的是整个 {PathDisplay.Shorten(_tree!.GetPath(target))}。";
+            _content.Controls.Add(Wrap(Ui.Label(scope + "加入后在清理计划里确认，确认之前不会删除任何东西。", Theme.Small, Theme.Subtle), new Padding(0, 0, 0, 6)));
         }
 
         foreach (var guide in rule?.Actions.OfType<GuideAction>() ?? [])
@@ -748,14 +756,6 @@ internal sealed class DetailPanel : Panel
         panel.Controls.Add(label);
         panel.Height = label.PreferredHeight + panel.Padding.Vertical;
         return panel;
-    }
-
-    private static Button Disabled(string text)
-    {
-        var b = Ui.Button(text);
-        b.Enabled = false;
-        b.AccessibleDescription = "清理功能在后续版本提供";
-        return b;
     }
 
     private static Control Stretch(Button b, int width)

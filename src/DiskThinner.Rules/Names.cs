@@ -69,6 +69,24 @@ public static class Names
         _ => "回收站",
     };
 
+    /// <summary>
+    /// 一个位置的简短标题：规则"作用"的第一句（如"npm 下载过的包""当前用户的临时文件"），比类别名更能说明是什么；
+    /// 太长时退回"归属 + 类别"。概览、清理计划、操作记录共用。
+    /// </summary>
+    public static string Title(LocationRule rule, Owner? owner)
+    {
+        // 去掉括号里的补充说明，再取第一句："ASP.NET（.NET Framework）网站的编译缓存，……" → "ASP.NET网站的编译缓存"
+        var text = System.Text.RegularExpressions.Regex.Replace(rule.Purpose, "（[^）]*）", "");
+        var cut = text.IndexOfAny(['，', '。', '、']);
+        var first = (cut > 0 ? text[..cut] : text).Trim();
+        if (first.Length is > 0 and <= 30)
+        {
+            return first;
+        }
+
+        return (owner is { Key: not "f:user" and not "f:several" and not "f:projects" } ? owner.Display + " " : "") + Display(rule.Kind);
+    }
+
     public static string Code(Tier tier) => tier switch
     {
         Tier.Draft => "draft",
