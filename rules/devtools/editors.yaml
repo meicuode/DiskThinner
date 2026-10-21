@@ -1,5 +1,8 @@
 # VS Code 系编辑器：VS Code、Cursor、Kiro、Windsurf、Trae、Antigravity。目录结构相同。
 # 缓存类子目录（Cache、CachedData、CachedExtensionVSIXs 等）由 generic/chromium-electron.yaml 识别。
+# dev.vscode.* 同时覆盖几种编辑器，不写 app：归属由已装软件按目录名推断（%APPDATA%\Cursor 对应 Cursor.exe）。
+apps:
+  - { id: kiro, name: Kiro, exes: [Kiro.exe] }
 locations:
   - id: dev.vscode.workspace-storage
     dir: '%APPDATA%\{Code,Cursor,Kiro,Windsurf,Trae,Antigravity}\User\workspaceStorage'
@@ -52,6 +55,7 @@ locations:
       - url: https://code.visualstudio.com/docs/editor/extension-marketplace#_where-are-extensions-installed
 
   - id: dev.kiro.home
+    app: kiro
     under: '%USERPROFILE%\.kiro'
     kind: session-history
     risk: medium

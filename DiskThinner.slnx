@@ -7,6 +7,7 @@
   <Folder Name="/src/">
     <Project Path="src/DiskThinner.App/DiskThinner.App.csproj" />
     <Project Path="src/DiskThinner.Core/DiskThinner.Core.csproj" />
+    <Project Path="src/DiskThinner.Inventory/DiskThinner.Inventory.csproj" />
     <Project Path="src/DiskThinner.Rules/DiskThinner.Rules.csproj" />
     <Project Path="src/DiskThinner.Scanner/DiskThinner.Scanner.csproj" />
   </Folder>

@@ -68,6 +68,15 @@ public sealed class ScanStats
     public long NameChars { get; set; }
     public long NameCharsCapacity { get; set; }
 
+    /// <summary>MFT 解析时记下的文件名条数（8.3 短名在同一记录有长名时不记）。</summary>
+    public int MftNames { get; set; }
+
+    /// <summary>各阶段结束时进程的工作集（MFT），用来找内存峰值出现在哪一步。</summary>
+    public long WorkingSetBeforeScan { get; set; }
+    public long WorkingSetAfterRead { get; set; }
+    public long WorkingSetAfterBuild { get; set; }
+    public long WorkingSetAfterFinalize { get; set; }
+
     /// <summary>没有使用 MFT 扫描的原因（为空表示用了 MFT，或者调用方本来就要求遍历）。</summary>
     public string? MftUnavailableReason { get; set; }
 }

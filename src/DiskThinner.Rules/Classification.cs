@@ -23,9 +23,9 @@ public sealed class MatchRoot(int node, int rule)
 /// <summary>一次规则匹配的结果：每个节点归哪条规则、受哪项保护，以及按目录汇总的可清理和未识别空间。</summary>
 public sealed class Classification
 {
-    private readonly int[] _ruleOf;
+    // 每个节点一项：所属规则位置（规则编号从位置里取，不单独存）、保护名单项。百万节点时共约 6 MB
     private readonly int[] _rootOf;
-    private readonly int[] _protOf;
+    private readonly short[] _protOf;
     private readonly long[] _cleanable;
     private readonly long[] _unexplained;
     private readonly List<MatchRoot> _roots = [];
@@ -35,12 +35,15 @@ public sealed class Classification
     {
         Engine = engine;
         Tree = tree;
-        _ruleOf = new int[tree.Count];
+        if (engine.Protections.Count > short.MaxValue)
+        {
+            throw new InvalidOperationException("保护名单项太多");
+        }
+
         _rootOf = new int[tree.Count];
-        _protOf = new int[tree.Count];
-        Array.Fill(_ruleOf, -1);
+        _protOf = new short[tree.Count];
         Array.Fill(_rootOf, -1);
-        Array.Fill(_protOf, -1);
+        Array.Fill(_protOf, (short)-1);
         _cleanable = new long[tree.Count];
         _unexplained = new long[tree.Count];
     }
@@ -64,9 +67,9 @@ public sealed class Classification
     /// <summary>子树中没有任何规则解释的空间。</summary>
     public long Unexplained(int node) => _unexplained[node];
 
-    public LocationRule? RuleOf(int node) => _ruleOf[node] >= 0 ? Engine.Rules.Locations[_ruleOf[node]] : null;
+    public LocationRule? RuleOf(int node) => RuleIndexOf(node) is var r && r >= 0 ? Engine.Rules.Locations[r] : null;
 
-    public int RuleIndexOf(int node) => _ruleOf[node];
+    public int RuleIndexOf(int node) => _rootOf[node] >= 0 ? _roots[_rootOf[node]].Rule : -1;
 
     /// <summary>节点所属的规则位置；不属于任何规则时返回 null。</summary>
     public MatchRoot? RootOf(int node) => _rootOf[node] >= 0 ? _roots[_rootOf[node]] : null;
@@ -113,9 +116,8 @@ public sealed class Classification
 
     internal void Assign(int node, int ruleIndex, int rootIndex, int protection)
     {
-        _ruleOf[node] = ruleIndex;
         _rootOf[node] = ruleIndex >= 0 ? rootIndex : -1;
-        _protOf[node] = protection;
+        _protOf[node] = (short)protection;
 
         ref var n = ref Tree[node];
         if (n.IsDirectory)

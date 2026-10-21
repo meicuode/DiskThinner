@@ -85,8 +85,9 @@ internal sealed class OverviewPage : UserControl
 
     public void ShowScanning() => _empty.Text = "正在扫描…";
 
-    public void SetResult(ScanResult? result, Classification? c)
+    public void SetResult(ScanResult? result, Classification? c, OwnerMap? owners = null)
     {
+        _owners = c is null ? null : owners ?? OwnerMap.RulesOnly(c);
         _empty.Visible = result is null;
         if (result is null)
         {
@@ -128,16 +129,19 @@ internal sealed class OverviewPage : UserControl
         var hotspots = c.UnexplainedHotspots(100L << 20);
         _unknown.Set(ByteSize.Format(c.Unexplained(tree.Root)), $"其中 {hotspots.Count} 处超过 100 MB", null);
 
-        _suggest.SetItems(BuildSuggestions(tree, c, hotspots));
-        _largest.SetItems(BuildLargest(tree, c));
+        _suggest.SetItems(BuildSuggestions(tree, c, hotspots, _owners!));
+        _largest.SetItems(BuildLargest(tree, c, _owners!));
     }
+
+    private OwnerMap? _owners;
 
     /// <summary>
     /// 建议先处理：可清理的按规则汇总取最大的几项；再加上只能用系统工具处理的大项（如分页文件、WinSxS）和最大的未识别位置。
     /// </summary>
-    internal static List<ListItem> BuildSuggestions(NodeTree tree, Classification c, List<(int Node, long Bytes, bool IsRemainder)> hotspots)
+    internal static List<ListItem> BuildSuggestions(NodeTree tree, Classification c, List<(int Node, long Bytes, bool IsRemainder)> hotspots, OwnerMap owners)
     {
         var rules = c.Engine.Rules;
+        string TitleAt(LocationRule rule, int node) => Title(rule, owners.OwnerOf(node));
         var items = new List<ListItem>();
         foreach (var g in c.Roots.Where(r => r.CleanableBytes > 0).GroupBy(r => r.Rule)
                      .Select(g => (Rule: rules.Locations[g.Key], Roots: g.ToList(), Bytes: g.Sum(r => r.CleanableBytes)))
@@ -145,7 +149,7 @@ internal sealed class OverviewPage : UserControl
         {
             var largest = g.Roots.MaxBy(r => r.CleanableBytes)!;
             var count = g.Roots.Count > 1 ? $"（{g.Roots.Count} 处）" : "";
-            items.Add(new ListItem(largest.Node, [Title(rules, g.Rule) + count, ByteSize.Format(g.Bytes), "", "查看"], g.Rule.Purpose,
+            items.Add(new ListItem(largest.Node, [TitleAt(g.Rule, largest.Node) + count, ByteSize.Format(g.Bytes), "", "查看"], g.Rule.Purpose,
                 RuleView.RiskStyle(g.Rule.Risk), RuleView.RiskLabel(g.Rule.Risk, g.Rule)));
         }
 
@@ -153,7 +157,7 @@ internal sealed class OverviewPage : UserControl
                      .OrderByDescending(r => r.Bytes).Take(2))
         {
             var rule = rules.Locations[root.Rule];
-            items.Add(new ListItem(root.Node, [Title(rules, rule), ByteSize.Format(root.Bytes), "", "查看步骤"], rule.Purpose,
+            items.Add(new ListItem(root.Node, [TitleAt(rule, root.Node), ByteSize.Format(root.Bytes), "", "查看步骤"], rule.Purpose,
                 RuleView.RiskStyle(Risk.Guide), RuleView.RiskLabel(Risk.Guide, rule)));
         }
 
@@ -167,7 +171,7 @@ internal sealed class OverviewPage : UserControl
     }
 
     /// <summary>占用最多：规则命中的位置按大小排列（不含兜底规则），再混入最大的未识别位置。</summary>
-    internal static List<ListItem> BuildLargest(NodeTree tree, Classification c)
+    internal static List<ListItem> BuildLargest(NodeTree tree, Classification c, OwnerMap owners)
     {
         var rules = c.Engine.Rules;
         var candidates = c.Roots.Where(r => rules.Locations[r.Rule].Mode != MatchMode.Under && r.Bytes > 0)
@@ -180,14 +184,16 @@ internal sealed class OverviewPage : UserControl
         foreach (var (node, bytes, rule) in candidates)
         {
             var path = Redact(tree.GetPath(node));
+            var owner = owners.OwnerOf(node)?.Display;
             if (rule is null)
             {
-                items.Add(new ListItem(node, [path, ByteSize.Format(bytes), "未识别", ""], null, RuleView.Unknown, "未识别"));
+                // 没有规则认识，但可能推断出了归属
+                items.Add(new ListItem(node, [path, ByteSize.Format(bytes), owner ?? "未识别", ""], null, RuleView.Unknown, "未识别"));
                 continue;
             }
 
             var risk = c.EffectiveRisk(node) ?? rule.Risk;
-            items.Add(new ListItem(node, [path, ByteSize.Format(bytes), RuleView.OwnerOf(rules, rule) ?? Names.Display(rule.Kind), ""], null,
+            items.Add(new ListItem(node, [path, ByteSize.Format(bytes), owner ?? Names.Display(rule.Kind), ""], null,
                 RuleView.RiskStyle(risk), RuleView.RiskLabel(risk, rule)));
         }
 
@@ -198,7 +204,7 @@ internal sealed class OverviewPage : UserControl
     /// 一行的标题：规则"作用"的第一句（如"npm 下载过的包""当前用户的临时文件"），比类别名更能说明是什么；
     /// 太长时退回"归属 + 类别"。完整的作用放在提示里。
     /// </summary>
-    private static string Title(RuleSet rules, LocationRule rule)
+    private static string Title(LocationRule rule, Owner? owner)
     {
         // 去掉括号里的补充说明，再取第一句："ASP.NET（.NET Framework）网站的编译缓存，……" → "ASP.NET网站的编译缓存"
         var text = System.Text.RegularExpressions.Regex.Replace(rule.Purpose, "（[^）]*）", "");
@@ -209,17 +215,11 @@ internal sealed class OverviewPage : UserControl
             return first;
         }
 
-        return (RuleView.OwnerOf(rules, rule) is { } owner && owner != "你自己的文件" ? owner + " " : "") + Names.Display(rule.Kind);
+        return (owner is { Key: not "f:user" and not "f:several" and not "f:projects" } ? owner.Display + " " : "") + Names.Display(rule.Kind);
     }
 
-    /// <summary>把当前用户的目录显示成 %USERPROFILE%，路径更短，截图里也不暴露用户名。</summary>
-    internal static string Redact(string path)
-    {
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return !string.IsNullOrEmpty(profile) && path.StartsWith(profile, StringComparison.OrdinalIgnoreCase)
-            ? "%USERPROFILE%" + path[profile.Length..]
-            : path;
-    }
+    /// <summary>把当前用户的目录显示成 %LOCALAPPDATA%、%USERPROFILE% 等，路径更短，截图里也不暴露用户名。</summary>
+    internal static string Redact(string path) => PathDisplay.Shorten(path);
 
     /// <summary>一行数据：点击后跳到 <see cref="Node"/>。</summary>
     internal sealed record ListItem(int Node, string[] Cells, string? Note, RuleView.TagStyle TagStyle, string Tag);

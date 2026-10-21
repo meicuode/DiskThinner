@@ -1,7 +1,38 @@
 # 开发工具的包缓存和工具链。几乎都能重新下载（risk: low），优先用官方清理命令。
+# 每个位置用 app: 指明归属；exes 用来在已装软件和 PATH 里找到对应的程序，作为证据显示。
+apps:
+  - { id: uv, name: uv, vendor: Astral, exes: [uv.exe] }
+  - { id: pip, name: pip, exes: [pip.exe] }
+  - { id: conda, name: Conda, vendor: Anaconda, exes: [conda.exe] }
+  - { id: huggingface, name: Hugging Face, exes: [huggingface-cli.exe, hf.exe] }
+  - { id: pytorch, name: PyTorch }
+  - { id: puppeteer, name: Puppeteer }
+  - { id: npm, name: npm, vendor: Node.js, exes: [node.exe] }
+  - { id: pnpm, name: pnpm, exes: [pnpm.exe] }
+  - { id: yarn, name: Yarn }
+  - { id: electron, name: Electron }
+  - { id: node-gyp, name: node-gyp }
+  - { id: playwright, name: Playwright, vendor: Microsoft }
+  - { id: nuget, name: NuGet, exes: [nuget.exe, dotnet.exe] }
+  - { id: dotnet, name: .NET, vendor: Microsoft, exes: [dotnet.exe] }
+  - { id: visual-studio, name: Visual Studio, vendor: Microsoft, exes: [devenv.exe] }
+  - { id: azure-functions, name: Azure Functions Core Tools, vendor: Microsoft, exes: [func.exe] }
+  - { id: gradle, name: Gradle }
+  - { id: maven, name: Maven, exes: [mvn.cmd] }
+  - { id: cargo, name: Cargo, vendor: Rust, exes: [cargo.exe] }
+  - { id: rustup, name: rustup, vendor: Rust, exes: [rustup.exe] }
+  - { id: go, name: Go, exes: [go.exe] }
+  - { id: vcpkg, name: vcpkg, vendor: Microsoft, exes: [vcpkg.exe] }
+  - { id: docker, name: Docker Desktop, vendor: Docker, exes: [Docker Desktop.exe, docker.exe] }
+  - { id: wsl, name: WSL, vendor: Microsoft, exes: [wsl.exe] }
+  - { id: android, name: Android SDK, vendor: Google, exes: [adb.exe] }
+  - { id: jetbrains, name: JetBrains IDE, vendor: JetBrains }
+  - { id: aws-toolkit, name: AWS Toolkit, vendor: Amazon }
+  - { id: postman, name: Postman, exes: [Postman.exe] }
 locations:
   # ---------- Python ----------
   - id: dev.uv.cache
+    app: uv
     dir: '%LOCALAPPDATA%\uv\cache'
     kind: package-cache
     risk: low
@@ -16,6 +47,7 @@ locations:
       - url: https://docs.astral.sh/uv/concepts/cache/
 
   - id: dev.uv.python
+    app: uv
     dir: '%APPDATA%\uv\python'
     kind: program
     risk: low
@@ -28,6 +60,7 @@ locations:
       - url: https://docs.astral.sh/uv/concepts/python-versions/
 
   - id: dev.uv.tools
+    app: uv
     dir: '%APPDATA%\uv\tools'
     kind: program
     risk: low
@@ -40,6 +73,7 @@ locations:
       - url: https://docs.astral.sh/uv/concepts/tools/
 
   - id: dev.pip.cache
+    app: pip
     dir: '%LOCALAPPDATA%\pip\cache'
     kind: package-cache
     risk: low
@@ -53,6 +87,7 @@ locations:
       - url: https://pip.pypa.io/en/stable/topics/caching/
 
   - id: dev.conda.pkgs
+    app: conda
     dir: '%USERPROFILE%\{anaconda3,miniconda3,miniforge3,.conda}\pkgs'
     kind: package-cache
     risk: low
@@ -66,6 +101,7 @@ locations:
       - url: https://docs.conda.io/projects/conda/en/latest/commands/clean.html
 
   - id: dev.huggingface
+    app: huggingface
     dir: '%USERPROFILE%\.cache\huggingface'
     kind: model
     risk: low
@@ -80,6 +116,7 @@ locations:
       - url: https://huggingface.co/docs/huggingface_hub/guides/manage-cache
 
   - id: dev.torch-hub
+    app: pytorch
     dir: '%USERPROFILE%\.cache\torch'
     kind: model
     risk: low
@@ -93,6 +130,7 @@ locations:
       - url: https://pytorch.org/docs/stable/hub.html#where-are-my-downloaded-models-saved
 
   - id: dev.puppeteer
+    app: puppeteer
     dir: '%USERPROFILE%\.cache\puppeteer'
     kind: program
     risk: low
@@ -117,6 +155,7 @@ locations:
 
   # ---------- Node.js ----------
   - id: dev.npm.cache
+    app: npm
     dir: '%LOCALAPPDATA%\npm-cache'
     kind: package-cache
     risk: low
@@ -130,6 +169,7 @@ locations:
       - url: https://docs.npmjs.com/cli/commands/npm-cache
 
   - id: dev.npm.global
+    app: npm
     under: '%APPDATA%\npm'
     kind: program
     risk: never
@@ -137,6 +177,7 @@ locations:
     impact: 不要手动删除，用 npm uninstall -g <包名> 卸载
 
   - id: dev.pnpm.store
+    app: pnpm
     dir: '%LOCALAPPDATA%\pnpm\store'
     kind: package-cache
     risk: low
@@ -149,6 +190,7 @@ locations:
       - url: https://pnpm.io/cli/store
 
   - id: dev.yarn.cache
+    app: yarn
     dir: '%LOCALAPPDATA%\Yarn\Cache'
     kind: package-cache
     risk: low
@@ -161,6 +203,7 @@ locations:
       - url: https://classic.yarnpkg.com/en/docs/cli/cache
 
   - id: dev.electron.cache
+    app: electron
     dir: '%LOCALAPPDATA%\{electron,electron-builder}\Cache'
     kind: package-cache
     risk: low
@@ -174,6 +217,7 @@ locations:
       - url: https://www.electronjs.org/docs/latest/tutorial/installation#cache
 
   - id: dev.node-gyp
+    app: node-gyp
     dir: '%LOCALAPPDATA%\node-gyp\Cache'
     kind: package-cache
     risk: low
@@ -186,6 +230,7 @@ locations:
       - url: https://github.com/nodejs/node-gyp#installation
 
   - id: dev.playwright
+    app: playwright
     dir: '%LOCALAPPDATA%\ms-playwright'
     kind: program
     risk: low
@@ -201,6 +246,7 @@ locations:
 
   # ---------- .NET ----------
   - id: dev.nuget.packages
+    app: nuget
     dir: '%USERPROFILE%\.nuget\packages'
     kind: package-cache
     risk: low
@@ -214,6 +260,7 @@ locations:
       - url: https://learn.microsoft.com/nuget/consume-packages/managing-the-global-packages-and-cache-folders
 
   - id: dev.nuget.http-cache
+    app: nuget
     dir: '%LOCALAPPDATA%\NuGet\v3-cache'
     kind: package-cache
     risk: low
@@ -227,6 +274,7 @@ locations:
       - url: https://learn.microsoft.com/nuget/consume-packages/managing-the-global-packages-and-cache-folders
 
   - id: dev.nuget.plugins-cache
+    app: nuget
     dir: '%LOCALAPPDATA%\NuGet\plugins-cache'
     kind: package-cache
     risk: low
@@ -239,6 +287,7 @@ locations:
       - url: https://learn.microsoft.com/nuget/consume-packages/managing-the-global-packages-and-cache-folders
 
   - id: dev.dotnet.tools
+    app: dotnet
     dir: '%USERPROFILE%\.dotnet\tools'
     kind: program
     risk: low
@@ -250,6 +299,7 @@ locations:
       - url: https://learn.microsoft.com/dotnet/core/tools/global-tools
 
   - id: dev.dotnet.home
+    app: dotnet
     under: '%USERPROFILE%\.dotnet'
     kind: cache
     risk: low
@@ -260,6 +310,7 @@ locations:
       - note: 全局工具单独由 dev.dotnet.tools 规则描述
 
   - id: dev.vs.component-cache
+    app: visual-studio
     dir: '%LOCALAPPDATA%\Microsoft\VisualStudio\*\ComponentModelCache'
     kind: cache
     risk: safe
@@ -273,6 +324,7 @@ locations:
       - url: https://learn.microsoft.com/visualstudio/extensibility/how-to-troubleshoot-extensions
 
   - id: dev.vs.local
+    app: visual-studio
     under: '%LOCALAPPDATA%\Microsoft\VisualStudio'
     kind: app-data
     risk: medium
@@ -280,6 +332,7 @@ locations:
     impact: 删除会丢失窗口布局、最近打开的项目等设置，扩展需要重新安装
 
   - id: dev.azure-functions
+    app: azure-functions
     dir: '%LOCALAPPDATA%\AzureFunctionsTools'
     kind: program
     risk: low
@@ -293,6 +346,7 @@ locations:
 
   # ---------- Java / Rust / Go ----------
   - id: dev.gradle.caches
+    app: gradle
     dir: '%USERPROFILE%\.gradle\caches'
     kind: package-cache
     risk: low
@@ -306,6 +360,7 @@ locations:
       - url: https://docs.gradle.org/current/userguide/directory_layout.html
 
   - id: dev.gradle.wrapper
+    app: gradle
     dir: '%USERPROFILE%\.gradle\wrapper\dists'
     kind: program
     risk: low
@@ -319,6 +374,7 @@ locations:
       - url: https://docs.gradle.org/current/userguide/gradle_wrapper.html
 
   - id: dev.gradle.daemon
+    app: gradle
     dir: '%USERPROFILE%\.gradle\daemon'
     kind: log
     risk: safe
@@ -331,6 +387,7 @@ locations:
       - url: https://docs.gradle.org/current/userguide/directory_layout.html
 
   - id: dev.maven
+    app: maven
     dir: '%USERPROFILE%\.m2\repository'
     kind: package-cache
     risk: low
@@ -343,6 +400,7 @@ locations:
       - url: https://maven.apache.org/guides/introduction/introduction-to-repositories.html
 
   - id: dev.cargo.registry
+    app: cargo
     dir: '%USERPROFILE%\.cargo\registry'
     kind: package-cache
     risk: low
@@ -356,6 +414,7 @@ locations:
       - url: https://doc.rust-lang.org/cargo/guide/cargo-home.html
 
   - id: dev.rustup.toolchains
+    app: rustup
     dir: '%USERPROFILE%\.rustup\toolchains'
     kind: program
     risk: low
@@ -368,6 +427,7 @@ locations:
       - url: https://rust-lang.github.io/rustup/concepts/toolchains.html
 
   - id: dev.go.modcache
+    app: go
     dir: '%USERPROFILE%\go\pkg\mod'
     kind: package-cache
     risk: low
@@ -381,6 +441,7 @@ locations:
       - url: https://go.dev/ref/mod#module-cache
 
   - id: dev.go.build-cache
+    app: go
     dir: '%LOCALAPPDATA%\go-build'
     kind: build-output
     risk: safe
@@ -394,6 +455,7 @@ locations:
       - url: https://pkg.go.dev/cmd/go#hdr-Build_and_test_caching
 
   - id: dev.vcpkg.archives
+    app: vcpkg
     dir: '%LOCALAPPDATA%\vcpkg\archives'
     kind: package-cache
     risk: low
@@ -408,6 +470,7 @@ locations:
 
   # ---------- 虚拟化 / 移动开发 ----------
   - id: dev.docker.wsl
+    app: docker
     dir: '%LOCALAPPDATA%\Docker\wsl'
     kind: vm-disk
     risk: guide
@@ -434,6 +497,7 @@ locations:
       - url: https://learn.microsoft.com/windows/wsl/disk-space
 
   - id: dev.wsl.distro
+    app: wsl
     file: '%LOCALAPPDATA%\wsl\*\ext4.vhdx'
     kind: vm-disk
     risk: guide
@@ -447,6 +511,7 @@ locations:
       - url: https://learn.microsoft.com/windows/wsl/disk-space
 
   - id: dev.android.sdk
+    app: android
     dir: '%LOCALAPPDATA%\Android\Sdk'
     kind: program
     risk: low
@@ -458,6 +523,7 @@ locations:
       - url: https://developer.android.com/studio/intro/update#sdk-manager
 
   - id: dev.android.avd
+    app: android
     dir: '%USERPROFILE%\.android\avd'
     kind: vm-disk
     risk: medium
@@ -469,6 +535,7 @@ locations:
       - url: https://developer.android.com/studio/run/managing-avds
 
   - id: dev.jetbrains.caches
+    app: jetbrains
     dir: '%LOCALAPPDATA%\JetBrains\*\caches'
     kind: cache
     risk: safe
@@ -483,6 +550,7 @@ locations:
       - url: https://www.jetbrains.com/help/idea/directories-used-by-the-ide-to-store-settings-caches-plugins-and-logs.html
 
   - id: dev.jetbrains.local
+    app: jetbrains
     under: '%LOCALAPPDATA%\JetBrains'
     kind: app-data
     risk: medium
@@ -492,6 +560,7 @@ locations:
       - guide: IDE 启动时会提示清理旧版本的目录，或在 Toolbox 里卸载旧版本
 
   - id: dev.aws-toolkit
+    app: aws-toolkit
     dir: '%LOCALAPPDATA%\AWSToolkit'
     kind: cache
     risk: low
@@ -502,6 +571,7 @@ locations:
       - note: 由目录名和扩展的行为推断，未实测
 
   - id: dev.postman.app
+    app: postman
     under: '%LOCALAPPDATA%\Postman'
     kind: program
     risk: never
@@ -509,6 +579,7 @@ locations:
     impact: 不要手动删除，请在"设置 → 应用"里卸载
 
   - id: dev.postman.data
+    app: postman
     under: '%APPDATA%\Postman'
     kind: app-data
     risk: high

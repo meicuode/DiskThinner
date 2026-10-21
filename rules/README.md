@@ -36,4 +36,17 @@ locations:
 - `kind`：cache、temp、log、crash-dump、update-cache、package-cache、build-output、model、vm-disk、session-history、browser-data、app-data、user-data、config、credential、program、system、backup、recycle-bin。
 - `risk`：safe（会自动重建）、low（需重新下载）、medium（丢历史或登录态）、high（丢用户数据）、guide（只能用系统工具处理）、never（不能删）。
 - `tier`：draft（草稿）、reviewed（审阅过，有依据）、verified（实测过）。
+- 一个文件讲多个应用时，用顶层 `apps:` 列表代替 `app:`，每个位置用 `app: <id>` 指明归属（应用可以定义在别的文件里）：
+
+  ```yaml
+  apps:
+    - { id: uv, name: uv, vendor: Astral, exes: [uv.exe] }
+    - { id: npm, name: npm, vendor: Node.js, exes: [node.exe] }
+  locations:
+    - id: dev.uv.cache
+      app: uv
+      dir: '%LOCALAPPDATA%\uv\cache'
+  ```
+
+  同一条规则覆盖几个不同软件时（例如 VS Code、Cursor、Kiro 共用的目录结构）不写 `app`，界面上的归属由已装软件按目录名推断，标"推断"。
 - 写死在程序里的保护名单（`src/DiskThinner.Rules/ProtectionList.cs`）优先级高于任何规则。

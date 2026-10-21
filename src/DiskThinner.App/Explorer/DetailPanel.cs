@@ -4,6 +4,7 @@ using DiskThinner.App.Controls;
 using DiskThinner.App.Formatting;
 using DiskThinner.App.Rules;
 using DiskThinner.Core;
+using DiskThinner.Inventory;
 using DiskThinner.Rules;
 using DiskThinner.Scanner;
 
@@ -20,6 +21,9 @@ internal sealed class DetailPanel : Panel
     private int _node = -1;
     private ScanStats? _stats;
     private Classification? _classification;
+    private OwnerMap? _owners;
+    private SpaceGroup? _group;
+    private int _version;
 
     public DetailPanel()
     {
@@ -54,14 +58,30 @@ internal sealed class DetailPanel : Panel
 
     private static IEnumerable<Control> Descendants(Control c) => c.Controls.Cast<Control>().SelectMany(x => Descendants(x).Prepend(x));
 
-    public void ShowNode(NodeTree? tree, int node, ScanStats? stats, Classification? classification = null)
+    public void ShowNode(NodeTree? tree, int node, ScanStats? stats, Classification? classification = null, OwnerMap? owners = null)
     {
         _tree = tree;
         _node = node;
         _stats = stats;
         _classification = classification;
+        _owners = classification is null ? null : owners ?? OwnerMap.RulesOnly(classification);
+        _group = null;
         Rebuild();
     }
+
+    /// <summary>显示汇总视图里的一组（应用或类别）。</summary>
+    public void ShowGroup(NodeTree tree, SpaceGroup group, Classification? classification, OwnerMap? owners)
+    {
+        _tree = tree;
+        _node = -1;
+        _classification = classification;
+        _owners = owners;
+        _group = group;
+        Rebuild();
+    }
+
+    /// <summary>当前显示的组（测试用）。</summary>
+    internal SpaceGroup? ShownGroup => _group;
 
     protected override void OnResize(EventArgs eventargs)
     {
@@ -84,8 +104,13 @@ internal sealed class DetailPanel : Panel
         _content.Controls.Clear();
         AutoScrollPosition = Point.Empty;
         _content.Location = new Point(Padding.Left, Padding.Top);
+        _version++;
 
-        if (_tree is null || _node < 0)
+        if (_tree is not null && _group is not null)
+        {
+            BuildForGroup(_tree, _group);
+        }
+        else if (_tree is null || _node < 0)
         {
             _content.Controls.Add(Wrap(Ui.Label("选中左侧的目录或文件查看详情。", Theme.Ui, Theme.Muted)));
         }
@@ -185,14 +210,26 @@ internal sealed class DetailPanel : Panel
             }
         }
 
-        if (rule is not null)
+        var resolved = _owners?.Resolve(n);
+        if (resolved is { } ro)
         {
-            var owner = RuleView.OwnerOf(c!.Engine.Rules, rule);
-            if (owner is not null)
+            // 归属 + 来源标签；推断是在上级目录做出的，补一句说明
+            var cell = new FlowLayoutPanel { AutoSize = true, WrapContents = true, MaximumSize = new Size(valueWidth, 0), Margin = new Padding(0, 1, 0, 1), BackColor = Color.Transparent };
+            cell.Controls.Add(new Label { Text = ro.Owner.Display, AutoSize = true, MaximumSize = new Size(valueWidth, 0), ForeColor = Theme.Text, Font = Theme.Ui, Margin = new Padding(0, 2, 4, 0), UseMnemonic = false });
+            var (tagText, tagStyle) = RuleView.SourceTag(ro.Owner.Source);
+            cell.Controls.Add(new TagBox(tagText, tagStyle));
+            if (ro.Root != n && ro.Owner.Source == OwnerSource.Inferred)
             {
-                Row("归属", owner);
+                cell.SetFlowBreak(cell.Controls[^1], true);
+                cell.Controls.Add(new Label { Text = "按上级目录 " + tree.GetNameString(ro.Root) + " 推断", AutoSize = true, ForeColor = Theme.Subtle, Font = Theme.Small, Margin = new Padding(0, 2, 0, 0), UseMnemonic = false });
             }
 
+            kv.Controls.Add(new Label { Text = "归属", AutoSize = true, ForeColor = Theme.Muted, Font = Theme.Ui, Margin = new Padding(0, 3, 4, 3), UseMnemonic = false });
+            kv.Controls.Add(cell);
+        }
+
+        if (rule is not null)
+        {
             Row("类别", Names.Display(rule.Kind));
             Row("作用", rule.Purpose);
             Row("删除后", rule.Impact);
@@ -252,25 +289,34 @@ internal sealed class DetailPanel : Panel
 
         if (c is not null && rule is null && node.AllocSize > 0 && c.Unexplained(n) >= node.AllocSize)
         {
-            _content.Controls.Add(Wrap(Ui.Label("没有规则认识这里。打开所在位置看看内容；AI 分析会在后续版本加入。", Theme.Small, Theme.Muted), new Padding(0, 10, 0, 0)));
+            var hint = resolved is null
+                ? "没有规则认识这里。打开所在位置看看内容；AI 分析会在后续版本加入。"
+                : "知道归谁，但没有规则说明这里存的是什么、能不能删。可以在对应软件的设置里找清理选项，或者打开所在位置看看。";
+            _content.Controls.Add(Wrap(Ui.Label(hint, Theme.Small, Theme.Muted), new Padding(0, 10, 0, 0)));
         }
 
-        // ---- 证据 ----
-        if (rule is { Evidence.Count: > 0 } && c!.IsRoot(n))
+        // ---- 证据：归属的依据（本机上看到的程序、已装软件、目录名）+ 规则的依据 ----
+        var ownerEvidence = OwnerEvidenceFor(resolved);
+        var showRuleEvidence = rule is { Evidence.Count: > 0 } && c!.IsRoot(n);
+        if (ownerEvidence.Count > 0 || showRuleEvidence)
         {
-            _content.Controls.Add(SectionTitle("依据"));
-            foreach (var ev in rule.Evidence)
+            _content.Controls.Add(SectionTitle("证据"));
+            AddOwnerEvidence(ownerEvidence, width);
+            if (showRuleEvidence)
             {
-                _content.Controls.Add(EvidenceItem(ev, width));
-            }
+                foreach (var ev in rule!.Evidence)
+                {
+                    _content.Controls.Add(TaggedItem("规则", RuleView.RuleSource, EvidenceItem(ev, width - TagWidth("规则")), width));
+                }
 
-            var tierText = rule.Tier switch
-            {
-                Tier.Verified => "已实测",
-                Tier.Reviewed => "人工审阅",
-                _ => "草稿，未审阅",
-            };
-            _content.Controls.Add(Wrap(Ui.Label($"规则 {rule.Id} · {tierText}", Theme.Small, Theme.Subtle), new Padding(0, 4, 0, 0)));
+                var tierText = rule.Tier switch
+                {
+                    Tier.Verified => "已实测",
+                    Tier.Reviewed => "人工审阅",
+                    _ => "草稿，未审阅",
+                };
+                _content.Controls.Add(Wrap(Ui.Label($"规则 {rule.Id} · {tierText}", Theme.Small, Theme.Subtle), new Padding(0, 4, 0, 0)));
+            }
         }
 
         // ---- 操作 ----
@@ -337,6 +383,201 @@ internal sealed class DetailPanel : Panel
                 _content.Controls.Add(Wrap(Ui.Label("命令里的 D:\\ 路径只是示例，请改成你想放的位置；改完后要重新打开相关程序，并删除旧位置的内容。", Theme.Small, Theme.Subtle), new Padding(0, 4, 0, 0)));
             }
         }
+    }
+
+    /// <summary>归属的证据：规则写明的应用用本机上找到的程序位置，推断的用推断时记下的依据。</summary>
+    private IReadOnlyList<OwnerEvidence> OwnerEvidenceFor((Owner Owner, int Root)? resolved)
+    {
+        if (resolved is not { } r || _owners is null || _classification is not { } c)
+        {
+            return [];
+        }
+
+        if (r.Owner.Source == OwnerSource.Rule)
+        {
+            return c.RuleOf(r.Root)?.AppId is { } appId ? _owners.AppEvidence(appId) : [];
+        }
+
+        return r.Owner.Evidence;
+    }
+
+    /// <summary>列出归属证据；第一个带程序路径的证据，在后台查它的数字签名，查到后补一行。</summary>
+    private void AddOwnerEvidence(IReadOnlyList<OwnerEvidence> evidence, int width)
+    {
+        foreach (var ev in evidence)
+        {
+            var label = Ui.Label(ev.Text, Theme.Small, Theme.Text);
+            label.MaximumSize = new Size(width - TagWidth(ev.KindText), 0);
+            label.Margin = new Padding(0, 2, 0, 0);
+            _content.Controls.Add(TaggedItem(ev.KindText, RuleView.EvidenceStyle(ev.Kind), label, width));
+        }
+
+        if (evidence.FirstOrDefault(e => e.ExePath is not null && e.Kind is OwnerEvidenceKind.Program or OwnerEvidenceKind.Process or OwnerEvidenceKind.CommandLine)
+                ?.ExePath is not { } exe || !File.Exists(exe))
+        {
+            return;
+        }
+
+        var name = Path.GetFileName(exe);
+        var text = Ui.Label($"正在检查 {name} 的数字签名…", Theme.Small, Theme.Subtle);
+        text.MaximumSize = new Size(width - TagWidth("签名"), 0);
+        text.Margin = new Padding(0, 2, 0, 0);
+        _content.Controls.Add(TaggedItem("签名", RuleView.ObservedSource, text, width));
+        var version = _version;
+        CheckSignature();
+
+        async void CheckSignature()
+        {
+            SignatureInfo sig;
+            try
+            {
+                sig = await Task.Run(() => ExeIdentityReader.ReadSignature(exe));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+            {
+                sig = SignatureInfo.None;
+            }
+
+            if (version != _version || text.IsDisposed)
+            {
+                return; // 期间已经换成别的节点
+            }
+
+            text.ForeColor = Theme.Text;
+            text.Text = sig switch
+            {
+                { Signer: null } => $"{name} 没有嵌入的数字签名",
+                { Valid: true } => $"{name} 由 {sig.Signer} 签名（签名有效）",
+                _ => $"{name} 由 {sig.Signer} 签名（无法验证，代码 0x{sig.Status:X8}）",
+            };
+        }
+    }
+
+    private int TagWidth(string text) =>
+        TextRenderer.MeasureText(text, Theme.Small, Size.Empty, TextFormatFlags.NoPadding).Width + Ui.Scale(this, 8) + Ui.Scale(this, 8);
+
+    /// <summary>证据的一行：左边一个来源标签，右边文字。</summary>
+    private static Control TaggedItem(string tag, RuleView.TagStyle style, Control content, int width)
+    {
+        var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, MaximumSize = new Size(width, 0), Margin = new Padding(0, 2, 0, 2), BackColor = Color.Transparent };
+        row.Controls.Add(new TagBox(tag, style));
+        row.Controls.Add(content);
+        return row;
+    }
+
+    /// <summary>汇总视图里选中一组时：总量、可释放、最大的几个位置（可点击）、归属的依据。</summary>
+    private void BuildForGroup(NodeTree tree, SpaceGroup group)
+    {
+        var width = ContentWidth;
+        var title = new FlowLayoutPanel { AutoSize = true, WrapContents = true, MaximumSize = new Size(width, 0), Width = width, Margin = new Padding(0), BackColor = Color.Transparent };
+        title.Controls.Add(new Label { Text = group.Name, AutoSize = true, MaximumSize = new Size(width, 0), Font = Theme.Title, ForeColor = Theme.Text, UseMnemonic = false, Margin = new Padding(0, 0, 6, 2) });
+        if (group.Owner is { } owner)
+        {
+            var (tag, style) = RuleView.SourceTag(owner.Source);
+            title.Controls.Add(new TagBox(tag, style) { Margin = new Padding(0, 6, 0, 0) });
+        }
+        else if (group.IsUnknown)
+        {
+            title.Controls.Add(new TagBox("未识别", RuleView.Unknown) { Margin = new Padding(0, 6, 0, 0) });
+        }
+
+        _content.Controls.Add(title);
+
+        var total = Math.Max(1, tree[tree.Root].AllocSize);
+        var lines = new List<string>
+        {
+            $"共 {ByteSize.Format(group.Bytes)}，占扫描总量的 {(group.Bytes * 100.0 / total).ToString("0.0", CultureInfo.InvariantCulture)}%",
+            $"分布在 {group.LocationCount.ToString("N0", CultureInfo.InvariantCulture)} 个位置",
+        };
+        if (group.CleanableBytes > 0)
+        {
+            lines.Add($"其中约 {ByteSize.Format(group.CleanableBytes)} 可以清理");
+        }
+
+        foreach (var line in lines)
+        {
+            _content.Controls.Add(Wrap(Ui.Label(line, line == lines[0] ? Theme.UiBold : Theme.Ui, Theme.Text), new Padding(0, 4, 0, 0)));
+        }
+
+        if (group.IsUnknown)
+        {
+            _content.Controls.Add(Callout(group.Kind is null && group.Owner is null && group.Name == "未识别"
+                ? "没有规则认识这些位置。打开所在位置看看内容；AI 分析会在后续版本加入。"
+                : "没有规则认识、也推断不出归属的位置。打开所在位置看看内容；AI 分析会在后续版本加入。", width, false));
+        }
+
+        _content.Controls.Add(SectionTitle("最大的几个位置"));
+        foreach (var loc in group.Locations.Where(l => !l.IsRemainder).Take(8))
+        {
+            var path = PathDisplay.Shorten(tree.GetPath(loc.Node)) + (loc.IsParentRemainder ? "（其余部分）" : "");
+            var link = new LinkLabel
+            {
+                Text = $"{path} · {ByteSize.Format(loc.Bytes)}",
+                AutoSize = true,
+                MaximumSize = new Size(width, 0),
+                Font = Theme.Small,
+                LinkColor = Theme.Accent,
+                Margin = new Padding(0, 2, 0, 2),
+                UseMnemonic = false,
+                AccessibleDescription = "选中这个位置",
+            };
+            var node = loc.Node;
+            link.LinkClicked += (_, _) => SelectRequested?.Invoke(this, node);
+            _content.Controls.Add(link);
+        }
+
+        if (group.Owner is { Source: OwnerSource.Inferred } inferred)
+        {
+            _content.Controls.Add(SectionTitle("证据"));
+            AddOwnerEvidence(inferred.Evidence, width);
+        }
+        else if (group.Owner is { Source: OwnerSource.Rule } && _owners is not null && _classification is { } c
+                 && group.Locations.FirstOrDefault(l => l.Rule >= 0 && c.Engine.Rules.Locations[l.Rule].AppId is not null) is { } withApp)
+        {
+            var evidence = _owners.AppEvidence(c.Engine.Rules.Locations[withApp.Rule].AppId!);
+            if (evidence.Count > 0)
+            {
+                _content.Controls.Add(SectionTitle("证据"));
+                AddOwnerEvidence(evidence, width);
+            }
+        }
+
+        _content.Controls.Add(Wrap(Ui.Label("双击列表里的位置，可以在目录视图里定位。", Theme.Small, Theme.Subtle), new Padding(0, 12, 0, 0)));
+    }
+
+    /// <summary>原型的来源标签（.s-rule / .s-infer / .s-obs）：自绘，推断是虚线框。</summary>
+    private sealed class TagBox : Control
+    {
+        private readonly RuleView.TagStyle _style;
+
+        public TagBox(string text, RuleView.TagStyle style)
+        {
+            _style = style;
+            Text = text;
+            Font = Theme.Small;
+            Margin = new Padding(0, 2, 6, 0);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
+            AccessibleRole = AccessibleRole.StaticText;
+            AccessibleName = text;
+            Size = GetPreferredSize(Size.Empty);
+        }
+
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            var t = TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+            var h = Math.Max(t.Height + 4, Ui.Scale(this, 17));
+            var pad = Math.Max(4, h / 4);
+            return new Size(t.Width + pad * 2, h);
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            base.OnFontChanged(e);
+            Size = GetPreferredSize(Size.Empty);
+        }
+
+        protected override void OnPaint(PaintEventArgs e) => RuleView.DrawTag(e.Graphics, Text, Font, Point.Empty, Height, _style);
     }
 
     private static string DescribeDelete(DeleteAction d)

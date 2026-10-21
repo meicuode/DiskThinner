@@ -9,8 +9,10 @@ namespace DiskThinner.App;
 ///   --screenshot a.png   扫描完成后截取窗口
 ///   --report r.txt       扫描完成后写入耗时和内存
 ///   --exit-after-scan    完成上面几步后退出
-///   --primary-screen     窗口放在主显示器上
+///   --primary-screen     窗口放在主显示器上（--secondary-screen 放在另一个显示器上）
 ///   --page explorer      启动后打开的页面（overview / explorer）
+///   --view owner         空间浏览的视图（dir / owner / kind，对应按目录、按归属汇总、按类别汇总）
+///   --no-rules           不加载规则和已装软件（对比内存用）
 /// </summary>
 internal sealed record AppOptions
 {
@@ -24,8 +26,17 @@ internal sealed record AppOptions
     /// <summary>窗口放在主显示器上（多显示器、缩放比例不同时用来验证高 DPI）。</summary>
     public bool PrimaryScreen { get; init; }
 
+    /// <summary>窗口放在第一个非主显示器上（没有时放在主显示器上）。</summary>
+    public bool SecondaryScreen { get; init; }
+
     /// <summary>启动后打开的页面：overview（默认）或 explorer。</summary>
     public string? StartPage { get; init; }
+
+    /// <summary>空间浏览的初始视图：0 按目录，1 按归属汇总，2 按类别汇总。</summary>
+    public int StartView { get; init; }
+
+    /// <summary>不加载规则和已装软件。</summary>
+    public bool NoRules { get; init; }
 
     public static AppOptions Parse(string[] args)
     {
@@ -46,7 +57,15 @@ internal sealed record AppOptions
             Report = Value("--report"),
             ExitAfterScan = Flag("--exit-after-scan"),
             PrimaryScreen = Flag("--primary-screen"),
+            SecondaryScreen = Flag("--secondary-screen"),
             StartPage = Value("--page") is { } page && page is "overview" or "explorer" ? page : null,
+            StartView = Value("--view")?.ToLowerInvariant() switch
+            {
+                "owner" => 1,
+                "kind" => 2,
+                _ => 0,
+            },
+            NoRules = Flag("--no-rules"),
         };
     }
 

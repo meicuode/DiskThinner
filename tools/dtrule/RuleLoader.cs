@@ -13,7 +13,8 @@ public sealed record RuleIssue(string File, string? RuleId, string Message)
 }
 
 /// <summary>
-/// 读取 rules/ 目录下的 YAML 源文件。每个文件可以有一个 app 段和一个 locations 列表。
+/// 读取 rules/ 目录下的 YAML 源文件。每个文件可以有一个 app 段（或一个 apps 列表）和一个 locations 列表；
+/// 位置可以用 app: &lt;id&gt; 指明归哪个应用（应用可以定义在别的文件里）。
 /// 用 YAML 的节点模型手动映射，不认识的键直接报错（拼错字段时不会被静默忽略）。
 /// </summary>
 public static partial class RuleLoader
@@ -21,7 +22,7 @@ public static partial class RuleLoader
     private static readonly HashSet<string> AppKeys = ["id", "name", "vendor", "exes", "processes"];
     private static readonly HashSet<string> LocationKeys =
     [
-        "id", "dir", "file", "under", "has_any", "sibling_any", "not_under", "kind", "risk", "tier", "label",
+        "id", "app", "dir", "file", "under", "has_any", "sibling_any", "not_under", "kind", "risk", "tier", "label",
         "regenerates", "requires_closed", "purpose", "impact", "actions", "relocate", "evidence",
     ];
 
@@ -78,6 +79,7 @@ public static partial class RuleLoader
             switch (key)
             {
                 case "app" when v is YamlMappingNode appNode:
+                    // 整个文件只讲一个应用：所有位置默认归它
                     var app = ReadApp(file, appNode, issues);
                     if (app is not null)
                     {
@@ -85,6 +87,24 @@ public static partial class RuleLoader
                         appId = app.Id;
                     }
 
+                    break;
+                case "apps" when v is YamlSequenceNode appList:
+                    // 一个文件讲多个应用：位置用 app: <id> 指明归属
+                    foreach (var item in appList.Children)
+                    {
+                        if (item is YamlMappingNode m && ReadApp(file, m, issues) is { } listed)
+                        {
+                            apps.Add(listed);
+                        }
+                        else if (item is not YamlMappingNode)
+                        {
+                            issues.Add(new RuleIssue(file, null, "apps 的每一项应该是映射"));
+                        }
+                    }
+
+                    break;
+                case "apps":
+                    issues.Add(new RuleIssue(file, null, "apps 应该是列表"));
                     break;
                 case "locations":
                     break;
@@ -228,7 +248,7 @@ public static partial class RuleLoader
         return new LocationRule
         {
             Id = id,
-            AppId = appId,
+            AppId = Str(node, "app") ?? appId,
             Mode = mode,
             Pattern = pattern,
             Conditions = conditions,

@@ -9,8 +9,10 @@
   <ItemGroup>
     <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
     <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+    <ProjectReference Include="..\DiskThinner.Inventory\DiskThinner.Inventory.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DiskThinner.Rules.Tests" />
+    <InternalsVisibleTo Include="DiskThinner.App.Tests" />
   </ItemGroup>
 </Project>

@@ -2,12 +2,13 @@
 
 一个轻量的 Windows C 盘空间分析与清理工具，要回答四个问题：哪里大、哪里在涨、是谁的、能不能删。
 
-当前进度：**M2 上半（规则）已完成**。可以查看 C 盘哪里占用最大，每个位置是什么、风险多大、该怎么处理；快照和清理功能还在开发中，程序不会删除任何文件。
+当前进度：**M2（规则与归属）已完成**。可以查看 C 盘哪里占用最大，每个位置是什么、归哪个软件、风险多大、该怎么处理，也可以按软件或按类别汇总；快照和清理功能还在开发中，程序不会删除任何文件。
 
 - 研发方案：[docs/dev-plan-v0.2.md](docs/dev-plan-v0.2.md)
 - 阶段 0 验证报告：[docs/phase0-report.md](docs/phase0-report.md)
 - M1 验收报告：[docs/m1-report.md](docs/m1-report.md)
 - M2 上半验收报告：[docs/m2a-report.md](docs/m2a-report.md)
+- M2 下半验收报告：[docs/m2b-report.md](docs/m2b-report.md)
 - 规则格式：[rules/README.md](rules/README.md)
 
 ## 使用
@@ -19,6 +20,7 @@ dotnet run --project src/DiskThinner.App
 - 以管理员身份运行时直接读取 NTFS 主文件表（MFT），C 盘几秒扫完；普通权限下逐个目录遍历，较慢，结果为估算，界面上可以一键"以管理员身份重启"。
 - 命令行 `--scan D:` 指定要扫描的磁盘（也可以是一个文件夹），`--walk` 强制使用遍历扫描。
 - DiskThinner 目前不会删除任何文件。"打开所在位置，自己清理"只是用资源管理器打开目录。
+- 判断"归哪个软件"时只在本机读取注册表卸载项、商店应用列表、PATH 里的程序和正在运行的程序路径，不联网，也不上传任何信息。
 - 界面原型：[prototype/index.html](prototype/index.html)（双击用浏览器打开）
 
 ## 构建

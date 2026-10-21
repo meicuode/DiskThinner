@@ -17,11 +17,13 @@ internal sealed class TreeListView : ListView
     private const int IndentWidth = 16;
 
     // 96 DPI 下的列宽；句柄创建和 DPI 变化时按 DeviceDpi 换算
-    private static readonly int[] BaseColumnWidths = [300, 88, 120, 96, 150, 230];
+    // 默认窗口在 150% 缩放下，列表区约 880 个 96 DPI 像素宽：六列加起来不能超过它，否则会出现横向滚动条
+    private static readonly int[] BaseColumnWidths = [300, 80, 110, 88, 150, 200];
 
     private readonly DerivedFonts _fonts = new();
     private TreeRows? _rows;
     private Classification? _classification;
+    private OwnerMap? _owners;
     private bool _suppressSelection;
     private DateTime _now = DateTime.Now;
     private int _hoverRow = -1;
@@ -112,7 +114,7 @@ internal sealed class TreeListView : ListView
 
         var hasVScroll = (GetWindowLong(Handle, GwlStyle) & WsVScroll) != 0;
         var reserve = hasVScroll ? 0 : SystemInformation.GetVerticalScrollBarWidthForDpi(DeviceDpi);
-        var width = Math.Max(Ui.Scale(this, 260), ClientSize.Width - others - reserve - 1);
+        var width = Math.Max(Ui.Scale(this, 220), ClientSize.Width - others - reserve - 1);
         if (Math.Abs(Columns[0].Width - width) > 1)
         {
             Columns[0].Width = width;
@@ -135,7 +137,7 @@ internal sealed class TreeListView : ListView
         SmallImageList = new ImageList { ImageSize = new Size(1, Ui.Scale(this, 24)) };
     }
 
-    public void SetTree(NodeTree? tree, Classification? classification = null)
+    public void SetTree(NodeTree? tree, Classification? classification = null, OwnerMap? owners = null)
     {
         _suppressSelection = true;
         try
@@ -143,6 +145,7 @@ internal sealed class TreeListView : ListView
             VirtualListSize = 0;
             _rows = tree is null ? null : new TreeRows(tree);
             _classification = classification;
+            _owners = classification is null ? null : owners ?? OwnerMap.RulesOnly(classification);
             _now = DateTime.Now;
             if (_rows is not null)
             {
@@ -270,19 +273,25 @@ internal sealed class TreeListView : ListView
             return ("", "");
         }
 
+        var owner = _owners?.OwnerOf(n)?.Display;
         if (c.RuleOf(n) is { } rule)
         {
-            var owner = RuleView.OwnerOf(c.Engine.Rules, rule) ?? "";
             var risk = c.EffectiveRisk(n) ?? rule.Risk;
-            return (owner, $"{Names.Display(rule.Kind)} {RuleView.RiskLabel(risk, rule)}");
+            return (owner ?? "", $"{Names.Display(rule.Kind)} {RuleView.RiskLabel(risk, rule)}");
         }
 
         if (c.ProtectionOf(n) is { Level: ProtectionLevel.Hard or ProtectionLevel.Guide } p)
         {
-            return ("", ProtectionList.Display(p.Level));
+            return (owner ?? "", ProtectionList.Display(p.Level));
         }
 
-        return IsUnrecognized(n) ? ("未识别", "") : ("", "");
+        if (IsUnrecognized(n))
+        {
+            // 知道归谁但没有规则说明是什么：归属列写应用，类别列标"未识别"
+            return owner is null ? ("未识别", "") : (owner, "未识别");
+        }
+
+        return (owner ?? "", "");
     }
 
     /// <summary>整个节点都没有被任何规则解释（目录要求整棵子树都没有规则）。</summary>
@@ -412,7 +421,10 @@ internal sealed class TreeListView : ListView
         }
     }
 
-    /// <summary>归属列：应用名 + "规则"标签；整块没被识别时显示"未识别"。规则在上级目录命中的子项用浅色。</summary>
+    /// <summary>
+    /// 归属列：应用名 + 来源标签（规则 / 推断）；标签只画在归属确定的那一级，下面的子项用浅色。
+    /// 不知道归谁、也没有规则认识时显示"未识别"。
+    /// </summary>
     private void DrawOwner(Graphics g, Rectangle bounds, int n, float s, TextFormatFlags flags)
     {
         var c = _classification;
@@ -424,20 +436,17 @@ internal sealed class TreeListView : ListView
         var x = bounds.X + (int)(6 * s);
         var tagH = (int)(17 * s);
         var tagY = bounds.Y + (bounds.Height - tagH) / 2;
-        if (c.RuleOf(n) is { } rule)
+        if (_owners?.Resolve(n) is { } resolved)
         {
-            var owner = RuleView.OwnerOf(c.Engine.Rules, rule);
-            var inherited = !c.IsRoot(n);
-            if (owner is not null)
+            var text = resolved.Owner.Display;
+            var atRoot = resolved.Root == n;
+            var w = Math.Min(TextRenderer.MeasureText(g, text, _fonts.Regular).Width, bounds.Right - x - (int)(44 * s));
+            TextRenderer.DrawText(g, text, _fonts.Regular, new Rectangle(x, bounds.Y, w, bounds.Height), atRoot ? Theme.Text : Theme.Muted, flags);
+            x += w + (int)(4 * s);
+            if (atRoot && x + (int)(36 * s) < bounds.Right)
             {
-                var w = Math.Min(TextRenderer.MeasureText(g, owner, _fonts.Regular).Width, bounds.Right - x - (int)(44 * s));
-                TextRenderer.DrawText(g, owner, _fonts.Regular, new Rectangle(x, bounds.Y, w, bounds.Height), inherited ? Theme.Muted : Theme.Text, flags);
-                x += w + (int)(4 * s);
-            }
-
-            if (!inherited && x + (int)(36 * s) < bounds.Right)
-            {
-                RuleView.DrawTag(g, "规则", _fonts.Small, new Point(x, tagY), tagH, RuleView.RuleSource);
+                var (tag, style) = RuleView.SourceTag(resolved.Owner.Source);
+                RuleView.DrawTag(g, tag, _fonts.Small, new Point(x, tagY), tagH, style);
             }
 
             return;
@@ -474,6 +483,10 @@ internal sealed class TreeListView : ListView
         if (risk is { } r && x < bounds.Right - (int)(20 * s))
         {
             RuleView.DrawTag(g, RuleView.RiskLabel(r, rule), _fonts.Small, new Point(x, tagY), tagH, RuleView.RiskStyle(r));
+        }
+        else if (rule is null && risk is null && IsUnrecognized(n) && _owners?.OwnerOf(n) is not null)
+        {
+            RuleView.DrawTag(g, "未识别", _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
         }
     }
 

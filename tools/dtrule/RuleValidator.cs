@@ -29,11 +29,17 @@ public static partial class RuleValidator
             errors.Add(new RuleIssue(string.Join(", ", dup.Select(r => r.SourceFile).Distinct()), dup.Key, "规则 id 重复"));
         }
 
+        var appIds = rules.Apps.Select(a => a.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var r in rules.Locations)
         {
             var file = r.SourceFile ?? "?";
             void Error(string m) => errors.Add(new RuleIssue(file, r.Id, m));
             void Warn(string m) => warnings.Add(new RuleIssue(file, r.Id, m));
+
+            if (r.AppId is { } app && !appIds.Contains(app))
+            {
+                Error($"app 引用了没有定义的应用：{app}");
+            }
 
             // ---- 路径 ----
             var token = PathTokens.LeadingToken(r.Pattern);

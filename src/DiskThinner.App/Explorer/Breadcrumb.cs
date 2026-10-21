@@ -89,6 +89,24 @@ internal sealed class Breadcrumb : FlowLayoutPanel
         ResumeLayout();
     }
 
+    /// <summary>显示不对应目录的位置（汇总视图里的组），例如"按归属汇总 › uv"。</summary>
+    public void ShowText(params string[] parts)
+    {
+        SuspendLayout();
+        Controls.Clear();
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (i > 0)
+            {
+                AddSeparator("›");
+            }
+
+            Controls.Add(MakeLabel(parts[i], i == parts.Length - 1 ? Theme.UiBold : Theme.Ui, i == parts.Length - 1 ? Theme.Text : Theme.Muted));
+        }
+
+        ResumeLayout();
+    }
+
     private void AddSeparator(string text) => Controls.Add(MakeLabel(text, Theme.Ui, Theme.Subtle));
 
     private static Label MakeLabel(string text, Font font, Color color) => new()

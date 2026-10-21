@@ -20,6 +20,7 @@ public static class MftScanner
         HardLinkAttribution attribution = HardLinkAttribution.FirstName)
     {
         var drive = NormalizeDrive(volume);
+        var beforeScan = Environment.WorkingSet;
         var stopwatch = Stopwatch.StartNew();
 
         using var handle = Win32.CreateFile(@"\\.\" + drive, Win32.GenericRead,
@@ -90,9 +91,12 @@ public static class MftScanner
         }
 
         var readDuration = stopwatch.Elapsed;
+        var afterRead = Environment.WorkingSet;
+        var names = tables.NameCount;
         stopwatch.Restart();
 
         var tree = tables.BuildTree(drive + @"\", out var hardLinks, attribution);
+        var afterBuild = Environment.WorkingSet;
         var inUse = tables.InUseRecords;
         var bad = tables.BadRecords;
         var malformed = tables.MalformedRuns;
@@ -113,6 +117,7 @@ public static class MftScanner
         tree.PropagateFlagToDescendants(NodeFlags.Metadata);
         tree.TrimExcess();
         var finalizeDuration = stopwatch.Elapsed;
+        var afterFinalize = Environment.WorkingSet;
 
         Win32.GetDiskFreeSpaceEx(drive + @"\", out _, out var totalBytes, out var freeBytes);
 
@@ -140,6 +145,11 @@ public static class MftScanner
             Unreachable = tree.UnreachableCount,
             NameChars = tree.NameChars,
             NameCharsCapacity = nameCapacity,
+            MftNames = names,
+            WorkingSetBeforeScan = beforeScan,
+            WorkingSetAfterRead = afterRead,
+            WorkingSetAfterBuild = afterBuild,
+            WorkingSetAfterFinalize = afterFinalize,
         };
         return new ScanResult(tree, stats);
     }

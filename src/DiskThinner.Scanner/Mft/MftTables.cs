@@ -20,6 +20,8 @@ internal sealed class MftTables
     private const uint FileAttributeRecallOnOpen = 0x40000;
     private const uint FileAttributeRecallOnDataAccess = 0x400000;
 
+    // 紧排成 14 字节（默认对齐是 16）：百万级条目省 2 MB 以上
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 2)]
     private struct NameEntry
     {
         public int Record;
@@ -52,7 +54,9 @@ internal sealed class MftTables
         _lastWrite = new long[recordCount];
         _attributes = new uint[recordCount];
         _nonDosNames = new byte[recordCount];
-        _names = new NameEntry[Math.Max(1024, recordCount + recordCount / 4)];
+
+        // 8.3 短名在解析时就丢掉了（见 Parse），名字数大致等于在用的记录数；不够时按 1.5 倍扩容
+        _names = new NameEntry[Math.Max(1024, recordCount)];
     }
 
     public int RecordCount { get; }
@@ -109,6 +113,22 @@ internal sealed class MftTables
             }
         }
 
+        // 同一条记录里已经有长文件名时，8.3 短名不会成为节点，不存它的名字（C 盘上约有 60 万个，占十几 MB）。
+        // 长名在扩展记录里的极少数情况照旧保留短名，建树时由 IsNodeName 排除。
+        var hasLongName = false;
+        foreach (var attr in MftRecord.Attributes(rec))
+        {
+            if (attr.Type == MftRecord.AttrFileName && !attr.NonResident)
+            {
+                var fn = attr.Value;
+                if (fn.Length >= 0x42 && fn[0x41] != MftRecord.NamespaceDos)
+                {
+                    hasLongName = true;
+                    break;
+                }
+            }
+        }
+
         foreach (var attr in MftRecord.Attributes(rec))
         {
             switch (attr.Type)
@@ -126,7 +146,7 @@ internal sealed class MftTables
                 }
 
                 case MftRecord.AttrFileName when !attr.NonResident:
-                    AddName(attr.Value, owner);
+                    AddName(attr.Value, owner, hasLongName);
                     break;
 
                 case MftRecord.AttrData:
@@ -184,7 +204,7 @@ internal sealed class MftTables
         return attr.LowestVcn == 0 ? attr.OnDiskSize : 0;
     }
 
-    private void AddName(ReadOnlySpan<byte> v, int owner)
+    private void AddName(ReadOnlySpan<byte> v, int owner, bool skipDos)
     {
         if (v.Length < 0x42)
         {
@@ -194,14 +214,14 @@ internal sealed class MftTables
         var parent = (long)(BinaryPrimitives.ReadUInt64LittleEndian(v) & MftRecord.ReferenceMask);
         var length = v[0x40];
         var ns = v[0x41];
-        if (v.Length < 0x42 + length * 2)
+        if (v.Length < 0x42 + length * 2 || ns == MftRecord.NamespaceDos && skipDos)
         {
             return;
         }
 
         if (_nameCount == _names.Length)
         {
-            Array.Resize(ref _names, _names.Length * 2);
+            Array.Resize(ref _names, _names.Length + _names.Length / 2);
         }
 
         // 直接解码到分块名称池里，建树时节点引用同一个池，不再复制
@@ -254,7 +274,8 @@ internal sealed class MftTables
         var tree = new NodeTree(nodeCount, _pool);
         var recordToNode = new int[RecordCount];
         Array.Fill(recordToNode, -1);
-        var parentRecord = new int[nodeCount];
+
+        // 父目录的记录号先放在节点的 Tag 里（建树完成后清回 -1），省掉一个按节点数分配的数组
         var nodeRecord = attribution == HardLinkAttribution.FirstName ? [] : new int[nodeCount];
         hardLinkSecondaries = 0;
 
@@ -284,7 +305,7 @@ internal sealed class MftTables
             var isDir = (flags & NodeFlags.Directory) != 0;
             var index = tree.AddPooled(-1, e.CharOffset, e.Length, flags,
                 isDir ? 0 : _logical[r], isDir ? 0 : _alloc[r], _lastWrite[r]);
-            parentRecord[index] = e.ParentRecord;
+            tree[index].Tag = e.ParentRecord;
             if (nodeRecord.Length > 0)
             {
                 nodeRecord[index] = r;
@@ -315,7 +336,7 @@ internal sealed class MftTables
                 continue;
             }
 
-            var pr = parentRecord[i];
+            var pr = node.Tag;
             var p = (uint)pr < (uint)RecordCount ? recordToNode[pr] : -1;
             if (p < 0 || !tree[p].IsDirectory || p == i)
             {
@@ -330,7 +351,12 @@ internal sealed class MftTables
 
         if (attribution != HardLinkAttribution.FirstName && hardLinkSecondaries > 0)
         {
-            ReassignPrimaryLinks(tree, attribution, recordToNode, parentRecord, nodeRecord);
+            ReassignPrimaryLinks(tree, attribution, recordToNode, nodeRecord);
+        }
+
+        for (var i = 0; i < tree.Count; i++)
+        {
+            tree[i].Tag = -1;
         }
 
         return tree;
@@ -340,7 +366,7 @@ internal sealed class MftTables
     /// 按策略重新挑选硬链接的"主名字"（大小算在它所在的目录里）。目录没有硬链接，所以只涉及文件，
     /// 不影响上面用 recordToNode 解析父目录。
     /// </summary>
-    private static void ReassignPrimaryLinks(NodeTree tree, HardLinkAttribution attribution, int[] recordToNode, int[] parentRecord, int[] nodeRecord)
+    private static void ReassignPrimaryLinks(NodeTree tree, HardLinkAttribution attribution, int[] recordToNode, int[] nodeRecord)
     {
         var store = FindComponentStore(tree);
         for (var i = 0; i < tree.Count; i++)
@@ -355,7 +381,7 @@ internal sealed class MftTables
             var better = attribution switch
             {
                 HardLinkAttribution.LastName => i > current,
-                HardLinkAttribution.LowestParentRecord => parentRecord[i] < parentRecord[current],
+                HardLinkAttribution.LowestParentRecord => tree[i].Tag < tree[current].Tag, // Tag 里还是父目录的记录号
                 HardLinkAttribution.OutsideComponentStore => store >= 0 && IsUnder(tree, current, store) && !IsUnder(tree, i, store),
                 _ => false,
             };

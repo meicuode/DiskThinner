@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 已装软件、程序身份（版本信息与 Authenticode 签名）、运行中的进程。不引用 WinForms，按 Native AOT 要求编写。 -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Rules.Tests" />
+  </ItemGroup>
+</Project>

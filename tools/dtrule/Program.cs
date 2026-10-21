@@ -3,13 +3,15 @@
 //   dtrule validate <rules 目录>                     校验全部 YAML 规则
 //   dtrule build    <rules 目录> --out rules.db      校验并编译成规则库（有错误时失败）
 //   dtrule probe    <rules 目录> [--drive C:] [--walk] [--out report.md]
-//                                                    在本机扫描并统计规则覆盖率（管理员下用 MFT 扫描）
+//                                                    在本机扫描并统计规则覆盖率和归属推断（管理员下用 MFT 扫描；
+//                                                    --drive 也可以是一个文件夹，例如用户目录，用遍历扫描）
 
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using DiskThinner.Core;
+using DiskThinner.Inventory;
 using DiskThinner.Rules;
 using DiskThinner.RuleTools;
 using DiskThinner.Scanner;
@@ -145,6 +147,56 @@ static int Probe(RuleSet rules, string drive, bool walk, string? output)
     foreach (var (node, bytes, rest) in c.UnexplainedHotspots(200L << 20).Take(30))
     {
         md.AppendLine($"| `{Redact(tree.GetPath(node))}`{(rest ? "（其余部分）" : "")} | {ByteSize.Format(bytes)} |");
+    }
+
+    // ---- 归属：已装软件 + 推断 ----
+    var inventory = InventoryCollector.Collect();
+    var owners = OwnerMap.Build(c, inventory);
+    var groups = SpaceGroups.ByOwner(owners);
+    long BySource(OwnerSource? s) => groups.Where(g => g.Owner?.Source == s).Sum(g => g.Bytes);
+    var total = tree[tree.Root].AllocSize;
+    md.AppendLine();
+    md.AppendLine("## 归属");
+    md.AppendLine();
+    md.AppendLine($"已装软件 {inventory.Apps.Count} 项（{string.Join("，", Enum.GetValues<AppSource>().Select(s => $"{s} {inventory.Count(s)}"))}），" +
+                  $"收集 {inventory.Duration.TotalMilliseconds:F0} 毫秒；推断出 {owners.InferredCount} 个位置的归属，用时 {owners.Duration.TotalMilliseconds:F0} 毫秒。" +
+                  (inventory.Errors.Count > 0 ? $"收集时出错：{string.Join("；", inventory.Errors)}" : ""));
+    md.AppendLine();
+    md.AppendLine($"按归属汇总：规则给出归属 {ByteSize.Format(BySource(OwnerSource.Rule))}（{Pct(BySource(OwnerSource.Rule), total)}），" +
+                  $"推断 {ByteSize.Format(BySource(OwnerSource.Inferred))}（{Pct(BySource(OwnerSource.Inferred), total)}），" +
+                  $"不知道归谁 {ByteSize.Format(BySource(null))}（{Pct(BySource(null), total)}）。");
+    md.AppendLine();
+    md.AppendLine("| 归属 | 来源 | 占用 | 位置数 | 可清理 |");
+    md.AppendLine("|---|---|---|---|---|");
+    foreach (var g in groups.Take(40))
+    {
+        var source = g.Owner is null ? "未识别" : g.Owner.Source == OwnerSource.Rule ? "规则" : "推断";
+        md.AppendLine($"| {g.Name} | {source} | {ByteSize.Format(g.Bytes)} | {g.LocationCount:N0} | {ByteSize.Format(g.CleanableBytes)} |");
+    }
+
+    md.AppendLine();
+    md.AppendLine("### 推断出的归属（按占用）");
+    md.AppendLine();
+    md.AppendLine("| 位置 | 归属 | 依据 |");
+    md.AppendLine("|---|---|---|");
+    foreach (var (node, owner) in owners.InferredRoots.OrderByDescending(x => tree[x.Key].AllocSize).Take(40))
+    {
+        var why = string.Join("；", owner.Evidence.Select(e => $"[{e.KindText}] {Redact(e.Text)}")).Replace("|", "\\|");
+        md.AppendLine($"| `{Redact(tree.GetPath(node))}` {ByteSize.Format(tree[node].AllocSize)} | {owner.Display} | {why} |");
+    }
+
+    if (groups.FirstOrDefault(g => g.Owner is null) is { } unknown)
+    {
+        md.AppendLine();
+        md.AppendLine("### 不知道归谁的大块");
+        md.AppendLine();
+        md.AppendLine("| 位置 | 占用 |");
+        md.AppendLine("|---|---|");
+        foreach (var l in unknown.Locations.Take(25))
+        {
+            var where = l.Node < 0 ? "零散的小位置" : $"`{Redact(tree.GetPath(l.Node))}`{(l.IsParentRemainder ? "（其余部分）" : "")}";
+            md.AppendLine($"| {where} | {ByteSize.Format(l.Bytes)} |");
+        }
     }
 
     var text = md.ToString();

@@ -206,4 +206,57 @@ public class RuleValidatorTests
             """, apps, locations, issues);
         Assert.Contains(issues, i => i.Message.Contains("evidenc"));
     }
+
+    [Fact]
+    public void LoaderReadsAppListAndPerLocationApp()
+    {
+        var apps = new List<AppInfo>();
+        var locations = new List<LocationRule>();
+        var issues = new List<RuleIssue>();
+        RuleLoader.LoadFile("t.yaml", """
+            apps:
+              - { id: uv, name: uv, vendor: Astral, exes: [uv.exe] }
+              - { id: npm, name: npm }
+            locations:
+              - id: dev.uv.cache
+                app: uv
+                dir: '%LOCALAPPDATA%\uv\cache'
+                kind: package-cache
+                risk: low
+                purpose: a
+                impact: b
+                evidence:
+                  - note: c
+              - id: dev.other
+                dir: '%LOCALAPPDATA%\other'
+                kind: cache
+                risk: high
+                purpose: a
+                impact: b
+            """, apps, locations, issues);
+        Assert.Empty(issues);
+        Assert.Equal(["uv", "npm"], apps.Select(a => a.Id));
+        Assert.Equal(["uv.exe"], apps[0].DetectExes);
+        Assert.Equal("uv", locations[0].AppId);
+        Assert.Null(locations[1].AppId);
+    }
+
+    [Fact]
+    public void ValidatorRejectsUndefinedApp()
+    {
+        var rule = Rule("dev.x", MatchMode.Dir, @"%LOCALAPPDATA%\x", Risk.High) with { AppId = "missing" };
+        Assert.Contains(Errors(rule), e => e.Message.Contains("没有定义的应用"));
+    }
+
+    [Fact]
+    public void RepositoryRulesNameTheirApps()
+    {
+        var (rules, _) = RuleLoader.LoadDirectory(Path.Combine(RepoRoot(), "rules"));
+        Assert.Equal("uv", rules.App(rules.Locations.Single(r => r.Id == "dev.uv.cache").AppId)?.Name);
+        Assert.Equal("Claude Code", rules.App(rules.Locations.Single(r => r.Id == "anthropic.claude-code.projects").AppId)?.Name);
+
+        // 同时覆盖几种编辑器的规则不写应用，由推断决定
+        Assert.Null(rules.Locations.Single(r => r.Id == "dev.vscode.workspace-storage").AppId);
+        Assert.True(rules.Apps.Count >= 30);
+    }
 }

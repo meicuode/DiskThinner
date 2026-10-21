@@ -225,6 +225,25 @@ public class MftTablesTests
     }
 
     [Fact]
+    public void ShortNamesAreNotStoredWhenTheRecordHasALongName()
+    {
+        var t = new MftTables(64);
+        t.Parse(RecordBuilder.Directory().StandardInfo().FileName(Root, ".", 3).Build(), 5);
+
+        // 短名排在长名前面也要识别出来；只有短名的记录照常保留
+        t.Parse(RecordBuilder.File().StandardInfo().FileName(Root, "A-LONG~1.TXT", 2).FileName(Root, "a-long-name.txt", 1).ResidentData(1).Build(), 30);
+        t.Parse(RecordBuilder.File().StandardInfo().FileName(Root, "ONLYDOS.TXT", 2).ResidentData(1).Build(), 31);
+        Assert.Equal(3, t.NameCount);
+
+        var tree = t.BuildTree(@"C:\", out _);
+        tree.Finalize();
+        Assert.True(tree.FindPath(@"C:\a-long-name.txt") >= 0);
+        Assert.True(tree.FindPath(@"C:\ONLYDOS.TXT") >= 0);
+        Assert.Equal(-1, tree.FindPath(@"C:\A-LONG~1.TXT"));
+        Assert.All(Enumerable.Range(0, tree.Count), i => Assert.Equal(-1, tree[i].Tag));
+    }
+
+    [Fact]
     public void BothHardLinkNamesAreMarked()
     {
         var tree = BuildSample(out _);

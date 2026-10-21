@@ -70,24 +70,18 @@ internal static class RuleView
     public static readonly Group[] LegendOrder =
         [Group.System, Group.Program, Group.Cache, Group.Temp, Group.Package, Group.UserData, Group.VmDisk, Group.Unknown];
 
-    /// <summary>
-    /// 归属文字。规则写了应用就用应用名；系统位置统一显示 Windows；通用结构规则（不针对某个应用）暂时不显示，
-    /// 由 M2 后半的已装软件匹配补上。
-    /// </summary>
-    public static string? OwnerOf(RuleSet rules, LocationRule rule)
+    /// <summary>实测（原型 .s-obs）：本机上看到的事实，例如程序就装在这里、正在运行。</summary>
+    public static readonly TagStyle ObservedSource = new(Color.White, Theme.Accent, ColorTranslator.FromHtml("#8db8e3"));
+
+    /// <summary>归属的来源标签：规则 = 实线框，推断 = 虚线框。</summary>
+    public static (string Text, TagStyle Style) SourceTag(OwnerSource source) => source == OwnerSource.Rule ? ("规则", RuleSource) : ("推断", InferredSource);
+
+    /// <summary>证据的标签样式：本机上看到的（程序、进程、命令行工具）用实测样式，按名称对上的用推断样式。</summary>
+    public static TagStyle EvidenceStyle(OwnerEvidenceKind kind) => kind switch
     {
-        if (rules.App(rule.AppId) is { } app)
-        {
-            return app.Vendor is null || app.Name.Contains(app.Vendor, StringComparison.OrdinalIgnoreCase) ? app.Name : $"{app.Name}（{app.Vendor}）";
-        }
-
-        if (rule.Id.StartsWith("sys.", StringComparison.Ordinal))
-        {
-            return rule.Kind == Kind.Program ? "已安装的程序" : "Windows";
-        }
-
-        return rule.Id.StartsWith("user.", StringComparison.Ordinal) ? "你自己的文件" : null;
-    }
+        OwnerEvidenceKind.Program or OwnerEvidenceKind.Process or OwnerEvidenceKind.CommandLine => ObservedSource,
+        _ => InferredSource,
+    };
 
     /// <summary>画一个原型样式的小标签，返回占用的宽度。</summary>
     public static int DrawTag(Graphics g, string text, Font font, Point location, int height, TagStyle style)

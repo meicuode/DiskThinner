@@ -1,6 +1,15 @@
 # 常用软件抽样（阶段 0 覆盖率实验里命中较多的几个）。都是草稿，只用于说明是谁的，不给出清理建议。
+apps:
+  - { id: dingtalk, name: 钉钉, vendor: 阿里巴巴, exes: [DingTalk.exe] }
+  - { id: wechat, name: 微信, vendor: 腾讯, exes: [Weixin.exe, WeChat.exe] }
+  - { id: tencent, name: 腾讯系软件, vendor: 腾讯 }
+  - { id: perplexity, name: Perplexity Comet, vendor: Perplexity, exes: [comet.exe] }
+  - { id: sogou, name: 搜狗输入法, vendor: 搜狗 }
+  - { id: onedrive, name: OneDrive, vendor: Microsoft, exes: [OneDrive.exe] }
+  - { id: edge-webview, name: Microsoft Edge WebView2, vendor: Microsoft, exes: [msedgewebview2.exe] }
 locations:
   - id: app.dingtalk.data
+    app: dingtalk
     under: '%APPDATA%\DingTalk'
     kind: app-data
     risk: high
@@ -11,6 +20,7 @@ locations:
       - guide: 在钉钉的"设置 → 通用 → 存储空间"里清理缓存，或更改文件存储位置
 
   - id: app.dingtalk.program
+    app: dingtalk
     under: '%LOCALAPPDATA%\DingTalk_*'
     kind: program
     risk: never
@@ -19,6 +29,7 @@ locations:
     impact: 不要手动删除，请在"设置 → 应用"里卸载
 
   - id: app.wechat
+    app: wechat
     under: '%APPDATA%\Tencent\xwechat'
     kind: user-data
     risk: high
@@ -29,6 +40,7 @@ locations:
       - guide: 在微信的"设置 → 存储空间"里管理
 
   - id: app.tencent
+    app: tencent
     under: '%APPDATA%\Tencent'
     kind: app-data
     risk: high
@@ -37,6 +49,7 @@ locations:
     impact: 删除可能丢失聊天记录和登录状态，请在对应软件里清理
 
   - id: app.perplexity
+    app: perplexity
     under: '%LOCALAPPDATA%\Perplexity'
     kind: browser-data
     risk: medium
@@ -45,6 +58,7 @@ locations:
     impact: 删除会丢失浏览记录和登录状态
 
   - id: app.sogou.models
+    app: sogou
     dir: '%LOCALLOW%\SogouPY\models'
     kind: model
     risk: low
@@ -55,6 +69,7 @@ locations:
       - note: 由目录名和内容推断，未实测
 
   - id: app.sogou
+    app: sogou
     under: '%LOCALLOW%\SogouPY'
     kind: app-data
     risk: medium
@@ -62,7 +77,31 @@ locations:
     purpose: 搜狗输入法的用户词库和设置
     impact: 删除会丢失没有同步的用户词库
 
+  - id: app.sogou.shared
+    app: sogou
+    under: '%PROGRAMDATA%\SogouInput'
+    kind: app-data
+    risk: medium
+    tier: draft
+    purpose: 搜狗输入法给所有用户共用的数据（皮肤、词库更新、网址缓存等）
+    impact: 删除后输入法可能需要重新下载部分内容；请在输入法的设置里清理，不要手动删除
+    actions:
+      - guide: 在搜狗输入法的"属性设置"里清理缓存，或者卸载后重新安装
+
+  - id: app.onenote.backup
+    dir: '%LOCALAPPDATA%\Microsoft\OneNote\*\{Backup,备份}'
+    kind: backup
+    risk: medium
+    tier: draft
+    purpose: OneNote 桌面版自动保存的笔记本备份
+    impact: 删除后笔记本本身不受影响，但丢失这些历史备份；可以在 OneNote 里调整备份份数
+    actions:
+      - guide: 在 OneNote 的"文件 → 选项 → 保存和备份"里减少备份份数，或者把备份位置改到其他盘
+    evidence:
+      - note: OneNote 2016 / 2021 的默认备份位置是 %LOCALAPPDATA%\Microsoft\OneNote\16.0\备份（英文系统为 Backup）
+
   - id: app.onedrive.program
+    app: onedrive
     under: '%LOCALAPPDATA%\Microsoft\OneDrive'
     kind: program
     risk: never
@@ -70,6 +109,7 @@ locations:
     impact: 不要手动删除
 
   - id: app.edge-webview
+    app: edge-webview
     under: '%LOCALAPPDATA%\Microsoft\EdgeWebView'
     kind: program
     risk: never

@@ -5,6 +5,8 @@ using DiskThinner.App.Explorer;
 using DiskThinner.App.Pages;
 using DiskThinner.App.Shell;
 using DiskThinner.Core;
+using DiskThinner.Inventory;
+using DiskThinner.Rules;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.App;
@@ -46,10 +48,13 @@ internal sealed class MainForm : Form
         MinimumSize = new Size(1100, 680);
         Size = new Size(1440, 900);
         StartPosition = FormStartPosition.CenterScreen;
-        if (options.PrimaryScreen && Screen.PrimaryScreen is { } primary)
+        var screen = options.SecondaryScreen ? Screen.AllScreens.FirstOrDefault(s => !s.Primary) ?? Screen.PrimaryScreen
+            : options.PrimaryScreen ? Screen.PrimaryScreen
+            : null;
+        if (screen is not null)
         {
             StartPosition = FormStartPosition.Manual;
-            Location = new Point(primary.WorkingArea.Left + 40, primary.WorkingArea.Top + 40);
+            Location = new Point(screen.WorkingArea.Left + 40, screen.WorkingArea.Top + 40);
         }
 
         KeyPreview = true;
@@ -257,30 +262,39 @@ internal sealed class MainForm : Form
         });
 
         ScanResult? result = null;
-        DiskThinner.Rules.Classification? classification = null;
+        Analysis? analysis = null;
         long peakAfterScan = 0;
         try
         {
-            (result, classification) = await Task.Run(() =>
+            (result, analysis) = await Task.Run(() =>
             {
-                var engine = EnsureRules();
-                var r = VolumeScanner.Scan(drive, preference, progress, cts.Token);
-                using (var proc = Process.GetCurrentProcess())
+                // 扫描和匹配期间不用后台 GC：后台回收进行时分配还在继续，堆会涨得更高；这几秒里界面没有要求低延迟的操作
+                var latency = System.Runtime.GCSettings.LatencyMode;
+                System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Batch;
+                try
                 {
-                    peakAfterScan = proc.PeakWorkingSet64;
-                }
+                    var r = VolumeScanner.Scan(drive, preference, progress, cts.Token);
+                    using (var proc = Process.GetCurrentProcess())
+                    {
+                        peakAfterScan = proc.PeakWorkingSet64;
+                    }
 
-                // 扫描是一次性的重活，结束后把空闲的 GC 内存还给系统
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-                var c = engine?.Classify(r.Tree, cts.Token);
-                return (r, c);
+                    // 扫描是一次性的重活，结束后把空闲的 GC 内存还给系统。
+                    // 规则和已装软件放在这之后再加载，扫描时的临时数组和它们不同时占着内存。
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                    return (r, _options.NoRules ? null : Analyze(r, cts.Token));
+                }
+                finally
+                {
+                    System.Runtime.GCSettings.LatencyMode = latency;
+                }
             }, cts.Token);
         }
         catch (OperationCanceledException)
         {
             if (_scanCts == cts)
             {
-                _explorer.SetResult(previous, _explorer.Classification);
+                _explorer.SetResult(previous, _explorer.Classification, _explorer.Owners);
                 _statusScan.Text = previous is null ? "扫描已取消" : "扫描已取消，显示的是上一次的结果 · " + ExplorerPage.Describe(previous.Stats);
                 _rescan.Enabled = true;
             }
@@ -291,7 +305,7 @@ internal sealed class MainForm : Form
         {
             if (_scanCts == cts)
             {
-                _explorer.SetResult(previous, _explorer.Classification);
+                _explorer.SetResult(previous, _explorer.Classification, _explorer.Owners);
                 _rescan.Enabled = true;
                 _statusScan.Text = "扫描失败";
                 MessageBox.Show(this, $"扫描 {drive} 失败：{ex.Message}", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -307,15 +321,79 @@ internal sealed class MainForm : Form
 
         _rescan.Enabled = true;
         var renderWatch = Stopwatch.StartNew();
-        _explorer.SetResult(result, classification);
-        _overview.SetResult(result, classification);
+        _analysis = analysis;
+        _explorer.SetResult(result, analysis?.C, analysis?.Owners, analysis?.ByOwner, analysis?.ByKind);
+        _overview.SetResult(result, analysis?.C, analysis?.Owners);
+        if (_options.StartView > 0 && !_startViewApplied)
+        {
+            _startViewApplied = true;
+            _explorer.ViewIndex = _options.StartView;
+        }
+
+        _wsAfterBind = Environment.WorkingSet;
         _statusScan.Text = ExplorerPage.Describe(result.Stats);
-        _statusRules.Text = _engine is { } eng
-            ? $"规则 {eng.Rules.Locations.Count} 条 · 匹配 {classification?.Duration.TotalSeconds:F1} 秒"
-            : "规则没有加载：" + _rulesError;
+        _statusRules.Text = _options.NoRules ? "没有加载规则（--no-rules）"
+            : _engine is { } eng && analysis is not null
+                ? $"规则 {eng.Rules.Locations.Count} 条 · 已装软件 {analysis.Owners.Inventory.Apps.Count} 项 · 匹配和归属 {(analysis.C.Duration + analysis.Owners.Duration).TotalSeconds:F1} 秒"
+                : "规则没有加载：" + _rulesError;
         LoadDrives();
         SelectDriveInCombo(drive);
         await AfterScanAutomation(result, peakAfterScan, renderWatch);
+    }
+
+    /// <summary>一次扫描的规则匹配、归属推断和两种汇总；<see cref="Memory"/> 是每一步之后的工作集（找内存峰值用）。</summary>
+    private sealed record Analysis(Classification C, OwnerMap Owners, List<SpaceGroup> ByOwner, List<SpaceGroup> ByKind, TimeSpan InventoryWait, TimeSpan GroupsDuration,
+        IReadOnlyList<(string Step, long Bytes)> Memory);
+
+    private Analysis? _analysis;
+    private long _wsAfterBind;
+    private bool _startViewApplied;
+    private string? _inventoryError;
+
+    /// <summary>
+    /// 在后台线程上：加载规则并匹配，同时收集已装软件（两者互不依赖，并行做），然后推断归属、计算汇总。
+    /// 规则加载失败时返回 null；已装软件收集失败时照样给出规则结果，只是没有推断。
+    /// </summary>
+    private Analysis? Analyze(ScanResult r, CancellationToken token)
+    {
+        var memory = new List<(string, long)> { ("analyze_start", Environment.WorkingSet) };
+        var inventoryTask = Task.Run(() => InventoryCollector.Collect(token), token);
+        var engine = EnsureRules();
+        memory.Add(("rules_loaded", Environment.WorkingSet));
+        var c = engine?.Classify(r.Tree, token);
+        memory.Add(("classified", Environment.WorkingSet));
+        var wait = Stopwatch.StartNew();
+        InventorySnapshot inventory;
+        try
+        {
+            inventory = inventoryTask.GetAwaiter().GetResult();
+            _inventoryError = inventory.Errors.Count > 0 ? string.Join("；", inventory.Errors) : null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            inventory = InventorySnapshot.Empty;
+            _inventoryError = ex.Message;
+        }
+
+        wait.Stop();
+        if (c is null)
+        {
+            return null;
+        }
+
+        memory.Add(("inventory", Environment.WorkingSet));
+        var owners = OwnerMap.Build(c, inventory, cancellationToken: token);
+        memory.Add(("owners", Environment.WorkingSet));
+        var sw = Stopwatch.StartNew();
+        var byOwner = SpaceGroups.ByOwner(owners, cancellationToken: token);
+        var byKind = SpaceGroups.ByKind(owners);
+        sw.Stop();
+        memory.Add(("groups", Environment.WorkingSet));
+
+        // 匹配和推断过程中的临时对象（路径字符串、注册表和进程信息等）在绑定界面之前回收掉
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        memory.Add(("after_gc", Environment.WorkingSet));
+        return new Analysis(c, owners, byOwner, byKind, wait.Elapsed, sw.Elapsed, memory);
     }
 
     /// <summary>自动化验证：选中路径、截图、写报告、退出（只在带了对应参数时执行）。</summary>
@@ -348,13 +426,7 @@ internal sealed class MainForm : Form
 
             if (_options.Screenshot is { } shot && ClientSize.Width > 0 && ClientSize.Height > 0)
             {
-                var bounds = RectangleToScreen(ClientRectangle);
-                using var bmp = new Bitmap(bounds.Width, bounds.Height);
-                using (var g = Graphics.FromImage(bmp))
-                {
-                    g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
-                }
-
+                using var bmp = CaptureClientArea();
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(shot))!);
                 bmp.Save(shot);
             }
@@ -386,19 +458,34 @@ internal sealed class MainForm : Form
                 $"treemap_render_ms={_explorer.Map.LastRenderTime.TotalMilliseconds:F0}",
                 $"treemap_blocks={_explorer.Map.BlockCount}",
                 $"rules={_engine?.Rules.Locations.Count}",
+                $"rules_apps={_engine?.Rules.Apps.Count}",
                 $"rules_error={_rulesError}",
+                $"no_rules={_options.NoRules}",
                 $"classify_ms={_explorer.Classification?.Duration.TotalMilliseconds:F0}",
                 $"cleanable_bytes={_explorer.Classification?.TotalCleanable}",
                 $"unexplained_bytes={_explorer.Classification?.Unexplained(result.Tree.Root)}",
+                .. AnalysisReport(),
+                $"view={_explorer.ViewIndex}",
                 $"nodes={s.Nodes}",
                 $"files={root.FileCount}",
                 $"dirs={root.DirCount}",
                 $"alloc_bytes={root.AllocSize}",
                 $"name_chars={s.NameChars}",
                 $"name_chars_capacity={s.NameCharsCapacity}",
+                $"mft_records={s.MftRecords}",
+                $"mft_names={s.MftNames}",
+                $"hardlink_secondary_names={s.HardLinkSecondaryNames}",
+                $"ws_before_scan_bytes={s.WorkingSetBeforeScan}",
+                $"ws_after_read_bytes={s.WorkingSetAfterRead}",
+                $"ws_after_build_bytes={s.WorkingSetAfterBuild}",
+                $"ws_after_finalize_bytes={s.WorkingSetAfterFinalize}",
                 $"peak_working_set_after_scan_bytes={peakAfterScan}",
                 $"peak_working_set_bytes={proc.PeakWorkingSet64}",
                 $"working_set_bytes={proc.WorkingSet64}",
+                $"peak_private_bytes={proc.PeakPagedMemorySize64}",
+                $"private_bytes={proc.PrivateMemorySize64}",
+                .. (_analysis?.Memory ?? []).Select(m => $"ws_{m.Step}_bytes={m.Bytes}"),
+                $"ws_after_bind_bytes={_wsAfterBind}",
                 $"managed_heap_bytes={GC.GetTotalMemory(false)}",
             ];
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))!);
@@ -408,6 +495,65 @@ internal sealed class MainForm : Form
         if (_options.ExitAfterScan)
         {
             Close();
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+
+    /// <summary>
+    /// 截取本窗口的客户区。用 PrintWindow 让窗口把自己画到位图上：窗口被别的程序挡住时也能截到，
+    /// 而且不会截到屏幕上的其他内容。
+    /// </summary>
+    private Bitmap CaptureClientArea()
+    {
+        const uint PwRenderFullContent = 2;
+        using var full = new Bitmap(Bounds.Width, Bounds.Height);
+        using (var g = Graphics.FromImage(full))
+        {
+            var hdc = g.GetHdc();
+            try
+            {
+                PrintWindow(Handle, hdc, PwRenderFullContent);
+            }
+            finally
+            {
+                g.ReleaseHdc(hdc);
+            }
+        }
+
+        var client = RectangleToScreen(ClientRectangle);
+        var area = new Rectangle(client.X - Bounds.X, client.Y - Bounds.Y, client.Width, client.Height);
+        area.Intersect(new Rectangle(Point.Empty, full.Size));
+        return full.Clone(area, full.PixelFormat);
+    }
+
+    /// <summary>报告里的已装软件、归属推断和汇总的统计。</summary>
+    private IEnumerable<string> AnalysisReport()
+    {
+        if (_analysis is not { } a)
+        {
+            yield break;
+        }
+
+        var inv = a.Owners.Inventory;
+        yield return $"inventory_apps={inv.Apps.Count}";
+        yield return $"inventory_by_source={string.Join(",", Enum.GetValues<AppSource>().Select(s => $"{s}:{inv.Count(s)}"))}";
+        yield return $"inventory_ms={inv.Duration.TotalMilliseconds:F0}";
+        yield return $"inventory_wait_ms={a.InventoryWait.TotalMilliseconds:F0}";
+        yield return $"inventory_errors={_inventoryError}";
+        yield return $"owners_ms={a.Owners.Duration.TotalMilliseconds:F0}";
+        yield return $"inferred_roots={a.Owners.InferredCount}";
+        yield return $"groups_ms={a.GroupsDuration.TotalMilliseconds:F0}";
+        yield return $"groups_by_owner={a.ByOwner.Count}";
+        yield return $"groups_by_kind={a.ByKind.Count}";
+        yield return $"owner_bytes_rule={a.ByOwner.Where(g => g.Owner?.Source == OwnerSource.Rule).Sum(g => g.Bytes)}";
+        yield return $"owner_bytes_inferred={a.ByOwner.Where(g => g.Owner?.Source == OwnerSource.Inferred).Sum(g => g.Bytes)}";
+        yield return $"owner_bytes_unknown={a.ByOwner.Where(g => g.Owner is null).Sum(g => g.Bytes)}";
+        foreach (var (g, i) in a.ByOwner.Where(g => g.Owner?.Source == OwnerSource.Inferred).Take(15).Select((g, i) => (g, i)))
+        {
+            yield return $"inferred_top{i}={g.Name}|{g.Bytes}|{g.LocationCount}|{g.Owner!.Evidence.FirstOrDefault()?.Kind}";
         }
     }
 

@@ -2,6 +2,7 @@ using System.Globalization;
 using DiskThinner.App.Controls;
 using DiskThinner.App.Shell;
 using DiskThinner.Core;
+using DiskThinner.Rules;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.App.Explorer;
@@ -27,8 +28,13 @@ internal sealed class ExplorerPage : UserControl
     private readonly FlowLayoutPanel _legend;
     private readonly CheckBox _onlyCleanable = Ui.Chip("只看可清理");
     private readonly CheckBox _onlyUnknown = Ui.Chip("只看未识别");
+    private readonly SegmentedControl _view = new("视图", "按目录", "按归属汇总", "按类别汇总");
+    private readonly GroupListView _groups = new() { Dock = DockStyle.Fill, Visible = false };
     private ScanResult? _result;
-    private DiskThinner.Rules.Classification? _classification;
+    private Classification? _classification;
+    private OwnerMap? _owners;
+    private List<SpaceGroup>? _byOwner;
+    private List<SpaceGroup>? _byKind;
     private int _selected = -1;
 
     public ExplorerPage()
@@ -47,7 +53,13 @@ internal sealed class ExplorerPage : UserControl
         _onlyCleanable.Enabled = _onlyUnknown.Enabled = false;
         _onlyCleanable.CheckedChanged += (_, _) => OnFilterChanged(_onlyCleanable);
         _onlyUnknown.CheckedChanged += (_, _) => OnFilterChanged(_onlyUnknown);
+        _view.Dock = DockStyle.Right;
+        _view.ItemsEnabled = false;
+        _view.SelectedIndexChanged += (_, _) => ApplyView();
+
+        // 停靠顺序：标题靠左，过滤按钮最右，视图切换在过滤按钮左边，面包屑占满中间
         bar.Controls.Add(_crumb);
+        bar.Controls.Add(_view);
         bar.Controls.Add(chips);
         bar.Controls.Add(title);
         bar.Paint += (_, e) =>
@@ -94,6 +106,7 @@ internal sealed class ExplorerPage : UserControl
 
         _left = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, FixedPanel = FixedPanel.Panel2, BackColor = Theme.Border, SplitterWidth = 4 };
         _left.Panel1.Controls.Add(_list);
+        _left.Panel1.Controls.Add(_groups);
         _left.Panel2.Controls.Add(mapPanel);
 
         _outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, FixedPanel = FixedPanel.Panel2, BackColor = Theme.Border, SplitterWidth = 4 };
@@ -122,6 +135,88 @@ internal sealed class ExplorerPage : UserControl
         menu.Items.Add("复制路径", null, (_, _) => CopyPath(_list.SelectedNode));
         menu.Items.Add("在方块图中只显示这个目录", null, (_, _) => _map.SetMapRoot(_list.SelectedNode));
         _list.ContextMenuStrip = menu;
+
+        _groups.NodeSelected += (_, n) => SelectFrom(n, _groups);
+        _groups.GroupSelected += (_, g) => ShowGroup(g);
+        _groups.RevealRequested += (_, n) => RevealInTree(n);
+        _groups.CopyPathRequested += (_, n) => CopyPath(n);
+        var groupMenu = new ContextMenuStrip();
+        var openItem = groupMenu.Items.Add("打开所在位置，自己清理", null, (_, _) => OpenLocation(_groups.SelectedNode));
+        var copyItem = groupMenu.Items.Add("复制路径", null, (_, _) => CopyPath(_groups.SelectedNode));
+        var revealItem = groupMenu.Items.Add("在目录视图中定位", null, (_, _) => RevealInTree(_groups.SelectedNode));
+        groupMenu.Opening += (_, _) => openItem.Enabled = copyItem.Enabled = revealItem.Enabled = _groups.SelectedNode >= 0;
+        _groups.ContextMenuStrip = groupMenu;
+    }
+
+    /// <summary>当前视图：0 按目录，1 按归属汇总，2 按类别汇总。</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal int ViewIndex
+    {
+        get => _view.SelectedIndex;
+        set => _view.SelectedIndex = value;
+    }
+
+    internal GroupListView GroupList => _groups;
+
+    /// <summary>当前是汇总视图（不看控件的 Visible：页面隐藏时它总是 false）。</summary>
+    private bool Grouped => _view.SelectedIndex > 0 && _classification is not null && _result is not null;
+
+    /// <summary>切换视图。汇总在第一次切过去时计算（扫描线程已经算好时直接用）。</summary>
+    private void ApplyView()
+    {
+        if (Grouped)
+        {
+            var byOwner = _view.SelectedIndex == 1;
+            var owners = _owners ??= OwnerMap.RulesOnly(_classification!);
+            var groups = byOwner ? _byOwner ??= SpaceGroups.ByOwner(owners) : _byKind ??= SpaceGroups.ByKind(owners);
+            _groups.SetGroups(_result!.Tree, _classification, groups, byOwner);
+            _groups.SetFilter(CurrentGroupFilter());
+            _groups.Visible = true;
+            _list.Visible = false;
+            // 当前选中的节点属于某个位置时选中那一行；否则（例如刚扫描完选中的是根）选中第一组并显示它的汇总
+            if (_selected >= 0 && _groups.SelectNode(_selected))
+            {
+                SelectFrom(_selected, _groups);
+            }
+            else if (_groups.RowCount > 0)
+            {
+                _groups.SelectRowAsUser(0);
+            }
+        }
+        else
+        {
+            _list.Visible = true;
+            _groups.Visible = false;
+            SelectFrom(_selected >= 0 ? _selected : _result?.Tree.Root ?? -1, null);
+        }
+    }
+
+    /// <summary>在"按目录"视图里定位（汇总视图里双击位置时）。</summary>
+    private void RevealInTree(int node)
+    {
+        if (node < 0)
+        {
+            return;
+        }
+
+        _selected = node;
+        _view.SelectedIndex = 0; // 触发 ApplyView，会选中 _selected
+        if (_view.SelectedIndex == 0)
+        {
+            SelectFrom(node, null);
+        }
+    }
+
+    private void ShowGroup(SpaceGroup group)
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        _crumb.ShowText(_view.SelectedIndex == 1 ? "按归属汇总" : "按类别汇总", group.Name);
+        _map.SelectNode(-1);
+        _detail.ShowGroup(_result.Tree, group, _classification, _owners);
     }
 
     public event EventHandler? RestartRequested;
@@ -165,22 +260,37 @@ internal sealed class ExplorerPage : UserControl
 
     public void HideProgress() => _overlay.Visible = false;
 
-    public void SetResult(ScanResult? result, DiskThinner.Rules.Classification? classification = null)
+    /// <summary>
+    /// 显示扫描结果。<paramref name="owners"/> 为空时只用规则给出的归属；两个汇总为空时在第一次切换视图时计算。
+    /// </summary>
+    public void SetResult(ScanResult? result, Classification? classification = null, OwnerMap? owners = null,
+        List<SpaceGroup>? byOwner = null, List<SpaceGroup>? byKind = null)
     {
         _result = result;
         _classification = result is null ? null : classification;
+        _owners = _classification is null ? null : owners ?? OwnerMap.RulesOnly(_classification);
+        _byOwner = _classification is null ? null : byOwner;
+        _byKind = _classification is null ? null : byKind;
         _overlay.Visible = false;
         _onlyCleanable.Checked = _onlyUnknown.Checked = false;
         _onlyCleanable.Enabled = _onlyUnknown.Enabled = _classification is not null;
-        _list.SetTree(result?.Tree, _classification);
+        _list.SetTree(result?.Tree, _classification, _owners);
         _map.SetTree(result?.Tree, _classification);
         BuildLegend(byRule: _classification is not null);
         UpdateBanner();
-        var first = result is null ? -1 : result.Tree.Root;
-        SelectFrom(first, null);
+        _view.ItemsEnabled = _classification is not null;
+        _selected = result is null ? -1 : result.Tree.Root;
+        if (_view.SelectedIndex != 0 && _classification is null)
+        {
+            _view.SelectedIndex = 0;
+        }
+
+        ApplyView();
     }
 
-    public DiskThinner.Rules.Classification? Classification => _classification;
+    public Classification? Classification => _classification;
+
+    public OwnerMap? Owners => _owners;
 
     internal CheckBox OnlyCleanable => _onlyCleanable;
 
@@ -204,11 +314,29 @@ internal sealed class ExplorerPage : UserControl
             : _onlyUnknown.Checked ? n => c.Unexplained(n) > 0
             : null;
         _list.SetFilter(filter);
-        if (_list.SelectedNode >= 0 && _list.SelectedNode != _selected)
+        if (Grouped)
+        {
+            _groups.SetFilter(CurrentGroupFilter());
+            if (_groups.SelectedNode >= 0 && _groups.SelectedNode != _selected)
+            {
+                SelectFrom(_groups.SelectedNode, _groups);
+            }
+            else if (_groups.SelectedNode < 0 && _groups.SelectedGroup is { } g)
+            {
+                ShowGroup(g);
+            }
+        }
+        else if (_list.SelectedNode >= 0 && _list.SelectedNode != _selected)
         {
             SelectFrom(_list.SelectedNode, _list);
         }
     }
+
+    /// <summary>汇总视图的过滤：可清理看位置本身的可清理空间；未识别看没有规则认识的位置。</summary>
+    private Func<SpaceGroup, SpaceLocation, bool>? CurrentGroupFilter() =>
+        _onlyCleanable.Checked ? (_, l) => l.CleanableBytes > 0
+        : _onlyUnknown.Checked ? (_, l) => l.Rule < 0
+        : null;
 
     private void BuildLegend(bool byRule)
     {
@@ -263,7 +391,17 @@ internal sealed class ExplorerPage : UserControl
     {
         _selected = node;
         var tree = _result?.Tree;
-        if (!ReferenceEquals(source, _list) && !_list.SelectNode(node) && node >= 0 && _list.HasFilter)
+        if (Grouped)
+        {
+            // 汇总视图：选中节点所在的位置；方块图上点到的节点不属于任何位置时只更新详情
+            if (!ReferenceEquals(source, _groups) && !_groups.SelectNode(node) && node >= 0 && _groups.HasFilter)
+            {
+                _onlyCleanable.Checked = _onlyUnknown.Checked = false;
+                _selected = node;
+                _groups.SelectNode(node);
+            }
+        }
+        else if (!ReferenceEquals(source, _list) && !_list.SelectNode(node) && node >= 0 && _list.HasFilter)
         {
             // 要选中的节点被"只看可清理/未识别"过滤掉了：取消过滤再选
             _onlyCleanable.Checked = _onlyUnknown.Checked = false;
@@ -277,7 +415,7 @@ internal sealed class ExplorerPage : UserControl
         }
 
         _crumb.Show(tree, node);
-        _detail.ShowNode(tree, node, _result?.Stats, _classification);
+        _detail.ShowNode(tree, node, _result?.Stats, _classification, _owners);
     }
 
     private void UpdateMapScope()
