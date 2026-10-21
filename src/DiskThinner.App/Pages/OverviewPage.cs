@@ -1,9 +1,11 @@
 using System.Globalization;
 using DiskThinner.App.Controls;
+using DiskThinner.App.Growth;
 using DiskThinner.App.Rules;
 using DiskThinner.Core;
 using DiskThinner.Rules;
 using DiskThinner.Scanner;
+using DiskThinner.Storage;
 
 namespace DiskThinner.App.Pages;
 
@@ -52,30 +54,137 @@ internal sealed class OverviewPage : UserControl
             c.Margin = new Padding(0, 0, 12, 0);
         }
 
-        var lists = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, RowCount = 1, Height = 400, BackColor = Color.Transparent, Margin = new Padding(0, 12, 0, 0), Padding = new Padding(0, 12, 0, 0) };
-        lists.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        lists.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        lists.Controls.Add(_suggest, 0, 0);
-        lists.Controls.Add(_largest, 1, 0);
-        _suggest.Dock = _largest.Dock = DockStyle.Fill;
-        _suggest.Margin = new Padding(0, 0, 12, 0);
-        _largest.Margin = new Padding(0, 0, 12, 0);
+        var trendCard = new ItemCard("可用空间（近 30 天）", _trend, "数据来自快照");
+        var row2 = Row(390, 57.5f, trendCard, _suggest);
+        var row3 = Row(350, 50, _largest, _fastest);
 
         _empty.Dock = DockStyle.Top;
         _empty.Padding = new Padding(0, 16, 0, 0);
 
-        Controls.Add(lists);
+        Controls.Add(row3);
+        Controls.Add(row2);
         Controls.Add(cards);
         Controls.Add(_empty);
         Controls.Add(head);
 
-        _growth.Set("—", "需要至少两次快照，增长分析在 M3 加入", null);
+        _growth.Set("—", "需要相隔半天以上的两次快照", null);
+        _trend.SetData([], "快照少于两个，还画不出趋势");
+        _fastest.SetPlaceholder("需要相隔半天以上的两次快照");
         _suggest.Activated += (_, node) => NavigateRequested?.Invoke(this, node);
         _largest.Activated += (_, node) => NavigateRequested?.Invoke(this, node);
+        _fastest.Activated += (_, node) =>
+        {
+            if (node >= 0)
+            {
+                NavigateRequested?.Invoke(this, node);
+            }
+        };
+    }
+
+    private static TableLayoutPanel Row(int height, float leftPercent, Control left, Control right)
+    {
+        var row = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, RowCount = 1, Height = height, BackColor = Color.Transparent, Padding = new Padding(0, 12, 0, 0) };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, leftPercent));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100 - leftPercent));
+        row.Controls.Add(left, 0, 0);
+        row.Controls.Add(right, 1, 0);
+        left.Dock = right.Dock = DockStyle.Fill;
+        left.Margin = right.Margin = new Padding(0, 0, 12, 0);
+        return row;
+    }
+
+    private readonly TrendChart _trend = new() { AccessibleName = "可用空间趋势" };
+    private readonly ItemList _fastest = new("增长最快（近 7 天）", ["目录", "变化", "归属"], [86, 150]);
+
+    internal ItemList Fastest => _fastest;
+
+    internal StatCard GrowthCard => _growth;
+
+    internal TrendChart Trend => _trend;
+
+    /// <summary>
+    /// 增长相关的部分：近 7 天净增长和"约 N 天后写满"、近 30 天可用空间趋势、增长最快的目录。
+    /// 快照历史不够时显示说明。
+    /// </summary>
+    public void SetGrowth(GrowthModel? model, NodeTree? tree, Classification? c, OwnerMap? owners)
+    {
+        var now = model?.NowPoint;
+        if (model is null || now is null)
+        {
+            _growth.Set("—", "快照库不可用", null);
+            return;
+        }
+
+        var points = model.Snapshots.Where(s => s.TakenAtUtc >= model.NowUtc.AddDays(-30)).Select(GrowthStats.Of).ToList();
+        if (!model.CurrentSaved)
+        {
+            points.Add(now.Value);
+        }
+
+        _trend.SetData(points.Select(p => (p.TakenAtUtc.ToLocalTime(), p.FreeBytes)).ToList(), "快照少于两个，还画不出趋势");
+
+        if (model.WeekBaseline is not { } baseline || model.WeekDiff is null)
+        {
+            _growth.Title = "近 7 天净增长";
+            _growth.Set("—", model.Snapshots.Count == 0 ? "还没有快照，扫描整个盘后会自动保存" : "需要相隔半天以上的两次快照", null);
+            _fastest.SetItems([]);
+            _fastest.SetPlaceholder("需要相隔半天以上的两次快照");
+            return;
+        }
+
+        var (change, days, toFull) = GrowthStats.Rate(GrowthStats.Of(baseline), now.Value);
+        var label = days >= 6.5 ? "近 7 天" : $"近 {Math.Max(1, (int)Math.Round(days))} 天";
+        _growth.Title = label + "净增长";
+        _fastest.Title = $"增长最快（{label}）";
+        var foot = toFull is { } d && d < 3650
+            ? $"按此速度约 {Math.Max(1, (int)Math.Round(d))} 天后写满"
+            : change <= 0 ? "没有在增长" : "按此速度短期内不会写满";
+        _growth.Set(BarChart.Signed(change), foot, null);
+
+        var items = model.WeekHotspots.Take(8).Select(h =>
+        {
+            var node = tree?.FindPath(h.Path) ?? -1;
+            var owner = node >= 0 ? owners?.OwnerOf(node)?.Display ?? (c?.RuleOf(node) is { } r ? Names.Display(r.Kind) : null) : null;
+            return new ListItem(node, [Redact(h.Path) + (h.IsRemainder ? "（其余部分）" : ""), BarChart.Signed(h.Change), owner ?? ""],
+                $"之前 {ByteSize.Format(h.Previous)}，现在 {ByteSize.Format(h.Current)}", RuleView.Unknown, node < 0 ? "已不存在" : "未识别",
+                h.Change > 0 ? Theme.Up : h.Change < 0 ? Theme.Down : null);
+        }).ToList();
+        _fastest.SetItems(items);
+        _fastest.SetPlaceholder(items.Count == 0 ? "这段时间里没有超过 100 MB 的变化" : null);
+    }
+
+    /// <summary>带标题和边框的卡片，里面放一个控件（趋势图）。</summary>
+    private sealed class ItemCard : Panel
+    {
+        public ItemCard(string title, Control body, string? note)
+        {
+            BackColor = Theme.Card;
+            Padding = new Padding(14, 10, 14, 10);
+            var heading = new Label { Text = title, Dock = DockStyle.Top, Height = 26, Font = Theme.UiBold, ForeColor = Theme.Text, UseMnemonic = false };
+            body.Dock = DockStyle.Fill;
+            Controls.Add(body);
+            if (note is not null)
+            {
+                Controls.Add(new Label { Text = note, Dock = DockStyle.Bottom, Height = 20, Font = Theme.Small, ForeColor = Theme.Subtle, UseMnemonic = false });
+            }
+
+            Controls.Add(heading);
+            AccessibleName = title;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using var pen = new Pen(Theme.Border);
+            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+        }
     }
 
     /// <summary>用户要在空间浏览里查看某个节点。</summary>
     public event EventHandler<int>? NavigateRequested;
+
+    /// <summary>焦点移到下面的列表时不要自动滚动页面。</summary>
+    protected override Point ScrollToControl(Control activeControl) => DisplayRectangle.Location;
 
     internal ItemList Suggestions => _suggest;
 
@@ -222,7 +331,7 @@ internal sealed class OverviewPage : UserControl
     internal static string Redact(string path) => PathDisplay.Shorten(path);
 
     /// <summary>一行数据：点击后跳到 <see cref="Node"/>。</summary>
-    internal sealed record ListItem(int Node, string[] Cells, string? Note, RuleView.TagStyle TagStyle, string Tag);
+    internal sealed record ListItem(int Node, string[] Cells, string? Note, RuleView.TagStyle TagStyle, string Tag, Color? ValueColor = null);
 
     /// <summary>原型 .stat 卡片：标题、大数字、说明和可选的进度条。</summary>
     internal sealed class StatCard : Panel
@@ -303,13 +412,22 @@ internal sealed class OverviewPage : UserControl
     {
         private readonly ListView _view;
         private readonly DerivedFonts _fonts = new();
+        private readonly int[] _fixedWidths;
+        private readonly int _numericColumns;
+        private readonly Label _placeholder;
         private List<ListItem> _items = [];
 
-        public ItemList(string title, string[] columns)
+        /// <param name="fixedWidths">第 2 列起每列的宽度（96 DPI），第一列占满剩余宽度；不给时按列数取默认值。</param>
+        /// <param name="numericColumns">第 2 列起有几列是数字（右对齐，第 2 列可以带颜色）。</param>
+        public ItemList(string title, string[] columns, int[]? fixedWidths = null, int numericColumns = 1)
         {
+            _fixedWidths = fixedWidths ?? (columns.Length == 4 ? [80, 110, 90] : [80, 110]);
+            _numericColumns = numericColumns;
+            _placeholder = new Label { Dock = DockStyle.Fill, ForeColor = Theme.Muted, Font = Theme.Ui, TextAlign = ContentAlignment.MiddleCenter, Visible = false, UseMnemonic = false, BackColor = Theme.Card };
             BackColor = Theme.Card;
             Padding = new Padding(14, 10, 14, 10);
             var heading = new Label { Text = title, Dock = DockStyle.Top, Height = 26, Font = Theme.UiBold, ForeColor = Theme.Text, UseMnemonic = false };
+            _heading = heading;
             var hint = new Label { Text = "双击或按回车在空间浏览中查看", Dock = DockStyle.Bottom, Height = 20, Font = Theme.Small, ForeColor = Theme.Subtle, UseMnemonic = false };
             _view = new ListView
             {
@@ -345,11 +463,35 @@ internal sealed class OverviewPage : UserControl
                 _view.SmallImageList = new ImageList { ImageSize = new Size(1, Ui.Scale(_view, 30)) };
                 FitColumns();
             };
+            Controls.Add(_placeholder);
             Controls.Add(_view);
             Controls.Add(hint);
             Controls.Add(heading);
             AccessibleName = title;
         }
+
+        private readonly Label _heading;
+
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        public string Title
+        {
+            get => _heading.Text;
+            set
+            {
+                _heading.Text = value;
+                _view.AccessibleName = value;
+            }
+        }
+
+        /// <summary>列表为空时显示的说明（为 null 时不显示）。</summary>
+        public void SetPlaceholder(string? text)
+        {
+            _placeholder.Text = text ?? "";
+            _placeholder.Visible = text is not null;
+            _placeholder.BringToFront();
+        }
+
+        internal string? PlaceholderText => _placeholder.Visible ? _placeholder.Text : null;
 
         public event EventHandler<int>? Activated;
 
@@ -394,12 +536,12 @@ internal sealed class OverviewPage : UserControl
             }
 
             var w = _view.ClientSize.Width;
-            int[] fixedWidths = _view.Columns.Count == 4 ? [80, 110, 90] : [80, 110];
-            var rest = w - fixedWidths.Sum(x => Ui.Scale(_view, x)) - 2;
+            var fixedWidths = _fixedWidths;
+            var rest = w - fixedWidths.Take(_view.Columns.Count - 1).Sum(x => Ui.Scale(_view, x)) - 2;
             _view.Columns[0].Width = Math.Max(Ui.Scale(_view, 120), rest);
             for (var i = 1; i < _view.Columns.Count; i++)
             {
-                _view.Columns[i].Width = Ui.Scale(_view, fixedWidths[i - 1]);
+                _view.Columns[i].Width = Ui.Scale(_view, i - 1 < fixedWidths.Length ? fixedWidths[i - 1] : 90);
             }
         }
 
@@ -441,8 +583,9 @@ internal sealed class OverviewPage : UserControl
                 return;
             }
 
-            var align = e.ColumnIndex == 1 ? TextFormatFlags.Right : TextFormatFlags.Left;
-            TextRenderer.DrawText(g, text, e.ColumnIndex == 0 ? _fonts.Regular : _fonts.Regular, cell, Theme.Text, flags | align);
+            var numeric = e.ColumnIndex >= 1 && e.ColumnIndex <= _numericColumns;
+            var color = e.ColumnIndex == 1 && item.ValueColor is { } vc ? vc : Theme.Text;
+            TextRenderer.DrawText(g, text, _fonts.Regular, cell, color, flags | (numeric ? TextFormatFlags.Right : TextFormatFlags.Left));
         }
 
         protected override void OnPaint(PaintEventArgs e)

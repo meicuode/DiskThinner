@@ -12,6 +12,7 @@
     <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
     <ProjectReference Include="..\DiskThinner.Rules\DiskThinner.Rules.csproj" />
     <ProjectReference Include="..\DiskThinner.Inventory\DiskThinner.Inventory.csproj" />
+    <ProjectReference Include="..\DiskThinner.Storage\DiskThinner.Storage.csproj" />
     <!-- 只为了在构建主程序前先构建 dtrule，用它把 rules/*.yaml 编译成 rules.db；不引用它的程序集 -->
     <ProjectReference Include="..\..\tools\dtrule\dtrule.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>

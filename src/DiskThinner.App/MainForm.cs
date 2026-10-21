@@ -4,10 +4,13 @@ using DiskThinner.App.Controls;
 using DiskThinner.App.Explorer;
 using DiskThinner.App.Pages;
 using DiskThinner.App.Shell;
+using DiskThinner.App.Formatting;
+using DiskThinner.App.Growth;
 using DiskThinner.Core;
 using DiskThinner.Inventory;
 using DiskThinner.Rules;
 using DiskThinner.Scanner;
+using DiskThinner.Storage;
 
 namespace DiskThinner.App;
 
@@ -21,6 +24,13 @@ internal sealed class MainForm : Form
     private readonly ExplorerPage _explorer = new() { Dock = DockStyle.Fill };
     private readonly OverviewPage _overview = new() { Dock = DockStyle.Fill };
     private readonly ToolStripStatusLabel _statusRules = new() { TextAlign = ContentAlignment.MiddleRight };
+    private readonly ToolStripStatusLabel _statusSnapshot = new() { TextAlign = ContentAlignment.MiddleRight };
+    private readonly GrowthPage _growthPage = new() { Dock = DockStyle.Fill };
+    private readonly Button _snapshot = Ui.Button("创建快照", accessibleDescription: "把当前扫描结果保存为快照，以后和它对比");
+    private SnapshotStore? _store;
+    private string? _storeError;
+    private GrowthModel? _growth;
+    private ScanResult? _lastResult;
     private DiskThinner.Rules.RuleEngine? _engine;
     private string? _rulesError;
     private readonly ComboBox _drives = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300, AccessibleName = "选择磁盘" };
@@ -74,7 +84,7 @@ internal sealed class MainForm : Form
 
         _pages["explorer"] = _explorer;
         _pages["overview"] = _overview;
-        _pages["growth"] = new PlaceholderPage("增长分析", "M3", "对比两次快照，找出哪些目录在变大。");
+        _pages["growth"] = _growthPage;
         _pages["cleanup"] = new PlaceholderPage("清理计划", "M4", "按风险分组的清理清单，确认后执行。");
         _pages["log"] = new PlaceholderPage("操作记录", "M4", "每次删除、运行命令、手动清理和拦截的记录。");
         _pages["settings"] = new PlaceholderPage("设置", "M5", "快照、清理、保护名单和规则设置。");
@@ -85,6 +95,14 @@ internal sealed class MainForm : Form
             _pageHost.Controls.Add(page);
         }
 
+        _growthPage.NavigateRequested += (_, node) =>
+        {
+            _nav.Select("explorer");
+            _explorer.Reveal(node);
+        };
+        _growthPage.SaveSnapshotRequested += (_, _) => SaveSnapshot();
+        _growthPage.ToggleScheduleRequested += (_, _) => ToggleSchedule();
+        _snapshot.Click += (_, _) => SaveSnapshot();
         _overview.NavigateRequested += (_, node) =>
         {
             _nav.Select("explorer");
@@ -117,6 +135,9 @@ internal sealed class MainForm : Form
         _rescan.Margin = new Padding(0, 0, 8, 0);
         left.Controls.Add(_drives);
         left.Controls.Add(_rescan);
+        _snapshot.Enabled = false;
+        _snapshot.Margin = new Padding(0, 0, 8, 0);
+        left.Controls.Add(_snapshot);
         bar.Controls.Add(left);
         bar.Paint += (_, e) =>
         {
@@ -131,6 +152,7 @@ internal sealed class MainForm : Form
         var status = new StatusStrip { BackColor = Theme.TitleBar, SizingGrip = true, Font = Theme.Small };
         _statusMode.Text = _elevated ? "管理员模式" : "普通权限（MFT 快速扫描需要管理员）";
         status.Items.Add(_statusScan);
+        status.Items.Add(_statusSnapshot);
         status.Items.Add(_statusRules);
         status.Items.Add(_statusMode);
         return status;
@@ -148,6 +170,7 @@ internal sealed class MainForm : Form
     {
         base.OnShown(e);
         LoadDrives();
+        RefreshSchedule();
         var drive = _options.Drive ?? Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
         SelectDriveInCombo(drive);
         StartScan(drive);
@@ -235,6 +258,8 @@ internal sealed class MainForm : Form
         var hint = mode == ScanMode.Mft ? "通常只需要几秒。" : $"遍历扫描较慢，整个系统盘约需 1 到 2 分钟。{(reason is null ? "" : "原因：" + reason + "。")}";
         _explorer.ShowProgress(title, hint, 0, cancellable: true);
         _overview.ShowScanning();
+        _growthPage.ShowScanning();
+        _snapshot.Enabled = false;
         _rescan.Enabled = false;
         _statusScan.Text = "正在扫描…";
 
@@ -263,6 +288,7 @@ internal sealed class MainForm : Form
 
         ScanResult? result = null;
         Analysis? analysis = null;
+        GrowthModel? growth = null;
         long peakAfterScan = 0;
         try
         {
@@ -282,7 +308,21 @@ internal sealed class MainForm : Form
                     // 扫描是一次性的重活，结束后把空闲的 GC 内存还给系统。
                     // 规则和已装软件放在这之后再加载，扫描时的临时数组和它们不同时占着内存。
                     GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-                    return (r, _options.NoRules ? null : Analyze(r, cts.Token));
+                    var a = _options.NoRules ? null : Analyze(r, cts.Token);
+                    growth = BuildGrowth(r, a?.C, DateTime.UtcNow);
+                    if (a?.Memory is List<(string, long)> steps)
+                    {
+                        steps.Add(("growth", Environment.WorkingSet));
+                    }
+
+                    // 匹配、推断和快照过程中的临时对象（路径字符串、注册表和进程信息等）在绑定界面之前回收掉
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                    if (a?.Memory is List<(string, long)> after)
+                    {
+                        after.Add(("after_gc", Environment.WorkingSet));
+                    }
+
+                    return (r, a);
                 }
                 finally
                 {
@@ -322,8 +362,10 @@ internal sealed class MainForm : Form
         _rescan.Enabled = true;
         var renderWatch = Stopwatch.StartNew();
         _analysis = analysis;
+        _lastResult = result;
         _explorer.SetResult(result, analysis?.C, analysis?.Owners, analysis?.ByOwner, analysis?.ByKind);
         _overview.SetResult(result, analysis?.C, analysis?.Owners);
+        ApplyGrowth(growth);
         if (_options.StartView > 0 && !_startViewApplied)
         {
             _startViewApplied = true;
@@ -346,6 +388,7 @@ internal sealed class MainForm : Form
         IReadOnlyList<(string Step, long Bytes)> Memory);
 
     private Analysis? _analysis;
+    private double _growthMs;
     private long _wsAfterBind;
     private bool _startViewApplied;
     private string? _inventoryError;
@@ -389,11 +432,100 @@ internal sealed class MainForm : Form
         var byKind = SpaceGroups.ByKind(owners);
         sw.Stop();
         memory.Add(("groups", Environment.WorkingSet));
-
-        // 匹配和推断过程中的临时对象（路径字符串、注册表和进程信息等）在绑定界面之前回收掉
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-        memory.Add(("after_gc", Environment.WorkingSet));
         return new Analysis(c, owners, byOwner, byKind, wait.Elapsed, sw.Elapsed, memory);
+    }
+
+    /// <summary>
+    /// 后台线程上：读快照，整个盘扫描完、离上次快照超过 6 小时就自动保存，再和 7 天前对比。快照库打不开时返回 null（不影响其他功能）。
+    /// </summary>
+    private GrowthModel? BuildGrowth(ScanResult r, Classification? c, DateTime nowUtc)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            _store ??= new SnapshotStore(_options.SnapshotDb ?? SnapshotStore.DefaultPath);
+            _storeError = null;
+            return GrowthModel.Build(_store, r, c, autoSave: !_options.NoAutoSnapshot, nowUtc);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException
+                                       or ArgumentException or KeyNotFoundException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            _storeError = ex.Message;
+            return null;
+        }
+        finally
+        {
+            _growthMs = sw.Elapsed.TotalMilliseconds;
+        }
+    }
+
+    /// <summary>把当前扫描结果保存为快照（工具栏和增长分析页的"创建快照"）。</summary>
+    private async void SaveSnapshot()
+    {
+        if (_store is not { } store || _lastResult is not { } result || _growth is { CurrentSaved: true })
+        {
+            return;
+        }
+
+        _snapshot.Enabled = false;
+        var classification = _explorer.Classification;
+        try
+        {
+            var model = await Task.Run(() => GrowthModel.SaveCurrent(store, result, classification, DateTime.UtcNow));
+            if (ReferenceEquals(result, _lastResult))
+            {
+                ApplyGrowth(model);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            _snapshot.Enabled = true;
+            MessageBox.Show(this, "保存快照失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void ApplyGrowth(GrowthModel? model)
+    {
+        _growth = model;
+        _growthPage.SetModel(model, _lastResult, _explorer.Classification, _explorer.Owners, _storeError is null ? null : "快照库打不开：" + _storeError);
+        _overview.SetGrowth(model, _lastResult?.Tree, _explorer.Classification, _explorer.Owners);
+        _snapshot.Enabled = model is { CurrentSaved: false };
+        _snapshot.Text = model is { CurrentSaved: true } ? "已保存快照" : "创建快照";
+        var latest = model?.Snapshots.LastOrDefault();
+        _statusSnapshot.Text = latest is null ? "还没有快照" : "最近快照：" + TimeText.Relative(new DateTimeOffset(latest.TakenAtUtc).ToFileTime(), DateTime.Now);
+    }
+
+    /// <summary>查询每日快照任务的状态（schtasks 要几十毫秒，放到后台）。</summary>
+    private async void RefreshSchedule()
+    {
+        var status = await Task.Run(ScheduledSnapshot.Query);
+        if (!IsDisposed)
+        {
+            _growthPage.SetSchedule(status);
+        }
+    }
+
+    /// <summary>开启或关闭每日快照。管理员模式下注册的任务用最高权限（MFT 扫描）；普通权限下注册的任务用遍历扫描。</summary>
+    private async void ToggleSchedule()
+    {
+        var exe = Environment.ProcessPath;
+        if (exe is null)
+        {
+            return;
+        }
+
+        var drive = (Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\").TrimEnd('\\');
+        var (ok, message) = await Task.Run(() =>
+        {
+            var status = ScheduledSnapshot.Query();
+            return status.Registered ? ScheduledSnapshot.Unregister() : ScheduledSnapshot.Register(exe, ScheduledSnapshot.DefaultTime, _elevated, drive);
+        });
+        if (!ok)
+        {
+            MessageBox.Show(this, "设置每日快照失败：" + message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        RefreshSchedule();
     }
 
     /// <summary>自动化验证：选中路径、截图、写报告、退出（只在带了对应参数时执行）。</summary>
@@ -466,6 +598,15 @@ internal sealed class MainForm : Form
                 $"unexplained_bytes={_explorer.Classification?.Unexplained(result.Tree.Root)}",
                 .. AnalysisReport(),
                 $"view={_explorer.ViewIndex}",
+                $"snapshots={_growth?.Snapshots.Count}",
+                $"snapshot_saved={_growth?.CurrentSaved}",
+                $"snapshot_entries={_growth?.Current?.Count}",
+                $"snapshot_db_bytes={_growth?.Store.FileBytes}",
+                $"growth_ms={_growthMs:F0}",
+                $"week_baseline={_growth?.WeekBaseline?.TakenAtUtc.ToString("o", CultureInfo.InvariantCulture)}",
+                $"week_change_bytes={_growth?.WeekDiff?.NetChange}",
+                $"week_hotspots={_growth?.WeekHotspots.Count}",
+                $"snapshot_error={_storeError}",
                 $"nodes={s.Nodes}",
                 $"files={root.FileCount}",
                 $"dirs={root.DirCount}",

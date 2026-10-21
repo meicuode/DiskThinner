@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 快照：剪枝存储、对比、热点分解、保留策略。SQLite 手写读写，不引用 WinForms，按 Native AOT 要求编写
+       （计划任务调用的 snapshot 子命令和以后的常驻服务都要用）。 -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
+    <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Storage.Tests" />
+    <InternalsVisibleTo Include="DiskThinner.App.Tests" />
+  </ItemGroup>
+</Project>
