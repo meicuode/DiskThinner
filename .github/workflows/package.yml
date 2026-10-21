@@ -1,0 +1,96 @@
+# 可复用的打包流程（由 ci.yml 和 release.yml 调用）：
+#   build：用 tools/release/build-release.ps1 打两个 zip，作为构建产物 packages 上传
+#   smoke：在全新的 windows-2022 和 windows-2025 上解压运行（tools/verify/smoke.ps1）。
+#          runner 是管理员，所以会用 MFT 扫描整个系统盘、生成清理计划；只读，不执行任何清理。
+#          先测自包含版（不依赖运行库），装上 .NET 10 之后再测依赖运行库的版本。
+name: Package
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 版本号；留空时用 Directory.Build.props 里的
+        type: string
+        default: ''
+    outputs:
+      version:
+        description: 实际打包的版本号
+        value: ${{ jobs.build.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.pack.outputs.version }}
+    env:
+      DOTNET_CLI_UI_LANGUAGE: en
+      DOTNET_NOLOGO: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: 打包
+        id: pack
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:VERSION) { pwsh -NoProfile -File tools/release/build-release.ps1 -Version $env:VERSION }
+          else { pwsh -NoProfile -File tools/release/build-release.ps1 }
+          if ($LASTEXITCODE -ne 0) { throw '打包失败' }
+          $dirs = @(Get-ChildItem artifacts/release -Directory)
+          if ($dirs.Count -ne 1) { throw "artifacts/release 下应该只有一个版本目录，实际：$($dirs.Name -join ', ')" }
+          "version=$($dirs[0].Name)" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            artifacts/release/${{ steps.pack.outputs.version }}/*.zip
+            artifacts/release/${{ steps.pack.outputs.version }}/SHA256SUMS.txt
+          if-no-files-found: error
+
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: pkg
+
+      - name: 自包含版
+        run: pwsh -NoProfile -File tools/verify/smoke.ps1 -PackageDir pkg -OutDir smoke/selfcontained -Variant selfcontained
+
+      - uses: actions/setup-dotnet@v4
+        if: always()
+        with:
+          global-json-file: global.json
+
+      - name: 依赖运行库的版本
+        if: always()
+        run: pwsh -NoProfile -File tools/verify/smoke.ps1 -PackageDir pkg -OutDir smoke/framework -Variant framework
+
+      - name: 保存截图和报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ matrix.os }}
+          path: |
+            smoke/**/smoke.txt
+            smoke/**/report.txt
+            smoke/**/*.png
+            smoke/**/crash-*.txt
+          if-no-files-found: warn

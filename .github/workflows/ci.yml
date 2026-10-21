@@ -1,4 +1,5 @@
-# 研发方案第 6 节：构建、单元测试、规则校验。MFT 扫描和测试盘上的删除验收需要管理员，在本机用 tools/verify 下的脚本跑。
+# 研发方案第 6 节：构建、单元测试、规则校验。推送到 main 时再打包，并在全新的 windows-2022 / 2025 上冒烟测试（package.yml）。
+# 测试盘上的删除验收需要管理员和 VHDX，在本机用 tools/verify 下的脚本跑。
 name: CI
 
 on:
@@ -30,3 +31,8 @@ jobs:
 
       - name: 测试
         run: dotnet test DiskThinner.slnx -c Release --no-build --blame-hang-timeout 90s
+
+  package:
+    if: github.event_name == 'push'
+    needs: build
+    uses: ./.github/workflows/package.yml

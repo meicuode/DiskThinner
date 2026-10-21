@@ -1,5 +1,7 @@
-# 推送 v主.次.修订 形式的标签（例如 v0.1.0、v0.2.0-beta.1）时：规则校验、构建、测试，
-# 用 tools/release/build-release.ps1 打两个 zip，然后创建 GitHub Release 并上传 zip 和 SHA256SUMS.txt。
+# 推送 v主.次.修订 形式的标签（例如 v0.1.0、v0.2.0-beta.1）时：
+#   verify：检查标签格式、规则校验、构建、测试
+#   package：打两个 zip，在全新的 windows-2022 / windows-2025 上冒烟测试（package.yml）
+#   publish：前两步都通过后才创建 GitHub Release，上传 zip 和 SHA256SUMS.txt
 # 版本号以标签为准；和 Directory.Build.props 不一致时只给警告。带 - 后缀的版本发布为预发布。
 # 发布说明取 docs/release-notes-<版本>.md（没有就用一段通用说明），末尾自动附上校验值。
 name: Release
@@ -9,15 +11,18 @@ on:
     tags: ['v*.*.*']
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  verify:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     env:
       DOTNET_CLI_UI_LANGUAGE: en
       DOTNET_NOLOGO: true
@@ -32,7 +37,6 @@ jobs:
 
       - name: 版本号
         id: version
-        shell: pwsh
         run: |
           if (-not ($env:TAG -cmatch '^v(\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?)$')) {
             throw "标签格式不对：$env:TAG（应为 v主.次.修订，可带预发布后缀，例如 v0.2.0-beta.1）"
@@ -57,23 +61,30 @@ jobs:
       - name: 测试
         run: dotnet test DiskThinner.slnx -c Release --no-build --blame-hang-timeout 90s
 
-      - name: 打包
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: pwsh -NoProfile -File tools/release/build-release.ps1 -Version $env:VERSION
+  package:
+    needs: verify
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.verify.outputs.version }}
 
-      - name: 保存构建产物
-        uses: actions/upload-artifact@v4
+  publish:
+    needs: [verify, package]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
         with:
-          name: DiskThinner-${{ steps.version.outputs.version }}
-          path: |
-            artifacts/release/${{ steps.version.outputs.version }}/*.zip
-            artifacts/release/${{ steps.version.outputs.version }}/SHA256SUMS.txt
-          if-no-files-found: error
+          name: packages
+          path: artifacts/release/${{ needs.verify.outputs.version }}
 
       - name: 发布说明
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
         run: |
           # 反引号在 PowerShell 双引号字符串里是转义符：代码块标记和文件名的反引号都用单引号字面量拼
           $v = $env:VERSION
@@ -95,11 +106,10 @@ jobs:
       - name: 创建 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           $out = "artifacts/release/$env:VERSION"
           $files = @(Get-ChildItem "$out/*.zip" | ForEach-Object FullName) + (Resolve-Path "$out/SHA256SUMS.txt").Path
+          if ($files.Count -ne 3) { throw "应该有两个 zip 和 SHA256SUMS.txt，实际：$($files -join ', ')" }
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE -eq 0) {
             # 重新运行同一个标签：替换附件和说明，不新建

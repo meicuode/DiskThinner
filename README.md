@@ -70,8 +70,9 @@ pwsh -File tools/release/build-release.ps1 [-Version 0.2.0]
 
 GitHub Actions：
 
-- `ci.yml`：推送到 main 和 PR 时跑规则校验、构建、测试。
-- `release.yml`：推送 `v主.次.修订` 形式的标签（如 `v0.2.0`，或 `v0.2.0-beta.1` 发布为预发布）时，跑同样的检查，打两个 zip，创建 GitHub Release 并上传 zip 和 `SHA256SUMS.txt`。版本号以标签为准；发布说明取 `docs/release-notes-<版本>.md`，没有就用通用说明。
+- `ci.yml`：推送到 main 和 PR 时跑规则校验、构建、测试；推送到 main 时再打包并冒烟测试。
+- `package.yml`（被另外两个调用）：打两个 zip，在全新的 windows-2022 和 windows-2025 上解压运行 `tools/verify/smoke.ps1`：扫描测试文件夹、以管理员身份用 MFT 扫描整个系统盘并生成清理计划（只读，不执行清理）、跑 snapshot 子命令。自包含版在装 .NET 之前测，依赖运行库的版本装好 .NET 10 之后测。截图和报告作为构建产物保存。
+- `release.yml`：推送 `v主.次.修订` 形式的标签（如 `v0.2.0`，或 `v0.2.0-beta.1` 发布为预发布）时，跑同样的检查和冒烟测试，都通过后才创建 GitHub Release 并上传 zip 和 `SHA256SUMS.txt`。版本号以标签为准；发布说明取 `docs/release-notes-<版本>.md`，没有就用通用说明。
 
 发布新版本：
 
