@@ -59,7 +59,20 @@ jobs:
         run: dotnet build DiskThinner.slnx -c Release "-p:Version=$env:VERSION"
 
       - name: 测试
-        run: dotnet test DiskThinner.slnx -c Release --no-build --blame-hang-timeout 90s
+        run: dotnet test DiskThinner.slnx -c Release --no-build --blame-hang-timeout 90s --blame-hang-dump-type mini --logger trx --results-directory TestResults
+
+      # 失败的用例写成注解：运行页面上不登录也能看到是哪个测试、为什么失败
+      - name: 失败的测试
+        if: failure()
+        run: pwsh -NoProfile -File tools/verify/test-annotations.ps1 -ResultsDir TestResults
+
+      - name: 保存测试结果
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore
 
   package:
     needs: verify

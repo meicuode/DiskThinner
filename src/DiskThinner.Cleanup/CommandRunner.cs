@@ -113,7 +113,19 @@ public static class CommandRunner
             }
         }
 
-        process.WaitForExit(); // 等输出读完
+        // 进程已经退出（或被结束）。不能用无参的 WaitForExit() 等输出读完：命令留下的后台子进程（npm 的更新检查、
+        // start /b 启动的程序）会一直拿着输出管道，那样会等到子进程结束。最多再等 2 秒，然后不再读取。
+        process.WaitForExit(TimeSpan.FromSeconds(2));
+        try
+        {
+            process.CancelOutputRead();
+            process.CancelErrorRead();
+        }
+        catch (InvalidOperationException)
+        {
+            // 已经读完
+        }
+
         string text;
         lock (output)
         {
