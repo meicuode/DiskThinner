@@ -13,5 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DiskThinner.Cleanup\DiskThinner.Cleanup.csproj" />
+    <!-- 只为保证先构建占用文件的辅助程序（RestartManagerTests 从它自己的输出目录启动），不引用它的程序集 -->
+    <ProjectReference Include="..\DiskThinner.LockHolder\DiskThinner.LockHolder.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

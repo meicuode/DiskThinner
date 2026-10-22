@@ -410,6 +410,7 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 > 2026-10-22 补上 JSON fixtures（第 6 节）：`tests/fixtures/matching/*.json`（规则匹配和保护名单，16 个用例）、`tests/fixtures/hotspots/*.json`（热点分解，6 个用例），格式见 `tests/fixtures/README.md`。C# 里原来的同类测试改成读这些文件，以后别的实现读同一套文件做同样的检查。
 > 2026-10-22 补上测试盘上的扫描验收（第 6 节）：1 GB 的 VHDX（簇 4 KB）上造出常驻小文件、压缩、稀疏、备用数据流、硬链接、junction、1000 层嵌套（路径 5000 多个字符）和 255 个字符的文件名，MFT 扫描、遍历扫描和期望值逐项一致，8 个用例全部通过。实测：4 MB 的压缩文件实际占 768 KB，64 MB 只写了 1 MB 的稀疏文件占 1 MB，文件上 3 MB 的备用数据流计入占用，100 字节的文件常驻在 MFT 记录里不占簇，硬链接只算一次；遍历扫描在这几项上按逻辑大小估算（偏大，硬链接算两次，看不到备用数据流），和设计一致。
 > 已知局限：目录上的备用数据流只计入 `AlternateStreamBytes`，不计入目录占用；`AlternateStreamBytes` 是逻辑大小，含 `$Bad:$Bad` 这类元数据流（1 GB 的测试盘上约 1 GB），不能当作占用看（目前界面没有显示它）。快照只记录到第 32 层（3.5 节），更深处的增长报在第 32 层的目录上，规则匹配和热点分解在 5000 层的树上都正常。
+> 2026-10-22 补上"关闭并继续"（3.6 节 RmShutdown）的测试：`tests/DiskThinner.LockHolder` 是一个带普通顶层窗口、独占打开文件的辅助程序，`RestartManagerTests` 验证查得出另一个进程里的占用者；用户不同意时不询问程序、文件跳过并在操作记录里写出程序名；同意时程序收到 `WM_QUERYENDSESSION`（`ENDSESSION_CLOSEAPP`）后正常退出（退出码 0），文件随后删除；程序拒绝时 `RmShutdown` 返回失败，程序继续运行，不会被强制结束。
 
 - 设置页（快照、清理、保护名单、规则）、settings.json、日志、未处理异常的兜底。
 - 发布两个版本：依赖运行库的 zip 和单文件自包含的 zip。
