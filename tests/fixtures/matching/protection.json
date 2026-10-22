@@ -1,0 +1,107 @@
+{
+  "description": "保护名单：任何规则都不能让它变成可删（研发方案 M2 验收要求的专门测试）。最坏情况是一条\u201c整个盘都安全可删\u201d的规则（校验会拒绝它，但引擎本身也必须守住）",
+  "tree": [
+    ["C:/Users/demo/.ssh/id_ed25519", 1],
+    ["C:/Users/demo/.ssh/known_hosts", 1],
+    ["C:/Users/demo/.aws/credentials", 1],
+    ["C:/Users/demo/.claude/.credentials.json", 1],
+    ["C:/Users/demo/.codex/auth.json", 1],
+    ["C:/Users/demo/.codex/log/codex.log", 10],
+    ["C:/Users/demo/AppData/Local/Google/Chrome/User Data/Local State", 1],
+    ["C:/Users/demo/AppData/Local/Google/Chrome/User Data/Default/Login Data", 1],
+    ["C:/Users/demo/AppData/Local/Google/Chrome/User Data/Default/Cache/f_000001", 100],
+    ["C:/Users/demo/AppData/Roaming/Microsoft/Protect/S-1-5-21/key", 1],
+    ["C:/Users/demo/Documents/thesis.docx", 500],
+    ["C:/Users/demo/NTUSER.DAT", 10],
+    ["C:/Windows/System32/ntdll.dll", 800],
+    ["C:/Windows/Temp/w.tmp", 60],
+    ["C:/Windows/WinSxS/amd64_x/a.dll", 300],
+    ["C:/Program Files/App/app.exe", 400],
+    ["C:/pagefile.sys", 5000],
+    ["C:/$MFT", 1000, ["metadata"]]
+  ],
+  "cases": [
+    {
+      "name": "草稿规则也删不了硬保护的路径",
+      "rules": [
+        { "id": "evil-dir", "dir": "%SYSTEMDRIVE%/**/*", "kind": "temp", "risk": "safe", "tier": "draft" },
+        { "id": "evil-file", "file": "%SYSTEMDRIVE%/**/*", "kind": "temp", "risk": "safe", "tier": "draft" }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/.ssh/id_ed25519": { "risk": "never", "cleanable": 0, "protection": "hard" },
+          "C:/Users/demo/.ssh/known_hosts": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/.aws/credentials": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/.claude/.credentials.json": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/.codex/auth.json": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/AppData/Local/Google/Chrome/User Data/Local State": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/AppData/Local/Google/Chrome/User Data/Default/Login Data": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/AppData/Roaming/Microsoft/Protect/S-1-5-21/key": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/NTUSER.DAT": { "risk": "never", "cleanable": 0 },
+          "C:/Windows/System32/ntdll.dll": { "risk": "never", "cleanable": 0 },
+          "C:/Program Files/App/app.exe": { "risk": "never", "cleanable": 0 },
+          "C:/$MFT": { "risk": "never", "cleanable": 0 }
+        }
+      }
+    },
+    {
+      "name": "实测过的规则也删不了硬保护的路径；只能用系统工具处理的位置保持引导；软保护的用户文件只有实测过的规则能放开",
+      "rules": [
+        { "id": "evil-dir", "dir": "%SYSTEMDRIVE%/**/*", "kind": "temp", "risk": "safe", "tier": "verified" },
+        { "id": "evil-file", "file": "%SYSTEMDRIVE%/**/*", "kind": "temp", "risk": "safe", "tier": "verified" }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/.ssh/id_ed25519": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/.ssh/known_hosts": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/.aws/credentials": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/.claude/.credentials.json": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/.codex/auth.json": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/AppData/Local/Google/Chrome/User Data/Local State": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/AppData/Local/Google/Chrome/User Data/Default/Login Data": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/AppData/Roaming/Microsoft/Protect/S-1-5-21/key": { "risk": "never", "cleanable": 0 },
+          "C:/Users/demo/NTUSER.DAT": { "risk": "never", "cleanable": 0 },
+          "C:/Windows/System32/ntdll.dll": { "risk": "never", "cleanable": 0 },
+          "C:/Program Files/App/app.exe": { "risk": "never", "cleanable": 0 },
+          "C:/$MFT": { "risk": "never", "cleanable": 0 },
+          "C:/pagefile.sys": { "risk": "guide", "protection": "guide" },
+          "C:/Windows/WinSxS/amd64_x/a.dll": { "risk": "guide" },
+          "C:/Users/demo/Documents/thesis.docx": { "risk": "safe", "protection": "soft" }
+        }
+      }
+    },
+    {
+      "name": "人工审阅过的规则不能放开软保护；受保护目录里的例外（Windows/Temp）放开",
+      "rules": [
+        { "id": "evil-dir", "dir": "%SYSTEMDRIVE%/**/*", "kind": "temp", "risk": "safe" },
+        { "id": "evil-file", "file": "%SYSTEMDRIVE%/**/*", "kind": "temp", "risk": "safe" }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/Documents/thesis.docx": { "risk": "high", "protection": "soft" },
+          "C:/Windows/Temp/w.tmp": { "risk": "safe", "protection": "none" }
+        }
+      }
+    },
+    {
+      "name": "规则认领了浏览器资料目录，里面的登录数据仍然受保护",
+      "rules": [{ "id": "profile", "dir": "%LOCALAPPDATA%/Google/Chrome/User Data", "kind": "browser-data", "risk": "medium" }],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Local/Google/Chrome/User Data/Default/Login Data": { "risk": "never" },
+          "C:/Users/demo/AppData/Local/Google/Chrome/User Data/Default/Cache/f_000001": { "risk": "medium" }
+        }
+      }
+    },
+    {
+      "name": "Codex 的日志可以清理，登录凭据不行",
+      "rules": [{ "id": "codex-log", "dir": "%USERPROFILE%/.codex/log", "kind": "log", "risk": "safe" }],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/.codex/log/codex.log": { "risk": "safe" },
+          "C:/Users/demo/.codex/auth.json": { "risk": "never" }
+        }
+      }
+    }
+  ]
+}

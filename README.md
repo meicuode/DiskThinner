@@ -100,7 +100,7 @@ git push origin v0.2.0
 | 目录 | 内容 |
 |---|---|
 | `src/` | 产品代码 |
-| `tests/` | 单元测试 |
+| `tests/` | 单元测试；`tests/fixtures/` 是规则匹配和热点分解的 JSON 用例（目录树加期望结果，格式见其中的 README） |
 | `tools/` | 规则工具 dtrule、验收和打包脚本 |
 | `rules/` | 内置规则（YAML） |
 | `spikes/` | 阶段 0 的技术验证程序，不进入产品 |

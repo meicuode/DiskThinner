@@ -1,0 +1,93 @@
+{
+  "description": "热点分解（研发方案 M3 验收）：一增一减、并列增长源、大量小文件、命中规则即停、其余部分、跨过记录阈值不重复计算。每个用例都分别用不剪枝和默认剪枝保存快照再对比，结果必须一样",
+  "cases": [
+    {
+      "name": "一增一减：净变化为 0，两个方向的变化都要看到",
+      "before": [
+        ["C:/Users/demo/AppData/Local/A/a.bin", "300M"],
+        ["C:/Users/demo/AppData/Local/B/b.bin", "600M"],
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "after": [
+        ["C:/Users/demo/AppData/Local/A/a.bin", "600M"],
+        ["C:/Users/demo/AppData/Local/B/b.bin", "300M"],
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "expect": [
+        { "path": "C:/Users/demo/AppData/Local/A/a.bin", "change": "300M" },
+        { "path": "C:/Users/demo/AppData/Local/B/b.bin", "change": "-300M" }
+      ],
+      "totals": { "net": 0, "increase": "300M", "decrease": "300M" }
+    },
+    {
+      "name": "并列增长源：一个大文件、一个目录里的很多小文件，分别报告",
+      "before": [
+        ["C:/Users/demo/AppData/Local/uv/cache/w.whl", "500M"],
+        { "repeat": 100, "dir": "C:/Users/demo/AppData/Local/Temp", "name": "f{i}.tmp", "size": "1M" },
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "after": [
+        ["C:/Users/demo/AppData/Local/uv/cache/w.whl", "500M"],
+        ["C:/Users/demo/AppData/Local/uv/cache/x.whl", "200M"],
+        { "repeat": 250, "dir": "C:/Users/demo/AppData/Local/Temp", "name": "f{i}.tmp", "size": "1M" },
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "expect": [
+        { "path": "C:/Users/demo/AppData/Local/uv/cache/x.whl", "change": "200M" },
+        { "path": "C:/Users/demo/AppData/Local/Temp", "change": "150M" }
+      ]
+    },
+    {
+      "name": "大量小文件：删了 300 个、新建了 450 个，没有单个子项超过阈值，报告目录本身",
+      "before": [
+        { "repeat": 300, "dir": "C:/Users/demo/AppData/Local/Temp", "name": "old{i}.tmp", "size": "1M" },
+        ["C:/Users/demo/AppData/Local/Other/o.bin", "400M"]
+      ],
+      "after": [
+        { "repeat": 450, "dir": "C:/Users/demo/AppData/Local/Temp", "name": "new{i}.tmp", "size": "1M" },
+        ["C:/Users/demo/AppData/Local/Other/o.bin", "400M"]
+      ],
+      "expect": [
+        { "path": "C:/Users/demo/AppData/Local/Temp", "change": "150M" }
+      ]
+    },
+    {
+      "name": "命中规则即停：分解到规则位置为止，不拆到规则里面",
+      "before": [["C:/Users/demo/AppData/Local/Docker/wsl/disk/data.vhdx", "4000M"]],
+      "after": [["C:/Users/demo/AppData/Local/Docker/wsl/disk/data.vhdx", "7000M"]],
+      "stop_at": ["C:/Users/demo/AppData/Local/Docker/wsl"],
+      "expect": [
+        { "path": "C:/Users/demo/AppData/Local/Docker/wsl", "change": "3000M" }
+      ]
+    },
+    {
+      "name": "其余部分：一个目录明显增长，另有 150 个散落的小目录各增加 1 MB",
+      "before": [
+        ["C:/Users/demo/AppData/Local/Big/b.bin", "100M"],
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "after": [
+        ["C:/Users/demo/AppData/Local/Big/b.bin", "600M"],
+        { "repeat": 150, "dir": "C:/Users/demo/AppData/Local", "name": "s{i}/x.tmp", "size": "1M" },
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "expect": [
+        { "path": "C:/Users/demo/AppData/Local/Big/b.bin", "change": "500M" },
+        { "path": "C:/Users/demo/AppData/Local", "change": "150M", "remainder": true }
+      ]
+    },
+    {
+      "name": "跨过记录阈值：从 40 MB（低于记录阈值）涨到 90 MB，不能把 +90 MB 和上级的 −40 MB 都算进变化量",
+      "before": [
+        ["C:/Users/demo/AppData/Local/X/x.bin", "40M"],
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "after": [
+        ["C:/Users/demo/AppData/Local/X/x.bin", "90M"],
+        ["C:/Windows/w.bin", "1000M"]
+      ],
+      "expect": [],
+      "totals": { "net": "50M", "increase": "50M", "decrease": 0 }
+    }
+  ]
+}

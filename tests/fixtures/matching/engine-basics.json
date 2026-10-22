@@ -1,0 +1,131 @@
+{
+  "description": "规则匹配的基本语义：dir 认领整棵子树、用户令牌对每个用户生效、under 兜底、条件、file 规则、可清理和未识别的汇总",
+  "tree": [
+    ["C:/Users/demo/AppData/Local/uv/cache/archive/a.whl", 4000],
+    ["C:/Users/demo/AppData/Local/uv/python/py.exe", 1000],
+    ["C:/Users/demo/AppData/Local/Temp/x.tmp", 500],
+    ["C:/Users/demo/AppData/Local/Temp/sub/y.tmp", 300],
+    ["C:/Users/demo/AppData/Roaming/Code/Cache/data_1", 200],
+    ["C:/Users/demo/AppData/Roaming/Code/Local Storage/leveldb/000003.log", 50],
+    ["C:/Users/demo/AppData/Roaming/Other/Cache/data", 70],
+    ["C:/Users/demo/.ssh/id_ed25519", 1],
+    ["C:/Users/demo/Documents/report.docx", 900],
+    ["C:/Users/other/AppData/Local/Temp/z.tmp", 100],
+    ["C:/Windows/System32/kernel32.dll", 800],
+    ["C:/Windows/Temp/w.tmp", 60],
+    ["C:/pagefile.sys", 5000],
+    ["C:/Unknown/blob.bin", 700]
+  ],
+  "cases": [
+    {
+      "name": "dir 规则认领整棵子树",
+      "rules": [{ "id": "uv", "dir": "%LOCALAPPDATA%/uv/cache", "kind": "package-cache", "risk": "low" }],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Local/uv/cache": { "rule": "uv", "root": true },
+          "C:/Users/demo/AppData/Local/uv/cache/archive": { "rule": "uv", "root": false, "root_bytes": 4000 },
+          "C:/Users/demo/AppData/Local/uv/cache/archive/a.whl": { "rule": "uv" },
+          "C:/Users/demo/AppData/Local/uv/python/py.exe": { "rule": null }
+        },
+        "totals": { "roots": 1 }
+      }
+    },
+    {
+      "name": "用户目录的令牌对盘上每个用户都生效",
+      "rules": [{ "id": "temp", "dir": "%LOCALAPPDATA%/Temp", "kind": "temp", "risk": "safe" }],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Local/Temp/sub/y.tmp": { "rule": "temp" },
+          "C:/Users/other/AppData/Local/Temp/z.tmp": { "rule": "temp" }
+        },
+        "totals": { "roots": 2 }
+      }
+    },
+    {
+      "name": "under 是兜底，更具体的规则优先",
+      "rules": [
+        { "id": "profile", "under": "%USERPROFILE%/AppData", "kind": "app-data", "risk": "high" },
+        { "id": "uv", "dir": "%LOCALAPPDATA%/uv/cache", "kind": "package-cache", "risk": "low" }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Local/uv/cache/archive/a.whl": { "rule": "uv" },
+          "C:/Users/demo/AppData/Local/uv/python/py.exe": { "rule": "profile" },
+          "C:/Users/demo/Documents/report.docx": { "rule": null }
+        }
+      }
+    },
+    {
+      "name": "更深的 under 取代更浅的 under",
+      "rules": [
+        { "id": "windows", "under": "%WINDIR%/System32", "kind": "system", "risk": "never" },
+        { "id": "all", "under": "%SYSTEMDRIVE%/Windows", "kind": "system", "risk": "high" }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Windows/System32/kernel32.dll": { "rule": "windows" },
+          "C:/Windows/Temp/w.tmp": { "rule": "all" }
+        }
+      }
+    },
+    {
+      "name": "sibling_any 区分 Chromium 的 Cache 和别的 Cache 目录",
+      "rules": [
+        { "id": "chromium", "dir": "%USERPROFILE%/AppData/**/Cache", "sibling_any": ["Local Storage", "GPUCache"], "kind": "cache", "risk": "safe" }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Roaming/Code/Cache/data_1": { "rule": "chromium" },
+          "C:/Users/demo/AppData/Roaming/Other/Cache/data": { "rule": null }
+        }
+      }
+    },
+    {
+      "name": "file 规则只匹配文件",
+      "rules": [{ "id": "tmp", "file": "%USERPROFILE%/**/*.tmp", "kind": "cache", "risk": "safe" }],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Local/Temp/sub/y.tmp": { "rule": "tmp" },
+          "C:/Users/demo/AppData/Local/Temp/sub": { "rule": null }
+        }
+      }
+    },
+    {
+      "name": "可清理和未识别的空间按目录往上汇总",
+      "rules": [
+        { "id": "temp", "dir": "%LOCALAPPDATA%/Temp", "kind": "temp", "risk": "safe" },
+        { "id": "uv", "dir": "%LOCALAPPDATA%/uv/cache", "kind": "package-cache", "risk": "low" },
+        { "id": "pagefile", "file": "%SYSTEMDRIVE%/pagefile.sys", "kind": "system", "risk": "guide" }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Users/demo": { "cleanable": 4800 },
+          "C:/Unknown": { "unexplained": 700 },
+          "C:/pagefile.sys": { "unexplained": 0, "risk": "guide" }
+        },
+        "totals": { "cleanable": 4900, "cleanable_by_risk": { "safe": 900, "low": 4000 } }
+      }
+    },
+    {
+      "name": "只有说明（guide）的规则不计入可清理",
+      "rules": [
+        { "id": "uv", "dir": "%LOCALAPPDATA%/uv/cache", "kind": "package-cache", "risk": "low", "actions": [{ "guide": "在程序里清理" }] }
+      ],
+      "expect": {
+        "paths": { "C:/Users/demo/AppData/Local/uv/cache/archive/a.whl": { "risk": "low", "cleanable": 0 } },
+        "totals": { "cleanable": 0 }
+      }
+    },
+    {
+      "name": "兜底规则不计入可清理，但算作已解释",
+      "rules": [{ "id": "appdata", "under": "%APPDATA%/Code", "kind": "app-data", "risk": "medium" }],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Roaming/Code/Cache/data_1": { "rule": "appdata", "risk": "medium", "cleanable": 0 },
+          "C:/Users/demo/AppData/Roaming/Code": { "unexplained": 0 }
+        },
+        "totals": { "cleanable": 0 }
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "description": "has_any / not_under 条件，硬链接共享的文件不计入可清理",
+  "tree": [
+    ["C:/Users/demo/proj/.venv/pyvenv.cfg", 1],
+    ["C:/Users/demo/proj/.venv/lib.py", 100],
+    ["C:/Users/demo/proj/fake/.venv/lib.py", 100],
+    ["C:/Users/demo/AppData/x/.venv/pyvenv.cfg", 1],
+    ["C:/Users/demo/AppData/Local/uv/cache/a.whl", 1000, ["hard-linked"]],
+    ["C:/Users/demo/AppData/Local/uv/cache/b.whl", 300]
+  ],
+  "cases": [
+    {
+      "name": "has_any 要求目录里有标记文件，not_under 排除位置",
+      "rules": [
+        {
+          "id": "venv", "dir": "%USERPROFILE%/**/.venv", "has_any": ["pyvenv.cfg"], "not_under": ["%USERPROFILE%/AppData"],
+          "kind": "build-output", "risk": "low"
+        }
+      ],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/proj/.venv/lib.py": { "rule": "venv" },
+          "C:/Users/demo/proj/fake/.venv/lib.py": { "rule": null },
+          "C:/Users/demo/AppData/x/.venv/pyvenv.cfg": { "rule": null }
+        }
+      }
+    },
+    {
+      "name": "有多个硬链接名的文件：占用照算，可清理不算",
+      "rules": [{ "id": "uv", "dir": "%LOCALAPPDATA%/uv/cache", "kind": "package-cache", "risk": "low" }],
+      "expect": {
+        "paths": {
+          "C:/Users/demo/AppData/Local/uv/cache": { "root": true, "root_bytes": 1300, "root_shared": 1000, "root_cleanable": 300, "cleanable": 300 }
+        },
+        "totals": { "cleanable": 300 }
+      }
+    }
+  ]
+}

@@ -407,6 +407,7 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 > 未完成：干净的 Windows 10 / 11 桌面版上的验收（开发机是 Windows 11 家庭版，没有 Hyper-V 和沙盒；Windows Server 2022 / 2025 上的冒烟测试已通过）。
 > 调整：单文件自包含版不开启单文件压缩（压缩后启动时解压程序集，峰值内存多约 100 MB，zip 只小 1 MB）。
 > 2026-10-22 补上界面文字的 resx（1.2 节）：源代码里的中文就是键，`L.T("…")` / `L.F("… {0} …", 参数)`，全部 673 条在 `src/DiskThinner.Core/Strings.resx`。`tools/i18n` 负责改写和生成，CI 检查 resx 和源代码同步、没有没包起来的中文、`case` / 模式匹配 / `const` 里没有中文。日志和正则表达式里的中文不翻译；规则库的说明文字是数据，阶段 4 单独处理。
+> 2026-10-22 补上 JSON fixtures（第 6 节）：`tests/fixtures/matching/*.json`（规则匹配和保护名单，16 个用例）、`tests/fixtures/hotspots/*.json`（热点分解，6 个用例），格式见 `tests/fixtures/README.md`。C# 里原来的同类测试改成读这些文件，以后别的实现读同一套文件做同样的检查。
 
 - 设置页（快照、清理、保护名单、规则）、settings.json、日志、未处理异常的兜底。
 - 发布两个版本：依赖运行库的 zip 和单文件自包含的 zip。
@@ -430,7 +431,7 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 ## 6. 测试与质量
 
 - 单元测试：路径令牌解析、规则匹配、归属合并、保护名单、快照剪枝、热点分解、命令白名单、audit_log 只追加。
-- fixtures：用 JSON 描述目录树和期望结果，供匹配引擎和热点算法共用，以后 C++ 版也跑同一套。
+- fixtures：用 JSON 描述目录树和期望结果，供匹配引擎和热点算法共用，以后 C++ 版也跑同一套。已完成：`tests/fixtures/`，格式见其中的 README。
 - 集成测试：在测试用 VHDX 盘上构造硬链接、压缩、稀疏、备用数据流、junction、长路径、深层嵌套，校验扫描结果和删除行为。删除类测试只允许在测试盘上运行，测试代码里写死盘符检查。
 - 性能：扫描耗时、峰值内存、匹配耗时写入日志。MFT 扫描需要管理员，CI 跑不了，每个版本在本机手动测一次。
 - CI（GitHub Actions，windows-latest）：构建、单元测试、`dtrule validate`。
