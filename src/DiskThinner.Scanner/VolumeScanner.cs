@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Security.Principal;
+using DiskThinner.Core;
 using DiskThinner.Scanner.Mft;
 using DiskThinner.Scanner.Walk;
 
@@ -33,12 +34,12 @@ public static class VolumeScanner
         var driveRoot = Path.GetPathRoot(full);
         if (driveRoot is null || !string.Equals(full.TrimEnd('\\'), driveRoot.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
         {
-            return (ScanMode.Walk, "扫描的是文件夹而不是整个盘");
+            return (ScanMode.Walk, L.T("扫描的是文件夹而不是整个盘"));
         }
 
         if (!IsElevated())
         {
-            return (ScanMode.Walk, "当前不是管理员权限");
+            return (ScanMode.Walk, L.T("当前不是管理员权限"));
         }
 
         try
@@ -46,12 +47,12 @@ public static class VolumeScanner
             var format = new DriveInfo(driveRoot).DriveFormat;
             if (!string.Equals(format, "NTFS", StringComparison.OrdinalIgnoreCase))
             {
-                return (ScanMode.Walk, $"文件系统是 {format}，不是 NTFS");
+                return (ScanMode.Walk, L.F("文件系统是 {0}，不是 NTFS", format));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return (ScanMode.Walk, "无法读取磁盘信息：" + ex.Message);
+            return (ScanMode.Walk, L.F("无法读取磁盘信息：{0}", ex.Message));
         }
 
         return (ScanMode.Mft, null);
@@ -69,7 +70,7 @@ public static class VolumeScanner
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or NotSupportedException or InvalidDataException or IOException or Win32Exception)
             {
-                reason = "MFT 读取失败，已改用遍历扫描：" + ex.Message;
+                reason = L.F("MFT 读取失败，已改用遍历扫描：{0}", ex.Message);
             }
         }
 

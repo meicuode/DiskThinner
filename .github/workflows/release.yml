@@ -53,6 +53,9 @@ jobs:
       - name: 规则校验
         run: dotnet run --project tools/dtrule -c Release -- validate rules
 
+      - name: 界面文字检查
+        run: dotnet run --project tools/i18n -c Release -- check src src/DiskThinner.Core/Strings.resx
+
       - name: 构建
         env:
           VERSION: ${{ steps.version.outputs.version }}

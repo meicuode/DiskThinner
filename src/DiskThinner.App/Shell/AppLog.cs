@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using DiskThinner.Core;
 
 namespace DiskThinner.App.Shell;
 
@@ -49,8 +50,7 @@ internal static class AppLog
             System.IO.Directory.CreateDirectory(Directory);
             var path = Path.Combine(Directory, $"crash-{DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}.txt");
             File.WriteAllText(path,
-                $"DiskThinner {typeof(AppLog).Assembly.GetName().Version}\n" +
-                $"时间：{DateTime.Now:O}\n位置：{where}\n系统：{Environment.OSVersion}，.NET {Environment.Version}，{(Environment.Is64BitProcess ? "64" : "32")} 位\n\n{ex}\n");
+                L.F("DiskThinner {0}\n时间：{1:O}\n位置：{2}\n系统：{3}，.NET {4}，{5} 位\n\n{6}\n", typeof(AppLog).Assembly.GetName().Version, DateTime.Now, where, Environment.OSVersion, Environment.Version, (Environment.Is64BitProcess ? "64" : "32"), ex));
             return path;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

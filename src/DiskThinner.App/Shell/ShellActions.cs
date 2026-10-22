@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using DiskThinner.Core;
 
 namespace DiskThinner.App.Shell;
 
@@ -16,7 +17,7 @@ internal static class ShellActions
     {
         if (isDirectory ? !Directory.Exists(path) : !File.Exists(path))
         {
-            MessageBox.Show(owner, $"找不到：\n{path}\n\n可能已被删除或移动，请重新扫描。", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(owner, L.F("找不到：\n{0}\n\n可能已被删除或移动，请重新扫描。", path), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return false;
         }
 
@@ -37,7 +38,7 @@ internal static class ShellActions
         }
         catch (Win32Exception ex)
         {
-            MessageBox.Show(owner, "无法打开资源管理器：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(owner, L.F("无法打开资源管理器：{0}", ex.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
     }
@@ -74,7 +75,7 @@ internal static class ShellActions
         }
         catch (Win32Exception ex)
         {
-            MessageBox.Show(owner, "无法以管理员身份启动：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(owner, L.F("无法以管理员身份启动：{0}", ex.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
 

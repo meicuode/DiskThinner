@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Enumeration;
+using DiskThinner.Core;
 using DiskThinner.Scanner.Native;
 
 namespace DiskThinner.Scanner.Walk;
@@ -164,7 +165,7 @@ public static class WalkScanner
                 var done = Interlocked.Increment(ref directoriesDone);
                 if ((done & 0x3FF) == 0)
                 {
-                    progress?.Report(new ScanProgress(done, 0, "列出目录", bytes));
+                    progress?.Report(new ScanProgress(done, 0, L.T("列出目录"), bytes));
                 }
 
                 if (Interlocked.Decrement(ref pending) == 0)

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DiskThinner.Core;
 using DiskThinner.Inventory;
 using DiskThinner.Scanner;
 
@@ -37,12 +38,12 @@ public sealed record OwnerEvidence(OwnerEvidenceKind Kind, string Text, string? 
 {
     public string KindText => Kind switch
     {
-        OwnerEvidenceKind.InstalledApp => "已装软件",
-        OwnerEvidenceKind.StoreApp => "商店应用",
-        OwnerEvidenceKind.CommandLine => "命令行工具",
-        OwnerEvidenceKind.Process => "运行中",
-        OwnerEvidenceKind.Program => "程序",
-        _ => "目录名",
+        OwnerEvidenceKind.InstalledApp => L.T("已装软件"),
+        OwnerEvidenceKind.StoreApp => L.T("商店应用"),
+        OwnerEvidenceKind.CommandLine => L.T("命令行工具"),
+        OwnerEvidenceKind.Process => L.T("运行中"),
+        OwnerEvidenceKind.Program => L.T("程序"),
+        _ => L.T("目录名"),
     };
 }
 
@@ -54,8 +55,8 @@ public sealed record Owner(string Name, string? Vendor, OwnerSource Source, stri
 
     /// <summary>界面上显示的文字："uv（Astral）"、"Microsoft（多个应用）"。</summary>
     public string Display => Several
-        ? $"{Name}（多个应用）"
-        : Vendor is null || Name.Contains(Vendor, StringComparison.OrdinalIgnoreCase) ? Name : $"{Name}（{Vendor}）";
+        ? L.F("{0}（多个应用）", Name)
+        : Vendor is null || Name.Contains(Vendor, StringComparison.OrdinalIgnoreCase) ? Name : L.F("{0}（{1}）", Name, Vendor);
 
     /// <summary>归属汇总时用的键：同名的应用（不管来自规则还是推断）合并到一起。</summary>
     internal static string NameKey(string name) => "n:" + AppNames.Key(name);
@@ -185,12 +186,12 @@ public sealed class OwnerMap
                              .DistinctBy(a => (a.ExePath, a.Source)).Take(3))
                 {
                     var where = PathDisplay.Shorten(Path.GetDirectoryName(found.ExePath!) ?? "");
-                    var product = found.RawName is { } raw && !raw.StartsWith('@') && raw != found.Name ? $"，产品名 {raw}" : "";
+                    var product = found.RawName is { } raw && !raw.StartsWith('@') && raw != found.Name ? L.F("，产品名 {0}", raw) : "";
                     list.Add(found.Source switch
                     {
-                        AppSource.Process => new OwnerEvidence(OwnerEvidenceKind.Process, $"{Path.GetFileName(found.ExePath)} 正在运行，位于 {where}{product}", found.ExePath),
-                        AppSource.Registry => new OwnerEvidence(OwnerEvidenceKind.InstalledApp, $"已安装 {found.RawName ?? found.Name}{(found.Version is null ? "" : " " + found.Version)}，程序位于 {where}", found.ExePath),
-                        _ => new OwnerEvidence(OwnerEvidenceKind.CommandLine, $"{Path.GetFileName(found.ExePath)} 位于 {where}{product}", found.ExePath),
+                        AppSource.Process => new OwnerEvidence(OwnerEvidenceKind.Process, L.F("{0} 正在运行，位于 {1}{2}", Path.GetFileName(found.ExePath), where, product), found.ExePath),
+                        AppSource.Registry => new OwnerEvidence(OwnerEvidenceKind.InstalledApp, L.F("已安装 {0}{1}，程序位于 {2}", found.RawName ?? found.Name, (found.Version is null ? "" : " " + found.Version), where), found.ExePath),
+                        _ => new OwnerEvidence(OwnerEvidenceKind.CommandLine, L.F("{0} 位于 {1}{2}", Path.GetFileName(found.ExePath), where, product), found.ExePath),
                     });
                 }
             }
@@ -211,18 +212,18 @@ public sealed class OwnerMap
         if (rule.Id.StartsWith("sys.", StringComparison.Ordinal))
         {
             return rule.Kind == Kind.Program
-                ? (new Owner("已安装的程序", null, OwnerSource.Rule, "f:programs", []), false)
+                ? (new Owner(L.T("已安装的程序"), null, OwnerSource.Rule, "f:programs", []), false)
                 : (new Owner("Windows", null, OwnerSource.Rule, Owner.NameKey("Windows"), []), true); // 和按程序版本信息推断出的 Windows 合并
         }
 
         if (rule.Id.StartsWith("user.", StringComparison.Ordinal))
         {
-            return (new Owner("你自己的文件", null, OwnerSource.Rule, "f:user", []), true);
+            return (new Owner(L.T("你自己的文件"), null, OwnerSource.Rule, "f:user", []), true);
         }
 
         return rule.Kind == Kind.BuildOutput
-            ? (new Owner("你的项目", null, OwnerSource.Rule, "f:projects", []), false)
-            : (new Owner("多个程序", null, OwnerSource.Rule, "f:several", []), false);
+            ? (new Owner(L.T("你的项目"), null, OwnerSource.Rule, "f:projects", []), false)
+            : (new Owner(L.T("多个程序"), null, OwnerSource.Rule, "f:several", []), false);
     }
 
     // =====================================================================
@@ -510,7 +511,7 @@ public sealed class OwnerMap
 
             var app = apps[0];
             return new Owner(app.Name, app.Vendor, OwnerSource.Inferred, Owner.NameKey(app.Name),
-                [new OwnerEvidence(OwnerEvidenceKind.DirName, $"目录名 {name} 和内置规则里的应用 {app.Name} 一致")]);
+                [new OwnerEvidence(OwnerEvidenceKind.DirName, L.F("目录名 {0} 和内置规则里的应用 {1} 一致", name, app.Name))]);
         }
 
         private Owner? FromStore(string dirName)
@@ -526,7 +527,7 @@ public sealed class OwnerMap
             var app = entry.App;
             var name = app.RawName is { } raw && raw.StartsWith('@') ? _options.ResolveIndirect(raw) ?? app.Name : app.Name;
             return new Owner(name, app.Publisher, OwnerSource.Inferred, Owner.NameKey(name),
-                [new OwnerEvidence(OwnerEvidenceKind.StoreApp, $"已注册的商店应用 {name}（包 {family}）")]);
+                [new OwnerEvidence(OwnerEvidenceKind.StoreApp, L.F("已注册的商店应用 {0}（包 {1}）", name, family))]);
         }
 
         /// <summary>已装软件的安装位置、正在运行的程序在这个目录里。</summary>
@@ -583,10 +584,10 @@ public sealed class OwnerMap
             var where = PathDisplay.Shorten(app.InstallLocation ?? dir);
             return app.Source switch
             {
-                AppSource.Process => new OwnerEvidence(OwnerEvidenceKind.Process, $"{Path.GetFileName(app.ExePath)} 正在运行，位于 {where}", app.ExePath),
-                AppSource.CommandLine => new OwnerEvidence(OwnerEvidenceKind.CommandLine, $"{Path.GetFileName(app.ExePath)} 位于 {where}" + (app.RawName is { } p ? $"，产品名 {p}" : ""), app.ExePath),
-                AppSource.Registry => new OwnerEvidence(OwnerEvidenceKind.InstalledApp, $"已安装 {app.RawName ?? app.Name}" + (app.Publisher is null ? "" : $"（{app.Publisher}）") + $"，安装位置 {where}", app.ExePath),
-                _ => new OwnerEvidence(OwnerEvidenceKind.InstalledApp, $"{app.SourceText} {app.Name}，位于 {where}", app.ExePath),
+                AppSource.Process => new OwnerEvidence(OwnerEvidenceKind.Process, L.F("{0} 正在运行，位于 {1}", Path.GetFileName(app.ExePath), where), app.ExePath),
+                AppSource.CommandLine => new OwnerEvidence(OwnerEvidenceKind.CommandLine, L.F("{0} 位于 {1}{2}", Path.GetFileName(app.ExePath), where, (app.RawName is { } p ? L.F("，产品名 {0}", p) : "")), app.ExePath),
+                AppSource.Registry => new OwnerEvidence(OwnerEvidenceKind.InstalledApp, L.F("已安装 {0}{1}，安装位置 {2}", app.RawName ?? app.Name, (app.Publisher is null ? "" : L.F("（{0}）", app.Publisher)), where), app.ExePath),
+                _ => new OwnerEvidence(OwnerEvidenceKind.InstalledApp, L.F("{0} {1}，位于 {2}", app.SourceText, app.Name, where), app.ExePath),
             };
         }
 
@@ -703,19 +704,21 @@ public sealed class OwnerMap
                 {
                     var only = products[0];
                     return new Owner(only.DisplayName, vendor, OwnerSource.Inferred, Owner.NameKey(only.DisplayName),
-                        [new OwnerEvidence(OwnerEvidenceKind.DirName, $"目录名 {name} 是已装软件 {only.App.RawName ?? only.App.Name} 的厂商名", only.App.ExePath)]);
+                        [new OwnerEvidence(OwnerEvidenceKind.DirName, L.F("目录名 {0} 是已装软件 {1} 的厂商名", name, only.App.RawName ?? only.App.Name), only.App.ExePath)]);
                 }
 
                 return new Owner(vendor, null, OwnerSource.Inferred, "v:" + vendors[0],
-                    [new OwnerEvidence(OwnerEvidenceKind.DirName, $"目录名 {name} 对应 {vendor} 的 {products.Count} 个已装软件：{string.Join("、", products.Take(3).Select(p => p.DisplayName))}")])
+                    [new OwnerEvidence(OwnerEvidenceKind.DirName, L.F("目录名 {0} 对应 {1} 的 {2} 个已装软件：{3}", name, vendor, products.Count, string.Join(L.T("、"), products.Take(3).Select(p => p.DisplayName))))])
                 { Several = true };
             }
 
             var e1 = products[0];
-            var how = e1.Key == key || best == 4 ? "和" : e1.ExeKey == key ? "和主程序名" : "是";
-            var tail = how == "是" ? " 的开头" : " 一致";
+            var appName = e1.App.RawName ?? e1.App.Name;
+            var why = e1.Key == key || best == 4 ? L.F("{0} 的目录名和{1} {2} 一致", dirText, e1.App.SourceText, appName)
+                : e1.ExeKey == key ? L.F("{0} 的目录名和主程序名{1} {2} 一致", dirText, e1.App.SourceText, appName)
+                : L.F("{0} 的目录名是{1} {2} 的开头", dirText, e1.App.SourceText, appName);
             return new Owner(e1.DisplayName, e1.App.Publisher, OwnerSource.Inferred, Owner.NameKey(e1.DisplayName),
-                [new OwnerEvidence(OwnerEvidenceKind.DirName, $"{dirText} 的目录名{how}{e1.App.SourceText} {e1.App.RawName ?? e1.App.Name}{tail}", e1.App.ExePath)]);
+                [new OwnerEvidence(OwnerEvidenceKind.DirName, why, e1.App.ExePath)]);
         }
 
         /// <summary>目录里（三层以内）最大的几个程序文件：产品名一致（或公司一致）时归它。</summary>
@@ -800,19 +803,19 @@ public sealed class OwnerMap
             var parts = new List<string>();
             if (id.Product is { } p)
             {
-                parts.Add("产品名 " + p);
+                parts.Add(L.F("产品名 {0}", p));
             }
             else if (id.Description is { } d)
             {
-                parts.Add("说明 " + d);
+                parts.Add(L.F("说明 {0}", d));
             }
 
             if (id.Company is { } c)
             {
-                parts.Add("公司 " + c);
+                parts.Add(L.F("公司 {0}", c));
             }
 
-            return new OwnerEvidence(OwnerEvidenceKind.Program, $"{shown}：{string.Join("，", parts)}", path);
+            return new OwnerEvidence(OwnerEvidenceKind.Program, L.F("{0}：{1}", shown, string.Join(L.T("，"), parts)), path);
         }
     }
 

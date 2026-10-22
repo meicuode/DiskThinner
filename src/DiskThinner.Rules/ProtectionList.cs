@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Rules;
 
 public enum ProtectionLevel : byte
@@ -26,61 +28,61 @@ public static class ProtectionList
     public static readonly IReadOnlyList<ProtectionEntry> BuiltIn =
     [
         // ---- 凭据与密钥 ----
-        new(@"%USERPROFILE%\.ssh", ProtectionLevel.Hard, "SSH 密钥"),
-        new(@"%USERPROFILE%\.gnupg", ProtectionLevel.Hard, "GPG 密钥"),
-        new(@"%USERPROFILE%\.aws", ProtectionLevel.Hard, "AWS 凭据"),
-        new(@"%USERPROFILE%\.azure", ProtectionLevel.Hard, "Azure 凭据"),
-        new(@"%USERPROFILE%\.kube", ProtectionLevel.Hard, "Kubernetes 凭据"),
-        new(@"%USERPROFILE%\.docker\config.json", ProtectionLevel.Hard, "Docker 登录凭据"),
-        new(@"%USERPROFILE%\.git-credentials", ProtectionLevel.Hard, "Git 凭据"),
-        new(@"%USERPROFILE%\.netrc", ProtectionLevel.Hard, "网络登录凭据"),
-        new(@"%USERPROFILE%\_netrc", ProtectionLevel.Hard, "网络登录凭据"),
-        new(@"%USERPROFILE%\.npmrc", ProtectionLevel.Hard, "npm 配置（可能含访问令牌）"),
-        new(@"%USERPROFILE%\.pypirc", ProtectionLevel.Hard, "PyPI 凭据"),
-        new(@"%USERPROFILE%\.config\gh", ProtectionLevel.Hard, "GitHub CLI 登录凭据"),
-        new(@"%USERPROFILE%\.claude\.credentials.json", ProtectionLevel.Hard, "Claude Code 登录凭据"),
-        new(@"%USERPROFILE%\.codex\auth.json", ProtectionLevel.Hard, "Codex CLI 登录凭据"),
-        new(@"%USERPROFILE%\.gemini\oauth_creds.json", ProtectionLevel.Hard, "Gemini CLI 登录凭据"),
-        new(@"%APPDATA%\Microsoft\Credentials", ProtectionLevel.Hard, "Windows 凭据管理器"),
-        new(@"%LOCALAPPDATA%\Microsoft\Credentials", ProtectionLevel.Hard, "Windows 凭据管理器"),
-        new(@"%APPDATA%\Microsoft\Protect", ProtectionLevel.Hard, "DPAPI 主密钥，删除后加密数据无法解密"),
-        new(@"%APPDATA%\Microsoft\Crypto", ProtectionLevel.Hard, "证书私钥"),
-        new(@"%APPDATA%\Microsoft\SystemCertificates", ProtectionLevel.Hard, "个人证书"),
-        new(@"%LOCALAPPDATA%\Microsoft\Vault", ProtectionLevel.Hard, "Windows 凭据保管库"),
+        new(@"%USERPROFILE%\.ssh", ProtectionLevel.Hard, L.T("SSH 密钥")),
+        new(@"%USERPROFILE%\.gnupg", ProtectionLevel.Hard, L.T("GPG 密钥")),
+        new(@"%USERPROFILE%\.aws", ProtectionLevel.Hard, L.T("AWS 凭据")),
+        new(@"%USERPROFILE%\.azure", ProtectionLevel.Hard, L.T("Azure 凭据")),
+        new(@"%USERPROFILE%\.kube", ProtectionLevel.Hard, L.T("Kubernetes 凭据")),
+        new(@"%USERPROFILE%\.docker\config.json", ProtectionLevel.Hard, L.T("Docker 登录凭据")),
+        new(@"%USERPROFILE%\.git-credentials", ProtectionLevel.Hard, L.T("Git 凭据")),
+        new(@"%USERPROFILE%\.netrc", ProtectionLevel.Hard, L.T("网络登录凭据")),
+        new(@"%USERPROFILE%\_netrc", ProtectionLevel.Hard, L.T("网络登录凭据")),
+        new(@"%USERPROFILE%\.npmrc", ProtectionLevel.Hard, L.T("npm 配置（可能含访问令牌）")),
+        new(@"%USERPROFILE%\.pypirc", ProtectionLevel.Hard, L.T("PyPI 凭据")),
+        new(@"%USERPROFILE%\.config\gh", ProtectionLevel.Hard, L.T("GitHub CLI 登录凭据")),
+        new(@"%USERPROFILE%\.claude\.credentials.json", ProtectionLevel.Hard, L.T("Claude Code 登录凭据")),
+        new(@"%USERPROFILE%\.codex\auth.json", ProtectionLevel.Hard, L.T("Codex CLI 登录凭据")),
+        new(@"%USERPROFILE%\.gemini\oauth_creds.json", ProtectionLevel.Hard, L.T("Gemini CLI 登录凭据")),
+        new(@"%APPDATA%\Microsoft\Credentials", ProtectionLevel.Hard, L.T("Windows 凭据管理器")),
+        new(@"%LOCALAPPDATA%\Microsoft\Credentials", ProtectionLevel.Hard, L.T("Windows 凭据管理器")),
+        new(@"%APPDATA%\Microsoft\Protect", ProtectionLevel.Hard, L.T("DPAPI 主密钥，删除后加密数据无法解密")),
+        new(@"%APPDATA%\Microsoft\Crypto", ProtectionLevel.Hard, L.T("证书私钥")),
+        new(@"%APPDATA%\Microsoft\SystemCertificates", ProtectionLevel.Hard, L.T("个人证书")),
+        new(@"%LOCALAPPDATA%\Microsoft\Vault", ProtectionLevel.Hard, L.T("Windows 凭据保管库")),
 
         // ---- 浏览器登录数据（Chromium 系与 Firefox） ----
-        new(@"%LOCALAPPDATA%\**\User Data\Local State", ProtectionLevel.Hard, "浏览器加密密钥"),
-        new(@"%LOCALAPPDATA%\**\User Data\*\{Login Data,Login Data For Account,Web Data,Cookies}", ProtectionLevel.Hard, "浏览器保存的密码、Cookie 和自动填充"),
-        new(@"%LOCALAPPDATA%\**\User Data\*\Network\Cookies", ProtectionLevel.Hard, "浏览器 Cookie"),
-        new(@"%APPDATA%\Mozilla\Firefox\Profiles\*\{logins.json,key4.db,cookies.sqlite,cert9.db}", ProtectionLevel.Hard, "Firefox 保存的密码、Cookie 和证书"),
+        new(@"%LOCALAPPDATA%\**\User Data\Local State", ProtectionLevel.Hard, L.T("浏览器加密密钥")),
+        new(@"%LOCALAPPDATA%\**\User Data\*\{Login Data,Login Data For Account,Web Data,Cookies}", ProtectionLevel.Hard, L.T("浏览器保存的密码、Cookie 和自动填充")),
+        new(@"%LOCALAPPDATA%\**\User Data\*\Network\Cookies", ProtectionLevel.Hard, L.T("浏览器 Cookie")),
+        new(@"%APPDATA%\Mozilla\Firefox\Profiles\*\{logins.json,key4.db,cookies.sqlite,cert9.db}", ProtectionLevel.Hard, L.T("Firefox 保存的密码、Cookie 和证书")),
 
         // ---- 加密货币钱包 ----
-        new(@"%APPDATA%\{Bitcoin,Ethereum,Electrum,Exodus,Monero,Litecoin}", ProtectionLevel.Hard, "加密货币钱包"),
-        new(@"%USERPROFILE%\**\wallet.dat", ProtectionLevel.Hard, "加密货币钱包"),
+        new(@"%APPDATA%\{Bitcoin,Ethereum,Electrum,Exodus,Monero,Litecoin}", ProtectionLevel.Hard, L.T("加密货币钱包")),
+        new(@"%USERPROFILE%\**\wallet.dat", ProtectionLevel.Hard, L.T("加密货币钱包")),
 
         // ---- 用户配置单元 ----
-        new(@"%USERPROFILE%\NTUSER.DAT*", ProtectionLevel.Hard, "用户注册表"),
-        new(@"%USERPROFILE%\ntuser.ini", ProtectionLevel.Hard, "用户注册表"),
-        new(@"%LOCALAPPDATA%\Microsoft\Windows\UsrClass.dat*", ProtectionLevel.Hard, "用户注册表"),
+        new(@"%USERPROFILE%\NTUSER.DAT*", ProtectionLevel.Hard, L.T("用户注册表")),
+        new(@"%USERPROFILE%\ntuser.ini", ProtectionLevel.Hard, L.T("用户注册表")),
+        new(@"%LOCALAPPDATA%\Microsoft\Windows\UsrClass.dat*", ProtectionLevel.Hard, L.T("用户注册表")),
 
         // ---- 用户文件（软保护） ----
-        new(@"%USERPROFILE%\{Documents,Desktop,Pictures,Videos,Music,Downloads,Favorites,Contacts,Links,Searches,Saved Games,3D Objects}", ProtectionLevel.Soft, "用户自己的文件"),
-        new(@"%USERPROFILE%\OneDrive*", ProtectionLevel.Soft, "OneDrive 同步的文件"),
-        new(@"%USERPROFILE%\source", ProtectionLevel.Soft, "代码仓库"),
+        new(@"%USERPROFILE%\{Documents,Desktop,Pictures,Videos,Music,Downloads,Favorites,Contacts,Links,Searches,Saved Games,3D Objects}", ProtectionLevel.Soft, L.T("用户自己的文件")),
+        new(@"%USERPROFILE%\OneDrive*", ProtectionLevel.Soft, L.T("OneDrive 同步的文件")),
+        new(@"%USERPROFILE%\source", ProtectionLevel.Soft, L.T("代码仓库")),
 
         // ---- 系统 ----
-        new(@"%WINDIR%", ProtectionLevel.Hard, "Windows 系统目录"),
-        new(@"%PROGRAMFILES%", ProtectionLevel.Hard, "程序文件，请通过卸载程序删除"),
-        new(@"%PROGRAMFILES(X86)%", ProtectionLevel.Hard, "程序文件，请通过卸载程序删除"),
-        new(@"%SYSTEMDRIVE%\Recovery", ProtectionLevel.Hard, "系统恢复环境"),
-        new(@"%SYSTEMDRIVE%\Boot", ProtectionLevel.Hard, "启动文件"),
-        new(@"%SYSTEMDRIVE%\bootmgr", ProtectionLevel.Hard, "启动文件"),
-        new(@"%SYSTEMDRIVE%\{pagefile.sys,hiberfil.sys,swapfile.sys}", ProtectionLevel.Guide, "在系统设置里调整"),
-        new(@"%SYSTEMDRIVE%\System Volume Information", ProtectionLevel.Guide, "系统还原点，在\u201c系统保护\u201d里调整"),
-        new(@"%WINDIR%\WinSxS", ProtectionLevel.Guide, "组件存储，只能用 DISM 清理"),
-        new(@"%WINDIR%\Installer", ProtectionLevel.Guide, "安装程序缓存，删除后无法修复或卸载程序"),
+        new(@"%WINDIR%", ProtectionLevel.Hard, L.T("Windows 系统目录")),
+        new(@"%PROGRAMFILES%", ProtectionLevel.Hard, L.T("程序文件，请通过卸载程序删除")),
+        new(@"%PROGRAMFILES(X86)%", ProtectionLevel.Hard, L.T("程序文件，请通过卸载程序删除")),
+        new(@"%SYSTEMDRIVE%\Recovery", ProtectionLevel.Hard, L.T("系统恢复环境")),
+        new(@"%SYSTEMDRIVE%\Boot", ProtectionLevel.Hard, L.T("启动文件")),
+        new(@"%SYSTEMDRIVE%\bootmgr", ProtectionLevel.Hard, L.T("启动文件")),
+        new(@"%SYSTEMDRIVE%\{pagefile.sys,hiberfil.sys,swapfile.sys}", ProtectionLevel.Guide, L.T("在系统设置里调整")),
+        new(@"%SYSTEMDRIVE%\System Volume Information", ProtectionLevel.Guide, L.T("系统还原点，在\u201c系统保护\u201d里调整")),
+        new(@"%WINDIR%\WinSxS", ProtectionLevel.Guide, L.T("组件存储，只能用 DISM 清理")),
+        new(@"%WINDIR%\Installer", ProtectionLevel.Guide, L.T("安装程序缓存，删除后无法修复或卸载程序")),
         new(@"%PROGRAMDATA%\Microsoft\Windows Defender", ProtectionLevel.Hard, "Microsoft Defender"),
-        new(@"%PROGRAMDATA%\Package Cache", ProtectionLevel.Guide, "安装包缓存，删除后可能无法修复或卸载程序"),
+        new(@"%PROGRAMDATA%\Package Cache", ProtectionLevel.Guide, L.T("安装包缓存，删除后可能无法修复或卸载程序")),
 
         // ---- Windows 目录里允许清理的位置（例外） ----
         new(@"%WINDIR%\Temp", ProtectionLevel.None, ""),
@@ -95,9 +97,9 @@ public static class ProtectionList
 
     public static string Display(ProtectionLevel level) => level switch
     {
-        ProtectionLevel.Hard => "保护名单",
-        ProtectionLevel.Guide => "系统设置",
-        ProtectionLevel.Soft => "用户文件",
+        ProtectionLevel.Hard => L.T("保护名单"),
+        ProtectionLevel.Guide => L.T("系统设置"),
+        ProtectionLevel.Soft => L.T("用户文件"),
         _ => "",
     };
 }

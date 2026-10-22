@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Scanner;
 
 /// <summary>
@@ -84,7 +86,7 @@ public sealed class NodeTree
     {
         if (name.Length > ushort.MaxValue)
         {
-            throw new ArgumentException("名称过长", nameof(name));
+            throw new ArgumentException(L.T("名称过长"), nameof(name));
         }
 
         if (_count == _nodes.Length)
@@ -126,7 +128,7 @@ public sealed class NodeTree
     {
         if (Root < 0)
         {
-            throw new InvalidOperationException("未设置根节点");
+            throw new InvalidOperationException(L.T("未设置根节点"));
         }
 
         CountHardLinksOnce = countHardLinksOnce;

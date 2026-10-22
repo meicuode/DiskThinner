@@ -37,15 +37,15 @@ internal sealed class MainForm : Form
     private readonly AccountInfo _account = AccountInfo.Current();
     private AuditLog? _audit;
     private string? _auditError;
-    private readonly Button _snapshot = Ui.Button("创建快照", accessibleDescription: "把当前扫描结果保存为快照，以后和它对比");
+    private readonly Button _snapshot = Ui.Button(L.T("创建快照"), accessibleDescription: L.T("把当前扫描结果保存为快照，以后和它对比"));
     private SnapshotStore? _store;
     private string? _storeError;
     private GrowthModel? _growth;
     private ScanResult? _lastResult;
     private DiskThinner.Rules.RuleEngine? _engine;
     private string? _rulesError;
-    private readonly ComboBox _drives = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300, AccessibleName = "选择磁盘" };
-    private readonly Button _rescan = Ui.Button("重新扫描", primary: true);
+    private readonly ComboBox _drives = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300, AccessibleName = L.T("选择磁盘") };
+    private readonly Button _rescan = Ui.Button(L.T("重新扫描"), primary: true);
     private readonly ToolStripStatusLabel _statusScan = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripStatusLabel _statusMode = new() { TextAlign = ContentAlignment.MiddleRight };
     private readonly bool _elevated = VolumeScanner.IsElevated();
@@ -91,12 +91,12 @@ internal sealed class MainForm : Form
         Controls.Add(BuildToolbar());
         Controls.Add(BuildStatusBar());
 
-        _nav.AddItem("overview", "概览", "\uE80A");
-        _nav.AddItem("explorer", "空间浏览", "\uE8B7");
-        _nav.AddItem("growth", "增长分析", "\uE9D2");
-        _nav.AddItem("cleanup", "清理计划", "\uE74D");
-        _nav.AddItem("log", "操作记录", "\uE81C");
-        _nav.AddItem("settings", "设置", "\uE713");
+        _nav.AddItem("overview", L.T("概览"), "\uE80A");
+        _nav.AddItem("explorer", L.T("空间浏览"), "\uE8B7");
+        _nav.AddItem("growth", L.T("增长分析"), "\uE9D2");
+        _nav.AddItem("cleanup", L.T("清理计划"), "\uE74D");
+        _nav.AddItem("log", L.T("操作记录"), "\uE81C");
+        _nav.AddItem("settings", L.T("设置"), "\uE713");
         _nav.Selected += (_, key) => ShowPage(key);
 
         _pages["explorer"] = _explorer;
@@ -182,7 +182,7 @@ internal sealed class MainForm : Form
     private StatusStrip BuildStatusBar()
     {
         var status = new StatusStrip { BackColor = Theme.TitleBar, SizingGrip = true, Font = Theme.Small };
-        _statusMode.Text = _elevated ? "管理员模式" : "普通权限（MFT 快速扫描需要管理员）";
+        _statusMode.Text = _elevated ? L.T("管理员模式") : L.T("普通权限（MFT 快速扫描需要管理员）");
         status.Items.Add(_statusScan);
         status.Items.Add(_statusSnapshot);
         status.Items.Add(_statusRules);
@@ -226,9 +226,9 @@ internal sealed class MainForm : Form
                     continue;
                 }
 
-                var label = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "本地磁盘" : d.VolumeLabel;
+                var label = string.IsNullOrWhiteSpace(d.VolumeLabel) ? L.T("本地磁盘") : d.VolumeLabel;
                 _drives.Items.Add(new DriveItem(d.RootDirectory.FullName,
-                    $"{d.Name.TrimEnd('\\')} {label} · 可用 {ByteSize.Format(d.AvailableFreeSpace)} / {ByteSize.Format(d.TotalSize)}"));
+                    L.F("{0} {1} · 可用 {2} / {3}", d.Name.TrimEnd('\\'), label, ByteSize.Format(d.AvailableFreeSpace), ByteSize.Format(d.TotalSize))));
             }
             catch (IOException)
             {
@@ -255,7 +255,7 @@ internal sealed class MainForm : Form
         if (index < 0)
         {
             // 扫描的是文件夹（命令行 --scan 指定），单独列一项
-            _drives.Items.Insert(0, new DriveItem(target, $"{target.TrimEnd('\\')}（文件夹）"));
+            _drives.Items.Insert(0, new DriveItem(target, L.F("{0}（文件夹）", target.TrimEnd('\\'))));
             index = 0;
         }
 
@@ -286,15 +286,15 @@ internal sealed class MainForm : Form
         {
         }
 
-        var title = mode == ScanMode.Mft ? $"正在读取 {drive.TrimEnd('\\')} 的主文件表（MFT）" : $"正在逐个目录扫描 {drive.TrimEnd('\\')}";
-        var hint = mode == ScanMode.Mft ? "通常只需要几秒。" : $"遍历扫描较慢，整个系统盘约需 1 到 2 分钟。{(reason is null ? "" : "原因：" + reason + "。")}";
+        var title = mode == ScanMode.Mft ? L.F("正在读取 {0} 的主文件表（MFT）", drive.TrimEnd('\\')) : L.F("正在逐个目录扫描 {0}", drive.TrimEnd('\\'));
+        var hint = mode == ScanMode.Mft ? L.T("通常只需要几秒。") : L.F("遍历扫描较慢，整个系统盘约需 1 到 2 分钟。{0}", (reason is null ? "" : L.F("原因：{0}。", reason)));
         _explorer.ShowProgress(title, hint, 0, cancellable: true);
         _overview.ShowScanning();
         _growthPage.ShowScanning();
         _cleanupPage.ShowScanning();
         _snapshot.Enabled = false;
         _rescan.Enabled = false;
-        _statusScan.Text = "正在扫描…";
+        _statusScan.Text = L.T("正在扫描…");
 
         var progress = new Progress<ScanProgress>(p =>
         {
@@ -308,12 +308,12 @@ internal sealed class MainForm : Form
             if (p.Total > 0)
             {
                 percent = (int)(p.Done * 100 / p.Total);
-                detail = $"已读取 {p.Done.ToString("N0", CultureInfo.InvariantCulture)} / {p.Total.ToString("N0", CultureInfo.InvariantCulture)} 条记录";
+                detail = L.F("已读取 {0} / {1} 条记录", p.Done.ToString("N0", CultureInfo.InvariantCulture), p.Total.ToString("N0", CultureInfo.InvariantCulture));
             }
             else
             {
                 percent = (int)Math.Min(99, p.Bytes * 100 / usedBytes);
-                detail = $"已列出 {p.Done.ToString("N0", CultureInfo.InvariantCulture)} 个目录，统计到 {ByteSize.Format(p.Bytes)}（已用 {ByteSize.Format(usedBytes)}）";
+                detail = L.F("已列出 {0} 个目录，统计到 {1}（已用 {2}）", p.Done.ToString("N0", CultureInfo.InvariantCulture), ByteSize.Format(p.Bytes), ByteSize.Format(usedBytes));
             }
 
             _explorer.ShowProgress(title, detail, percent, cancellable: true);
@@ -368,7 +368,7 @@ internal sealed class MainForm : Form
             if (_scanCts == cts)
             {
                 _explorer.SetResult(previous, _explorer.Classification, _explorer.Owners);
-                _statusScan.Text = previous is null ? "扫描已取消" : "扫描已取消，显示的是上一次的结果 · " + ExplorerPage.Describe(previous.Stats);
+                _statusScan.Text = previous is null ? L.T("扫描已取消") : L.F("扫描已取消，显示的是上一次的结果 · {0}", ExplorerPage.Describe(previous.Stats));
                 _rescan.Enabled = true;
             }
 
@@ -380,8 +380,8 @@ internal sealed class MainForm : Form
             {
                 _explorer.SetResult(previous, _explorer.Classification, _explorer.Owners);
                 _rescan.Enabled = true;
-                _statusScan.Text = "扫描失败";
-                MessageBox.Show(this, $"扫描 {drive} 失败：{ex.Message}", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _statusScan.Text = L.T("扫描失败");
+                MessageBox.Show(this, L.F("扫描 {0} 失败：{1}", drive, ex.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
             return;
@@ -398,7 +398,7 @@ internal sealed class MainForm : Form
         _lastResult = result;
         _explorer.SetResult(result, analysis?.C, analysis?.Owners, analysis?.ByOwner, analysis?.ByKind);
         _overview.SetResult(result, analysis?.C, analysis?.Owners);
-        _cleanupPage.SetPlan(analysis?.Plan ?? CleanupPlan.Empty, analysis is null ? "规则没有加载，不能生成清理计划。" : null);
+        _cleanupPage.SetPlan(analysis?.Plan ?? CleanupPlan.Empty, analysis is null ? L.T("规则没有加载，不能生成清理计划。") : null);
         ApplyGrowth(growth);
         if (_options.StartView > 0 && !_startViewApplied)
         {
@@ -408,10 +408,10 @@ internal sealed class MainForm : Form
 
         _wsAfterBind = Environment.WorkingSet;
         _statusScan.Text = ExplorerPage.Describe(result.Stats);
-        _statusRules.Text = _options.NoRules ? "没有加载规则（--no-rules）"
+        _statusRules.Text = _options.NoRules ? L.T("没有加载规则（--no-rules）")
             : _engine is { } eng && analysis is not null
-                ? $"规则 {eng.Rules.Locations.Count} 条 · 已装软件 {analysis.Owners.Inventory.Apps.Count} 项 · 匹配和归属 {(analysis.C.Duration + analysis.Owners.Duration).TotalSeconds:F1} 秒"
-                : "规则没有加载：" + _rulesError;
+                ? L.F("规则 {0} 条 · 已装软件 {1} 项 · 匹配和归属 {2:F1} 秒", eng.Rules.Locations.Count, analysis.Owners.Inventory.Apps.Count, (analysis.C.Duration + analysis.Owners.Duration).TotalSeconds)
+                : L.F("规则没有加载：{0}", _rulesError);
         _settingsPage.SetInfo(_engine?.Rules.Locations.Count ?? 0, _rulesError, _store?.FileBytes ?? 0);
         AppLog.Write($"扫描完成：{drive}，{result.Stats.Mode}，{result.Tree.Count} 项，{result.Stats.TotalDuration.TotalSeconds:F1} 秒；清理计划 {analysis?.Plan.Items.Count ?? 0} 项");
         LoadDrives();
@@ -446,7 +446,7 @@ internal sealed class MainForm : Form
         try
         {
             inventory = inventoryTask.GetAwaiter().GetResult();
-            _inventoryError = inventory.Errors.Count > 0 ? string.Join("；", inventory.Errors) : null;
+            _inventoryError = inventory.Errors.Count > 0 ? string.Join(L.T("；"), inventory.Errors) : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -503,7 +503,7 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, "保存设置失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("保存设置失败：{0}", ex.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         AppLog.Write("设置已更新");
@@ -511,7 +511,7 @@ internal sealed class MainForm : Form
         {
             // 执行清理时立即按新名单复核；规则引擎重新加载后，下次扫描的计划和标签也会更新
             _engine = null;
-            _cleanupPage.RefreshItems("保护名单已更新：执行清理时立即生效；重新扫描后清理计划会更新。");
+            _cleanupPage.RefreshItems(L.T("保护名单已更新：执行清理时立即生效；重新扫描后清理计划会更新。"));
         }
         else if (previous.Cleanup.TempMinAgeDays != next.Cleanup.TempMinAgeDays && _analysis is { } a && _lastResult is { } r
                  && _cleanupPage.Plan.Items.All(i => i.State == PlanItemState.Pending))
@@ -548,8 +548,8 @@ internal sealed class MainForm : Form
         if (item is null)
         {
             var blocked = _cleanupPage.Plan.Items.FirstOrDefault(i => i.Node == node);
-            MessageBox.Show(this, blocked?.BlockReason is { } why ? $"这个位置不能由工具清理：{why}。" : "这个位置不在清理计划里：可以清理的部分不到 1 MB，或者受保护。",
-                "清理计划", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, blocked?.BlockReason is { } why ? L.F("这个位置不能由工具清理：{0}。", why) : L.T("这个位置不在清理计划里：可以清理的部分不到 1 MB，或者受保护。"),
+                L.T("清理计划"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -560,7 +560,7 @@ internal sealed class MainForm : Form
                 : item.Methods.FirstOrDefault(m => m.Command?.Id == commandId);
             if (method is null)
             {
-                MessageBox.Show(this, "没有找到这个命令的程序（已装软件里没有探测到），可以改用直接删除或手动清理。", "清理计划", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, L.T("没有找到这个命令的程序（已装软件里没有探测到），可以改用直接删除或手动清理。"), L.T("清理计划"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
@@ -586,7 +586,7 @@ internal sealed class MainForm : Form
 
         if (EnsureAudit() is not { } audit)
         {
-            MessageBox.Show(this, "操作记录打不开（" + _auditError + "）。为了每次删除都有记录可查，这次不执行清理。", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("操作记录打不开（{0}）。为了每次删除都有记录可查，这次不执行清理。", _auditError), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -609,9 +609,8 @@ internal sealed class MainForm : Form
             var progress = new Progress<ExecProgress>(progressDialog.Report);
             Func<PlanItem, IReadOnlyList<FileHolder>, bool>? ask = askWhenLocked
                 ? (item, holders) => progressDialog.Invoke(() => MessageBox.Show(progressDialog,
-                    $"{item.Title}里有文件被这些程序占用：\n\n{string.Join("\n", holders.Select(h => h.Name).Distinct().Take(8))}\n\n" +
-                    "要请它们正常关闭后再试一次吗？不会强制结束，程序可能会提示保存。选\u201c否\u201d则跳过这些文件。",
-                    "有文件被占用", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+                    L.F("{0}里有文件被这些程序占用：\n\n{1}\n\n要请它们正常关闭后再试一次吗？不会强制结束，程序可能会提示保存。选“否”则跳过这些文件。", item.Title, string.Join("\n", holders.Select(h => h.Name).Distinct().Take(8))),
+                    L.T("有文件被占用"), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
                 : null;
             var executor = new CleanupExecutor(engine, audit, new ExecutorOptions { Account = _account, AskCloseApps = ask, ExtraProtection = _settings.ProtectionEntries() });
             AppLog.Write($"开始清理 {toRun.Count} 项，预计释放 {toRun.Sum(i => i.EstimatedBytes)} 字节");
@@ -632,11 +631,11 @@ internal sealed class MainForm : Form
         }
 
         AppLog.Write(run is null ? "清理出错：" + error?.Message : $"清理结束：释放 {run.FreedBytes} 字节，{run.Results.Count} 项，用时 {run.Duration.TotalSeconds:F1} 秒{(run.Cancelled ? "（被停止）" : "")}");
-        _cleanupPage.RefreshItems("已执行清理，结果见操作记录。磁盘上的内容已经变了，重新扫描后会生成新的计划。");
+        _cleanupPage.RefreshItems(L.T("已执行清理，结果见操作记录。磁盘上的内容已经变了，重新扫描后会生成新的计划。"));
         _historyPage.Reload();
         if (error is not null)
         {
-            MessageBox.Show(this, "清理中途出错：" + error.Message + "\n\n已经完成的部分记在操作记录里。", "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("清理中途出错：{0}\n\n已经完成的部分记在操作记录里。", error.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         else if (run is not null)
         {
@@ -644,10 +643,8 @@ internal sealed class MainForm : Form
             var partial = run.Results.Count(r => r.Result == AuditResult.Partial);
             var notRun = run.Results.Count(r => r.Result is AuditResult.NotRun or AuditResult.Failed);
             MessageBox.Show(this,
-                $"释放 {ByteSize.Format(run.FreedBytes)}（预计 {ByteSize.Format(run.EstimatedBytes)}），用时 {run.Duration.TotalSeconds:F1} 秒。\n\n" +
-                $"成功 {ok} 项" + (partial > 0 ? $"，部分完成 {partial} 项" : "") + (notRun > 0 ? $"，没有完成 {notRun} 项" : "") + "。" +
-                (run.Cancelled ? "\n清理被停止了。" : "") + "\n\n每一项的结果都记在操作记录里。建议重新扫描，更新空间占用。",
-                "清理完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                L.F("释放 {0}（预计 {1}），用时 {2:F1} 秒。\n\n成功 {3} 项{4}{5}。{6}\n\n每一项的结果都记在操作记录里。建议重新扫描，更新空间占用。", ByteSize.Format(run.FreedBytes), ByteSize.Format(run.EstimatedBytes), run.Duration.TotalSeconds, ok, (partial > 0 ? L.F("，部分完成 {0} 项", partial) : ""), (notRun > 0 ? L.F("，没有完成 {0} 项", notRun) : ""), (run.Cancelled ? L.T("\n清理被停止了。") : "")),
+                L.T("清理完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         _nav.Select("log");
@@ -658,7 +655,7 @@ internal sealed class MainForm : Form
     {
         if (EnsureAudit() is not { } audit)
         {
-            MessageBox.Show(this, "操作记录打不开：" + _auditError, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("操作记录打不开：{0}", _auditError), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -670,7 +667,7 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, "重新测量失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("重新测量失败：{0}", ex.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -683,13 +680,13 @@ internal sealed class MainForm : Form
             Title = item.Title,
             Bytes = before,
             FreedBytes = freed,
-            Basis = "用户自行处理 · 打开所在位置后重新测量",
+            Basis = L.T("用户自行处理 · 打开所在位置后重新测量"),
             Result = AuditResult.Succeeded,
-            Detail = $"扫描时 {ByteSize.Format(before)}，现在 {ByteSize.Format(now)}",
+            Detail = L.F("扫描时 {0}，现在 {1}", ByteSize.Format(before), ByteSize.Format(now)),
         });
         item.State = PlanItemState.Measured;
         item.FreedBytes = freed;
-        item.ResultText = $"重新测量：现在 {ByteSize.Format(now)}，释放 {ByteSize.Format(freed)}";
+        item.ResultText = L.F("重新测量：现在 {0}，释放 {1}", ByteSize.Format(now), ByteSize.Format(freed));
         _cleanupPage.RefreshItems();
         _historyPage.Reload();
     }
@@ -709,22 +706,22 @@ internal sealed class MainForm : Form
     {
         using var dlg = new SaveFileDialog
         {
-            Title = "导出清理清单",
-            Filter = "CSV 文件 (*.csv)|*.csv",
-            FileName = $"DiskThinner-清理计划-{DateTime.Now:yyyyMMdd}.csv",
+            Title = L.T("导出清理清单"),
+            Filter = L.T("CSV 文件 (*.csv)|*.csv"),
+            FileName = L.F("DiskThinner-清理计划-{0:yyyyMMdd}.csv", DateTime.Now),
         };
         if (dlg.ShowDialog(this) != DialogResult.OK)
         {
             return;
         }
 
-        var lines = new List<string> { "分组,项目,路径,大小（字节）,来源,处理方式,预计释放（字节）,已选,提示" };
+        var lines = new List<string> { L.T("分组,项目,路径,大小（字节）,来源,处理方式,预计释放（字节）,已选,提示") };
         foreach (var i in _cleanupPage.Plan.Items)
         {
             lines.Add(string.Join(',',
                 AuditLog.Csv(CleanupText.GroupTitle(i.Group)), AuditLog.Csv(i.Title), AuditLog.Csv(i.Path),
-                i.Bytes.ToString(CultureInfo.InvariantCulture), AuditLog.Csv(i.Source), AuditLog.Csv(i.Method?.Display ?? i.BlockReason),
-                i.EstimatedBytes.ToString(CultureInfo.InvariantCulture), i.Selected && i.Selectable ? "是" : "否", AuditLog.Csv(i.ResultText ?? i.Hint)));
+                i.Bytes.ToString(CultureInfo.InvariantCulture), AuditLog.Csv(i.SourceText), AuditLog.Csv(i.Method?.Display ?? i.BlockReason),
+                i.EstimatedBytes.ToString(CultureInfo.InvariantCulture), i.Selected && i.Selectable ? L.T("是") : L.T("否"), AuditLog.Csv(i.ResultText ?? i.Hint)));
         }
 
         try
@@ -733,7 +730,7 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, "导出失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("导出失败：{0}", ex.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -785,19 +782,19 @@ internal sealed class MainForm : Form
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
         {
             _snapshot.Enabled = true;
-            MessageBox.Show(this, "保存快照失败：" + ex.Message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("保存快照失败：{0}", ex.Message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
     private void ApplyGrowth(GrowthModel? model)
     {
         _growth = model;
-        _growthPage.SetModel(model, _lastResult, _explorer.Classification, _explorer.Owners, _storeError is null ? null : "快照库打不开：" + _storeError);
+        _growthPage.SetModel(model, _lastResult, _explorer.Classification, _explorer.Owners, _storeError is null ? null : L.F("快照库打不开：{0}", _storeError));
         _overview.SetGrowth(model, _lastResult?.Tree, _explorer.Classification, _explorer.Owners);
         _snapshot.Enabled = model is { CurrentSaved: false };
-        _snapshot.Text = model is { CurrentSaved: true } ? "已保存快照" : "创建快照";
+        _snapshot.Text = model is { CurrentSaved: true } ? L.T("已保存快照") : L.T("创建快照");
         var latest = model?.Snapshots.LastOrDefault();
-        _statusSnapshot.Text = latest is null ? "还没有快照" : "最近快照：" + TimeText.Relative(new DateTimeOffset(latest.TakenAtUtc).ToFileTime(), DateTime.Now);
+        _statusSnapshot.Text = latest is null ? L.T("还没有快照") : L.F("最近快照：{0}", TimeText.Relative(new DateTimeOffset(latest.TakenAtUtc).ToFileTime(), DateTime.Now));
     }
 
     /// <summary>查询每日快照任务的状态（schtasks 要几十毫秒，放到后台）。</summary>
@@ -837,7 +834,7 @@ internal sealed class MainForm : Form
         AppLog.Write(ok ? (enabled ? $"每日快照已开启（{time}）" : "每日快照已关闭") : "设置每日快照失败：" + message);
         if (!ok)
         {
-            MessageBox.Show(this, "设置每日快照失败：" + message, "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, L.F("设置每日快照失败：{0}", message), "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         RefreshSchedule();
@@ -848,7 +845,7 @@ internal sealed class MainForm : Form
     {
         if (_options.SelectPath is { } path && !_explorer.SelectPath(path))
         {
-            _statusScan.Text += $" · 找不到 {path}";
+            _statusScan.Text += L.F(" · 找不到 {0}", path);
         }
 
         if (_options.Screenshot is null && _options.Report is null && !_options.ExitAfterScan)
@@ -1065,7 +1062,7 @@ internal sealed class MainForm : Form
         _scanCts?.Cancel();
         if (!ShellActions.RestartElevated(_currentDrive, this))
         {
-            _statusScan.Text = "已取消以管理员身份重启";
+            _statusScan.Text = L.T("已取消以管理员身份重启");
         }
     }
 

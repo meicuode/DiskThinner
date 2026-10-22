@@ -5,6 +5,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="DiskThinner.Rules.Tests" />
   </ItemGroup>
 </Project>

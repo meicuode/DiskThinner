@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using DiskThinner.Cleanup.Native;
+using DiskThinner.Core;
 using DiskThinner.Rules;
 using Microsoft.Win32.SafeHandles;
 
@@ -63,7 +64,7 @@ public sealed class DeleteOutcome
         ErrorCount++;
         if (Errors.Count < MaxListed)
         {
-            Errors.Add($"{path}：{new System.ComponentModel.Win32Exception(code).Message}（{code}）");
+            Errors.Add(L.F("{0}：{1}（{2}）", path, new System.ComponentModel.Win32Exception(code).Message, code));
         }
     }
 

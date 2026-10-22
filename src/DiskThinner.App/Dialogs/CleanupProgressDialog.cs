@@ -7,15 +7,15 @@ namespace DiskThinner.App.Dialogs;
 /// <summary>执行清理时的进度：第几项、删了多少；可以取消（当前文件处理完就停）。</summary>
 internal sealed class CleanupProgressDialog : Form
 {
-    private readonly Label _title = Ui.Label("正在准备…", Theme.UiBold);
+    private readonly Label _title = Ui.Label(L.T("正在准备…"), Theme.UiBold);
     private readonly Label _detail = Ui.Label("", Theme.Ui, Theme.Muted);
     private readonly ProgressBar _bar = new() { Width = 440, Height = 10, Style = ProgressBarStyle.Continuous, Minimum = 0 };
-    private readonly Button _cancel = Ui.Button("停止");
+    private readonly Button _cancel = Ui.Button(L.T("停止"));
     private readonly CancellationTokenSource _cts = new();
 
     public CleanupProgressDialog(int count)
     {
-        Text = "正在清理";
+        Text = L.T("正在清理");
         Font = Theme.Ui;
         BackColor = Theme.Card;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -37,7 +37,7 @@ internal sealed class CleanupProgressDialog : Form
         {
             _cts.Cancel();
             _cancel.Enabled = false;
-            _cancel.Text = "正在停止…";
+            _cancel.Text = L.T("正在停止…");
         };
         flow.Controls.AddRange([_title, _detail, _bar, _cancel]);
         Controls.Add(flow);
@@ -47,8 +47,8 @@ internal sealed class CleanupProgressDialog : Form
 
     public void Report(ExecProgress p)
     {
-        _title.Text = $"正在清理 {p.Index + 1} / {p.Count}：{p.Title}";
-        _detail.Text = p.Files > 0 ? $"这一项已删除 {p.Files:N0} 个文件 · {ByteSize.Format(p.Bytes)}" : "";
+        _title.Text = L.F("正在清理 {0} / {1}：{2}", p.Index + 1, p.Count, p.Title);
+        _detail.Text = p.Files > 0 ? L.F("这一项已删除 {0:N0} 个文件 · {1}", p.Files, ByteSize.Format(p.Bytes)) : "";
         _bar.Value = Math.Min(_bar.Maximum, p.Index);
     }
 

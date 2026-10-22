@@ -1,4 +1,5 @@
 using System.Globalization;
+using DiskThinner.Core;
 
 namespace DiskThinner.App.Formatting;
 
@@ -30,24 +31,24 @@ internal static class TimeText
 
         if (span.TotalMinutes < 1)
         {
-            return "刚刚";
+            return L.T("刚刚");
         }
 
         if (span.TotalHours < 1)
         {
-            return $"{(int)span.TotalMinutes} 分钟前";
+            return L.F("{0} 分钟前", (int)span.TotalMinutes);
         }
 
         if (local.Date == nowLocal.Date)
         {
-            return span.TotalHours < 6 ? $"{(int)span.TotalHours} 小时前" : "今天 " + local.ToString("HH:mm", CultureInfo.InvariantCulture);
+            return span.TotalHours < 6 ? L.F("{0} 小时前", (int)span.TotalHours) : L.F("今天 {0}", local.ToString("HH:mm", CultureInfo.InvariantCulture));
         }
 
         var days = (nowLocal.Date - local.Date).Days;
         return days switch
         {
-            1 => "昨天",
-            < 60 => $"{days} 天前",
+            1 => L.T("昨天"),
+            < 60 => L.F("{0} 天前", days),
             _ => local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         };
     }
@@ -56,7 +57,7 @@ internal static class TimeText
     {
         if (fileTimeUtc <= 0)
         {
-            return "未知";
+            return L.T("未知");
         }
 
         try
@@ -65,7 +66,7 @@ internal static class TimeText
         }
         catch (ArgumentOutOfRangeException)
         {
-            return "未知";
+            return L.T("未知");
         }
     }
 }

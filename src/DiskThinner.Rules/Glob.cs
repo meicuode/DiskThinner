@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Rules;
 
 /// <summary>
@@ -90,7 +92,7 @@ public sealed class Segment
         var close = text.IndexOf('}', open);
         if (close < 0)
         {
-            throw new FormatException($"花括号没有闭合：{text}");
+            throw new FormatException(L.F("花括号没有闭合：{0}", text));
         }
 
         var head = text[..open];
@@ -127,7 +129,7 @@ public sealed class CompiledPattern
         var parts = absolutePattern.TrimEnd('\\').Split('\\');
         if (parts.Length == 0 || parts.Any(p => p.Length == 0))
         {
-            throw new FormatException($"路径格式错误：{absolutePattern}");
+            throw new FormatException(L.F("路径格式错误：{0}", absolutePattern));
         }
 
         return new CompiledPattern(absolutePattern, parts.Select(Segment.Parse).ToArray());

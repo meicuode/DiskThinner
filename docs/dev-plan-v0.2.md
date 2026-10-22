@@ -405,7 +405,8 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 > 2026-10-21 设置页、settings.json、日志和异常兜底、两种发布包完成，见 `docs/m5-report.md`。两个包在开发机上解压后都能运行，管理员下 MFT 扫描正常。
 > 2026-10-22 发布 v0.1.0：https://github.com/meicuode/DiskThinner/releases/tag/v0.1.0 （推送标签后由 `.github/workflows/release.yml` 检查、打包、在 windows-2022 / 2025 上冒烟测试后自动发布）。
 > 未完成：干净的 Windows 10 / 11 桌面版上的验收（开发机是 Windows 11 家庭版，没有 Hyper-V 和沙盒；Windows Server 2022 / 2025 上的冒烟测试已通过）。
-> 调整：单文件自包含版不开启单文件压缩（压缩后启动时解压程序集，峰值内存多约 100 MB，zip 只小 1 MB）。界面文字没有放进 resx，留到做英文界面时一起处理。
+> 调整：单文件自包含版不开启单文件压缩（压缩后启动时解压程序集，峰值内存多约 100 MB，zip 只小 1 MB）。
+> 2026-10-22 补上界面文字的 resx（1.2 节）：源代码里的中文就是键，`L.T("…")` / `L.F("… {0} …", 参数)`，全部 673 条在 `src/DiskThinner.Core/Strings.resx`。`tools/i18n` 负责改写和生成，CI 检查 resx 和源代码同步、没有没包起来的中文、`case` / 模式匹配 / `const` 里没有中文。日志和正则表达式里的中文不翻译；规则库的说明文字是数据，阶段 4 单独处理。
 
 - 设置页（快照、清理、保护名单、规则）、settings.json、日志、未处理异常的兜底。
 - 发布两个版本：依赖运行库的 zip 和单文件自包含的 zip。

@@ -66,7 +66,11 @@ dotnet run --project tools/dtrule -- probe rules --drive C:\ --out probe.md
 pwsh -File tools/release/build-release.ps1 [-Version 0.2.0]
 ```
 
-主程序构建时会自动用 dtrule 校验 `rules/` 并编译成内置规则库；规则有错误时构建失败。MFT 扫描和删除类验收需要管理员，用 `tools/verify/` 下的脚本在本机跑（删除类验收在新建的 VHDX 测试盘上进行）。
+主程序构建时会自动用 dtrule 校验 `rules/` 并编译成内置规则库；规则有错误时构建失败。
+
+界面文字写成 `L.T("清理计划")`、`L.F("扫描 {0} 项", count)`，源代码里的中文就是 `src/DiskThinner.Core/Strings.resx` 的键。新写或改了界面文字后运行 `dotnet run --project tools/i18n -- extract src src/DiskThinner.Core/Strings.resx` 更新 resx，CI 会检查（见 [tools/i18n/README.md](tools/i18n/README.md)）。
+
+MFT 扫描和删除类验收需要管理员，用 `tools/verify/` 下的脚本在本机跑（删除类验收在新建的 VHDX 测试盘上进行）。
 
 GitHub Actions：
 

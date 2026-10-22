@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using DiskThinner.Core;
 using DiskThinner.Scanner.Native;
 using Microsoft.Win32.SafeHandles;
 
@@ -29,8 +30,8 @@ public static class MftScanner
         {
             var error = Marshal.GetLastPInvokeError();
             throw error == 5
-                ? new UnauthorizedAccessException("读取 MFT 需要管理员权限")
-                : new Win32Exception(error, $"无法打开卷 {drive}");
+                ? new UnauthorizedAccessException(L.T("读取 MFT 需要管理员权限"))
+                : new Win32Exception(error, L.F("无法打开卷 {0}", drive));
         }
 
         var vd = GetVolumeData(handle);
@@ -85,7 +86,7 @@ public static class MftScanner
                     buffer.AsSpan(pos, carry).CopyTo(buffer);
                 }
 
-                progress?.Report(new ScanProgress(recordIndex, recordCount, "读取 MFT"));
+                progress?.Report(new ScanProgress(recordIndex, recordCount, L.T("读取 MFT")));
                 cancellationToken.ThrowIfCancellationRequested();
             }
         }
@@ -159,7 +160,7 @@ public static class MftScanner
         var v = volume.Trim().TrimEnd('\\');
         if (v.Length != 2 || v[1] != ':' || !char.IsAsciiLetter(v[0]))
         {
-            throw new ArgumentException("请指定盘符，例如 C:", nameof(volume));
+            throw new ArgumentException(L.T("请指定盘符，例如 C:"), nameof(volume));
         }
 
         return char.ToUpperInvariant(v[0]) + ":";
@@ -171,7 +172,7 @@ public static class MftScanner
         if (!Win32.DeviceIoControl(handle, Win32.FsctlGetNtfsVolumeData, null, 0, &data, sizeof(Win32.NtfsVolumeData), out _, 0))
         {
             var error = Marshal.GetLastPInvokeError();
-            throw new NotSupportedException($"不是 NTFS 卷，或无法读取卷参数（错误 {error}）");
+            throw new NotSupportedException(L.F("不是 NTFS 卷，或无法读取卷参数（错误 {0}）", error));
         }
 
         return data;
@@ -202,7 +203,7 @@ public static class MftScanner
 
             if (attr.NonResident)
             {
-                throw new NotSupportedException("$MFT 的属性列表是非常驻的，暂不支持，请使用遍历扫描");
+                throw new NotSupportedException(L.T("$MFT 的属性列表是非常驻的，暂不支持，请使用遍历扫描"));
             }
 
             var list = attr.Value;
@@ -236,7 +237,7 @@ public static class MftScanner
             var run = known.FirstOrDefault(r => r.Lcn >= 0 && vcn >= r.Vcn && vcn < r.Vcn + r.Length);
             if (run.Length == 0)
             {
-                throw new InvalidDataException($"无法定位 $MFT 的扩展记录 {record}");
+                throw new InvalidDataException(L.F("无法定位 $MFT 的扩展记录 {0}", record));
             }
 
             var offset = (run.Lcn + (vcn - run.Vcn)) * clusterSize + withinCluster;
@@ -284,7 +285,7 @@ public static class MftScanner
         var record = buffer.AsSpan(lead, recordSize).ToArray();
         if (!MftRecord.ApplyFixup(record))
         {
-            throw new InvalidDataException($"MFT 记录校验失败（偏移 {offset}）");
+            throw new InvalidDataException(L.F("MFT 记录校验失败（偏移 {0}）", offset));
         }
 
         return record;

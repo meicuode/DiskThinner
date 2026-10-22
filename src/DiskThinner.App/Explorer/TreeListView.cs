@@ -40,14 +40,14 @@ internal sealed class TreeListView : ListView
         BorderStyle = BorderStyle.None;
         HeaderStyle = ColumnHeaderStyle.Nonclickable;
         Font = Theme.Ui;
-        AccessibleName = "文件树";
+        AccessibleName = L.T("文件树");
 
-        Columns.Add("名称", BaseColumnWidths[0]);
-        Columns.Add("大小", BaseColumnWidths[1], HorizontalAlignment.Right);
-        Columns.Add("占上级", BaseColumnWidths[2]);
-        Columns.Add("最后写入", BaseColumnWidths[3]);
-        Columns.Add("归属", BaseColumnWidths[4]);
-        Columns.Add("类别 / 风险", BaseColumnWidths[5]);
+        Columns.Add(L.T("名称"), BaseColumnWidths[0]);
+        Columns.Add(L.T("大小"), BaseColumnWidths[1], HorizontalAlignment.Right);
+        Columns.Add(L.T("占上级"), BaseColumnWidths[2]);
+        Columns.Add(L.T("最后写入"), BaseColumnWidths[3]);
+        Columns.Add(L.T("归属"), BaseColumnWidths[4]);
+        Columns.Add(L.T("类别 / 风险"), BaseColumnWidths[5]);
 
         RetrieveVirtualItem += OnRetrieveVirtualItem;
         DrawColumnHeader += (_, e) => e.DrawDefault = true;
@@ -288,7 +288,7 @@ internal sealed class TreeListView : ListView
         if (IsUnrecognized(n))
         {
             // 知道归谁但没有规则说明是什么：归属列写应用，类别列标"未识别"
-            return owner is null ? ("未识别", "") : (owner, "未识别");
+            return owner is null ? (L.T("未识别"), "") : (owner, L.T("未识别"));
         }
 
         return (owner ?? "", "");
@@ -304,12 +304,12 @@ internal sealed class TreeListView : ListView
         var flags = tree[n].Flags;
         if ((flags & NodeFlags.AccessDenied) != 0)
         {
-            return name + "（无法列出）";
+            return L.F("{0}（无法列出）", name);
         }
 
         if ((flags & NodeFlags.ReparsePoint) != 0 && tree[n].IsDirectory)
         {
-            return name + "（链接，未展开）";
+            return L.F("{0}（链接，未展开）", name);
         }
 
         return name;
@@ -454,7 +454,7 @@ internal sealed class TreeListView : ListView
 
         if (IsUnrecognized(n))
         {
-            RuleView.DrawTag(g, "未识别", _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
+            RuleView.DrawTag(g, L.T("未识别"), _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
         }
     }
 
@@ -486,7 +486,7 @@ internal sealed class TreeListView : ListView
         }
         else if (rule is null && risk is null && IsUnrecognized(n) && _owners?.OwnerOf(n) is not null)
         {
-            RuleView.DrawTag(g, "未识别", _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
+            RuleView.DrawTag(g, L.T("未识别"), _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
         }
     }
 

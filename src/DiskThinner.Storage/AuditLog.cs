@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using DiskThinner.Core;
 using Microsoft.Data.Sqlite;
 
 namespace DiskThinner.Storage;
@@ -100,7 +101,7 @@ public sealed class AuditLog
             var version = Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
             if (version > FormatVersion)
             {
-                throw new InvalidDataException($"user.db 来自更新的版本（格式 {version}），请升级 DiskThinner");
+                throw new InvalidDataException(L.F("user.db 来自更新的版本（格式 {0}），请升级 DiskThinner", version));
             }
         }
 
@@ -181,7 +182,7 @@ public sealed class AuditLog
     public static void ExportCsv(IEnumerable<AuditEntry> entries, string path)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("时间,操作,对象,名称,大小（字节）,实际释放（字节）,依据,结果,说明,文件数,错误数");
+        sb.AppendLine(L.T("时间,操作,对象,名称,大小（字节）,实际释放（字节）,依据,结果,说明,文件数,错误数"));
         foreach (var e in entries)
         {
             sb.AppendJoin(',',
@@ -222,18 +223,18 @@ public sealed class AuditLog
 
     public static string Display(AuditAction action) => action switch
     {
-        AuditAction.Delete => "删除",
-        AuditAction.Command => "运行命令",
-        AuditAction.Manual => "手动清理",
-        _ => "拦截",
+        AuditAction.Delete => L.T("删除"),
+        AuditAction.Command => L.T("运行命令"),
+        AuditAction.Manual => L.T("手动清理"),
+        _ => L.T("拦截"),
     };
 
     public static string Display(AuditResult result) => result switch
     {
-        AuditResult.Succeeded => "成功",
-        AuditResult.Partial => "部分成功",
-        AuditResult.Failed => "失败",
-        _ => "未执行",
+        AuditResult.Succeeded => L.T("成功"),
+        AuditResult.Partial => L.T("部分成功"),
+        AuditResult.Failed => L.T("失败"),
+        _ => L.T("未执行"),
     };
 
     private static string Code(AuditAction action) => action switch

@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Rules;
 
 /// <summary>
@@ -71,7 +73,7 @@ public static class PathTokens
     /// <summary>把开头的令牌展开成绝对路径模式；没有已知令牌时抛出异常。</summary>
     public static string Expand(string pattern, PathContext ctx)
     {
-        var token = LeadingToken(pattern) ?? throw new FormatException($"路径必须以已知令牌开头：{pattern}");
+        var token = LeadingToken(pattern) ?? throw new FormatException(L.F("路径必须以已知令牌开头：{0}", pattern));
         var rest = pattern[token.Length..];
         var users = ctx.ProfilesRoot + @"\*";
         var prefix = token.ToUpperInvariant() switch

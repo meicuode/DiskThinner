@@ -16,17 +16,17 @@ internal sealed class SettingsPage : UserControl
     private readonly TableLayoutPanel _stack = new() { ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Location = Point.Empty, BackColor = Color.Transparent };
     private readonly Dictionary<string, Control> _sections = [];
 
-    private readonly CheckBox _daily = new() { Text = "每天", AutoSize = true, Font = Theme.Ui, AccessibleName = "每日快照" };
-    private readonly ComboBox _dailyTime = Combo("每日快照的时间", Enumerable.Range(0, 24).Select(h => $"{h:00}:00").ToArray(), width: 100);
+    private readonly CheckBox _daily = new() { Text = L.T("每天"), AutoSize = true, Font = Theme.Ui, AccessibleName = L.T("每日快照") };
+    private readonly ComboBox _dailyTime = Combo(L.T("每日快照的时间"), Enumerable.Range(0, 24).Select(h => $"{h:00}:00").ToArray(), width: 100);
     private readonly Label _dailyHint = Hint("");
-    private readonly CheckBox _auto = new() { Text = "扫描整个盘后，距离上次快照超过 6 小时就自动保存一次", AutoSize = true, Font = Theme.Ui };
-    private readonly ComboBox _minDir = Combo("只记录大于", AppSettings.MinDirChoices.Select(m => $"{m} MB 的目录").ToArray());
-    private readonly ComboBox _keep = Combo("快照保留时长", AppSettings.KeepDayChoices.Select(d => $"{d} 天").ToArray());
+    private readonly CheckBox _auto = new() { Text = L.T("扫描整个盘后，距离上次快照超过 6 小时就自动保存一次"), AutoSize = true, Font = Theme.Ui };
+    private readonly ComboBox _minDir = Combo(L.T("只记录大于"), AppSettings.MinDirChoices.Select(m => L.F("{0} MB 的目录", m)).ToArray());
+    private readonly ComboBox _keep = Combo(L.T("快照保留时长"), AppSettings.KeepDayChoices.Select(d => L.F("{0} 天", d)).ToArray());
     private readonly Label _dbSize = Ui.Label("", Theme.Small, Theme.Muted);
-    private readonly ComboBox _tempAge = Combo("临时文件最小年龄", ["只删 24 小时前的", "只删 7 天前的"]);
-    private readonly ComboBox _locked = Combo("被占用的文件", ["跳过并记录", "询问是否关闭程序"]);
-    private readonly ListBox _protected = new() { Height = 96, Width = 420, Font = Theme.Ui, IntegralHeight = false, AccessibleName = "我添加的保护目录" };
-    private readonly Button _remove = Ui.Button("移除");
+    private readonly ComboBox _tempAge = Combo(L.T("临时文件最小年龄"), [L.T("只删 24 小时前的"), L.T("只删 7 天前的")]);
+    private readonly ComboBox _locked = Combo(L.T("被占用的文件"), [L.T("跳过并记录"), L.T("询问是否关闭程序")]);
+    private readonly ListBox _protected = new() { Height = 96, Width = 420, Font = Theme.Ui, IntegralHeight = false, AccessibleName = L.T("我添加的保护目录") };
+    private readonly Button _remove = Ui.Button(L.T("移除"));
     private readonly Label _rules = Ui.Label("", Theme.Ui);
     private readonly Label _paths = Ui.Label("", Theme.Small, Theme.Muted);
     private AppSettings _settings = new();
@@ -36,20 +36,20 @@ internal sealed class SettingsPage : UserControl
     {
         BackColor = Theme.Background;
         Padding = new Padding(20, 16, 20, 16);
-        AccessibleName = "设置";
+        AccessibleName = L.T("设置");
 
-        var title = Ui.Label("设置", new Font(Theme.UiFontName, 15F, FontStyle.Bold));
+        var title = Ui.Label(L.T("设置"), new Font(Theme.UiFontName, 15F, FontStyle.Bold));
         title.Dock = DockStyle.Top;
         title.Padding = new Padding(0, 0, 0, 12);
 
         var nav = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 150, FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.Transparent, Padding = new Padding(0, 4, 12, 0) };
-        nav.AccessibleName = "设置分类";
+        nav.AccessibleName = L.T("设置分类");
 
-        AddSection(nav, "写入监控", Card("写入监控（ETW）",
-            Row("", Later("关闭", "只用扫描和每日快照，看得到哪里变了，看不到是谁写的。不需要管理员权限。", true)),
-            Row("", Later("临时诊断", "需要时手动开启 1 到 24 小时，到时自动停止。不安装后台服务。", false)),
-            Row("", Later("常驻服务", "安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。", false)),
-            Row("", Hint("写入监控在后续版本（阶段 2）提供，这一版固定为\u201c关闭\u201d。"))));
+        AddSection(nav, L.T("写入监控"), Card(L.T("写入监控（ETW）"),
+            Row("", Later(L.T("关闭"), L.T("只用扫描和每日快照，看得到哪里变了，看不到是谁写的。不需要管理员权限。"), true)),
+            Row("", Later(L.T("临时诊断"), L.T("需要时手动开启 1 到 24 小时，到时自动停止。不安装后台服务。"), false)),
+            Row("", Later(L.T("常驻服务"), L.T("安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。"), false)),
+            Row("", Hint(L.T("写入监控在后续版本（阶段 2）提供，这一版固定为\u201c关闭\u201d。")))));
 
         var dailyRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
         _daily.Margin = new Padding(0, 4, 8, 0);
@@ -57,35 +57,35 @@ internal sealed class SettingsPage : UserControl
         var keepRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
         _dbSize.Margin = new Padding(8, 6, 0, 0);
         keepRow.Controls.AddRange([_keep, _dbSize]);
-        AddSection(nav, "快照", Card("快照",
-            Row("每日快照", Stack(dailyRow, _dailyHint)),
-            Row("扫描后保存", _auto),
-            Row("只记录大于", Stack(_minDir, Hint("更小的目录并入上级。改小会让快照库变大；文件固定为 100 MB 以上才单独记录。"))),
-            Row("保留", Stack(keepRow, Hint("这么多天内的快照全部保留，更早的每周只留一个。")))));
+        AddSection(nav, L.T("快照"), Card(L.T("快照"),
+            Row(L.T("每日快照"), Stack(dailyRow, _dailyHint)),
+            Row(L.T("扫描后保存"), _auto),
+            Row(L.T("只记录大于"), Stack(_minDir, Hint(L.T("更小的目录并入上级。改小会让快照库变大；文件固定为 100 MB 以上才单独记录。")))),
+            Row(L.T("保留"), Stack(keepRow, Hint(L.T("这么多天内的快照全部保留，更早的每周只留一个。"))))));
 
         AddSection(nav, "AI", Card("AI",
-            Row("", Hint("AI 分析在后续版本（阶段 3）提供：接口配置、发送前预览、MCP 服务都会放在这里。DiskThinner 现在不联网。"))));
+            Row("", Hint(L.T("AI 分析在后续版本（阶段 3）提供：接口配置、发送前预览、MCP 服务都会放在这里。DiskThinner 现在不联网。")))));
 
         var protectButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
-        var showBuiltIn = Ui.Button("查看内置保护名单");
-        var add = Ui.Button("添加我的保护目录");
+        var showBuiltIn = Ui.Button(L.T("查看内置保护名单"));
+        var add = Ui.Button(L.T("添加我的保护目录"));
         showBuiltIn.Margin = new Padding(0, 0, 8, 0);
         add.Margin = new Padding(0, 0, 8, 0);
         _remove.Margin = new Padding(0);
         protectButtons.Controls.AddRange([showBuiltIn, add, _remove]);
         _protected.Margin = new Padding(0, 8, 0, 0);
-        AddSection(nav, "清理", Card("清理",
-            Row("临时文件", Stack(_tempAge, Hint("避免删掉正在安装或运行的程序刚写的临时文件。规则本身更严格时以规则为准。"))),
-            Row("被占用的文件", Stack(_locked, Hint("询问时，同意了才请程序正常关闭，不会强制结束。确认清理时还可以再改。"))),
-            Row("保护名单", Stack(protectButtons, _protected,
-                Hint("内置名单不能删除，只能追加。添加的目录和里面的所有内容都不会被清理：执行清理时立即生效，清理计划在重新扫描后更新。")))));
+        AddSection(nav, L.T("清理"), Card(L.T("清理"),
+            Row(L.T("临时文件"), Stack(_tempAge, Hint(L.T("避免删掉正在安装或运行的程序刚写的临时文件。规则本身更严格时以规则为准。")))),
+            Row(L.T("被占用的文件"), Stack(_locked, Hint(L.T("询问时，同意了才请程序正常关闭，不会强制结束。确认清理时还可以再改。")))),
+            Row(L.T("保护名单"), Stack(protectButtons, _protected,
+                Hint(L.T("内置名单不能删除，只能追加。添加的目录和里面的所有内容都不会被清理：执行清理时立即生效，清理计划在重新扫描后更新。"))))));
 
-        var openData = Ui.Button("打开数据目录");
+        var openData = Ui.Button(L.T("打开数据目录"));
         openData.Margin = new Padding(0, 8, 0, 0);
-        AddSection(nav, "规则", Card("规则",
-            Row("内置规则", _rules),
-            Row("本地规则", Hint("后续版本提供（保存 AI 结论为本地规则、导入、导出）。")),
-            Row("数据位置", Stack(_paths, openData))));
+        AddSection(nav, L.T("规则"), Card(L.T("规则"),
+            Row(L.T("内置规则"), _rules),
+            Row(L.T("本地规则"), Hint(L.T("后续版本提供（保存 AI 结论为本地规则、导入、导出）。"))),
+            Row(L.T("数据位置"), Stack(_paths, openData))));
 
         _scroll.Controls.Add(_stack);
         _scroll.Resize += (_, _) => FitWidth();
@@ -161,17 +161,16 @@ internal sealed class SettingsPage : UserControl
 
         _binding = false;
         _dailyHint.Text = status.Registered
-            ? status.Highest ? "已开启，以最高权限运行（MFT 扫描，几秒完成）。" : "已开启，以普通权限运行（遍历扫描，较慢）。以管理员身份打开 DiskThinner 再开启可以改用 MFT。"
-            : "通过 Windows 计划任务运行 DiskThinner.exe snapshot，不需要打开界面。";
+            ? status.Highest ? L.T("已开启，以最高权限运行（MFT 扫描，几秒完成）。") : L.T("已开启，以普通权限运行（遍历扫描，较慢）。以管理员身份打开 DiskThinner 再开启可以改用 MFT。")
+            : L.T("通过 Windows 计划任务运行 DiskThinner.exe snapshot，不需要打开界面。");
     }
 
     public void SetInfo(int rules, string? rulesError, long snapshotDbBytes)
     {
-        _rules.Text = rulesError is null ? $"{rules} 条 · 随程序更新" : "没有加载：" + rulesError;
-        _dbSize.Text = snapshotDbBytes > 0 ? $"当前占用 {ByteSize.Format(snapshotDbBytes)}" : "";
+        _rules.Text = rulesError is null ? L.F("{0} 条 · 随程序更新", rules) : L.F("没有加载：{0}", rulesError);
+        _dbSize.Text = snapshotDbBytes > 0 ? L.F("当前占用 {0}", ByteSize.Format(snapshotDbBytes)) : "";
         var root = Path.GetDirectoryName(AppSettings.DefaultPath)!;
-        _paths.Text = $"设置：{PathDisplay.Shorten(AppSettings.DefaultPath)}\n快照：{PathDisplay.Shorten(Path.Combine(root, "snapshots.db"))}\n" +
-            $"操作记录：{PathDisplay.Shorten(Path.Combine(root, "user.db"))}\n日志：{PathDisplay.Shorten(AppLog.Directory)}";
+        _paths.Text = L.F("设置：{0}\n快照：{1}\n操作记录：{2}\n日志：{3}", PathDisplay.Shorten(AppSettings.DefaultPath), PathDisplay.Shorten(Path.Combine(root, "snapshots.db")), PathDisplay.Shorten(Path.Combine(root, "user.db")), PathDisplay.Shorten(AppLog.Directory));
     }
 
     private void Bind(AppSettings s)
@@ -207,7 +206,7 @@ internal sealed class SettingsPage : UserControl
 
     private void AddProtected()
     {
-        using var dlg = new FolderBrowserDialog { Description = "选择不希望被清理的目录（里面的所有内容都会受保护）", UseDescriptionForTitle = true };
+        using var dlg = new FolderBrowserDialog { Description = L.T("选择不希望被清理的目录（里面的所有内容都会受保护）"), UseDescriptionForTitle = true };
         if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
         {
             return;
@@ -216,7 +215,7 @@ internal sealed class SettingsPage : UserControl
         var path = Path.GetFullPath(dlg.SelectedPath).TrimEnd('\\');
         if (!AppSettings.IsValidProtectedPath(path))
         {
-            MessageBox.Show(FindForm(), "这个位置不能作为保护目录：需要是本机磁盘上的目录，路径里不能有 * ? { }，也不能是整个盘。", "保护名单", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(FindForm(), L.T("这个位置不能作为保护目录：需要是本机磁盘上的目录，路径里不能有 * ? { }，也不能是整个盘。"), L.T("保护名单"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -246,7 +245,7 @@ internal sealed class SettingsPage : UserControl
     {
         using var dlg = new Form
         {
-            Text = "内置保护名单",
+            Text = L.T("内置保护名单"),
             Font = Theme.Ui,
             StartPosition = FormStartPosition.CenterParent,
             AutoScaleMode = AutoScaleMode.Dpi,
@@ -255,17 +254,17 @@ internal sealed class SettingsPage : UserControl
             MinimizeBox = false,
             ShowInTaskbar = false,
         };
-        var list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, AccessibleName = "内置保护名单" };
-        list.Columns.Add("位置", 420);
-        list.Columns.Add("级别", 90);
-        list.Columns.Add("原因", 280);
+        var list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, AccessibleName = L.T("内置保护名单") };
+        list.Columns.Add(L.T("位置"), 420);
+        list.Columns.Add(L.T("级别"), 90);
+        list.Columns.Add(L.T("原因"), 280);
         foreach (var e in ProtectionList.BuiltIn)
         {
-            list.Items.Add(new ListViewItem([e.Pattern, e.Level == ProtectionLevel.None ? "例外（可清理）" : ProtectionList.Display(e.Level), e.Reason]));
+            list.Items.Add(new ListViewItem([e.Pattern, e.Level == ProtectionLevel.None ? L.T("例外（可清理）") : ProtectionList.Display(e.Level), e.Reason]));
         }
 
         var note = new Label { Dock = DockStyle.Top, AutoSize = false, Height = 44, Padding = new Padding(10, 8, 10, 4), Font = Theme.Small, ForeColor = Theme.Muted, UseMnemonic = false,
-            Text = "保护名单优先于任何规则：硬保护的位置任何规则都不能清理；\u201c系统设置\u201d只给引导；\u201c用户文件\u201d只有实测过的规则可以提出建议。\u201c例外\u201d是在受保护的目录里放开的子目录（如 Windows\\Temp）。" };
+            Text = L.T("保护名单优先于任何规则：硬保护的位置任何规则都不能清理；\u201c系统设置\u201d只给引导；\u201c用户文件\u201d只有实测过的规则可以提出建议。\u201c例外\u201d是在受保护的目录里放开的子目录（如 Windows\\Temp）。") };
         dlg.Controls.Add(list);
         dlg.Controls.Add(note);
         dlg.Load += (_, _) =>
@@ -368,7 +367,7 @@ internal sealed class SettingsPage : UserControl
     private static Control Later(string title, string detail, bool selected)
     {
         var flow = Stack(
-            new RadioButton { Text = title + (selected ? "" : "（后续版本）"), Checked = selected, Enabled = false, AutoSize = true, Font = Theme.Ui, Margin = new Padding(0) },
+            new RadioButton { Text = title + (selected ? "" : L.T("（后续版本）")), Checked = selected, Enabled = false, AutoSize = true, Font = Theme.Ui, Margin = new Padding(0) },
             Hint(detail));
         flow.Margin = new Padding(0, 0, 0, 4);
         return flow;

@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Scanner;
 
 /// <summary>
@@ -37,7 +39,7 @@ public sealed class NamePool
     {
         if (length > ChunkSize)
         {
-            throw new ArgumentOutOfRangeException(nameof(length), "名称过长");
+            throw new ArgumentOutOfRangeException(nameof(length), L.T("名称过长"));
         }
 
         var chunk = _end >> ChunkShift;

@@ -1,3 +1,4 @@
+using DiskThinner.Core;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.App.Explorer;
@@ -78,13 +79,13 @@ internal static class FileKinds
 
     public static string NameOf(FileKind kind) => kind switch
     {
-        FileKind.Program => "程序",
-        FileKind.TempLog => "临时 / 日志 / 转储",
-        FileKind.Archive => "压缩包 / 安装包",
-        FileKind.Media => "文档 / 媒体",
-        FileKind.Data => "数据库 / 缓存 / 模型",
-        FileKind.System => "系统 / 虚拟磁盘",
-        _ => "其他",
+        FileKind.Program => L.T("程序"),
+        FileKind.TempLog => L.T("临时 / 日志 / 转储"),
+        FileKind.Archive => L.T("压缩包 / 安装包"),
+        FileKind.Media => L.T("文档 / 媒体"),
+        FileKind.Data => L.T("数据库 / 缓存 / 模型"),
+        FileKind.System => L.T("系统 / 虚拟磁盘"),
+        _ => L.T("其他"),
     };
 
     public static readonly FileKind[] LegendOrder =

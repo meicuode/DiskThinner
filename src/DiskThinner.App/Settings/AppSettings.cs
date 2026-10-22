@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DiskThinner.Core;
 using DiskThinner.Rules;
 using DiskThinner.Storage;
 
@@ -58,7 +59,7 @@ internal sealed record AppSettings
 
     /// <summary>用户追加的保护目录，作为硬保护交给规则引擎和执行器。</summary>
     public IReadOnlyList<ProtectionEntry> ProtectionEntries() =>
-        Cleanup.ProtectedPaths.Where(IsValidProtectedPath).Select(p => new ProtectionEntry(p.TrimEnd('\\'), ProtectionLevel.Hard, "你添加的保护目录")).ToList();
+        Cleanup.ProtectedPaths.Where(IsValidProtectedPath).Select(p => new ProtectionEntry(p.TrimEnd('\\'), ProtectionLevel.Hard, L.T("你添加的保护目录"))).ToList();
 
     /// <summary>可以作为保护目录的路径：本地盘上的绝对路径，不含通配符和花括号（会被当成模式）。</summary>
     public static bool IsValidProtectedPath(string path) =>

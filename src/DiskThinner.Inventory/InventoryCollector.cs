@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using DiskThinner.Core;
 using DiskThinner.Inventory.Native;
 using Microsoft.Win32;
 
@@ -30,16 +31,16 @@ public static class InventoryCollector
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or JsonException
                                            or System.ComponentModel.Win32Exception or InvalidOperationException)
             {
-                errors.Add($"{name}：{ex.Message}");
+                errors.Add(L.F("{0}：{1}", name, ex.Message));
             }
         }
 
-        Run("注册表卸载项", ReadRegistry);
-        Run("商店应用", ReadStorePackages);
-        Run("npm 全局包", ReadNpmGlobal);
+        Run(L.T("注册表卸载项"), ReadRegistry);
+        Run(L.T("商店应用"), ReadStorePackages);
+        Run(L.T("npm 全局包"), ReadNpmGlobal);
         Run("scoop", ReadScoop);
-        Run("命令行工具", ReadCommandLineTools);
-        Run("运行中的进程", ReadProcesses);
+        Run(L.T("命令行工具"), ReadCommandLineTools);
+        Run(L.T("运行中的进程"), ReadProcesses);
         return new InventorySnapshot(apps, sw.Elapsed, errors);
     }
 

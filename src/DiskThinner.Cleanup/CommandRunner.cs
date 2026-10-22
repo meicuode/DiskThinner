@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using DiskThinner.Core;
 using DiskThinner.Inventory;
 using DiskThinner.Rules;
 
@@ -27,12 +28,12 @@ public static class CommandRunner
     {
         if (!IsWhitelisted(command))
         {
-            return new CommandResult(null, false, false, "", TimeSpan.Zero, "命令不在白名单里");
+            return new CommandResult(null, false, false, "", TimeSpan.Zero, L.T("命令不在白名单里"));
         }
 
         if (!Path.IsPathFullyQualified(exePath) || !string.Equals(Path.GetFileName(exePath), command.Exe, StringComparison.OrdinalIgnoreCase) || !File.Exists(exePath))
         {
-            return new CommandResult(null, false, false, "", TimeSpan.Zero, $"找不到 {command.Exe}：{exePath}");
+            return new CommandResult(null, false, false, "", TimeSpan.Zero, L.F("找不到 {0}：{1}", command.Exe, exePath));
         }
 
         return Start(exePath, command.Arguments, timeout, token);

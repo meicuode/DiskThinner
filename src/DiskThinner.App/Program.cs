@@ -1,4 +1,5 @@
 using DiskThinner.App.Shell;
+using DiskThinner.Core;
 
 namespace DiskThinner.App;
 
@@ -41,8 +42,7 @@ internal static class Program
     {
         var report = AppLog.Crash(ex, "界面");
         MessageBox.Show(
-            "DiskThinner 遇到了一个没有预料到的问题，这次操作没有完成。程序可以继续使用；如果反复出现，请重启程序。\n\n" +
-            $"{ex.GetType().Name}: {ex.Message}" + (report is null ? "" : $"\n\n详细信息已保存到：\n{report}"),
+            L.F("DiskThinner 遇到了一个没有预料到的问题，这次操作没有完成。程序可以继续使用；如果反复出现，请重启程序。\n\n{0}: {1}{2}", ex.GetType().Name, ex.Message, (report is null ? "" : L.F("\n\n详细信息已保存到：\n{0}", report))),
             "DiskThinner", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }

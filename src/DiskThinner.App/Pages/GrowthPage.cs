@@ -16,19 +16,19 @@ namespace DiskThinner.App.Pages;
 /// </summary>
 internal sealed class GrowthPage : UserControl
 {
-    private readonly Label _sub = Ui.Label("对比两个快照，找出哪些目录在变大", Theme.Ui, Theme.Muted);
-    private readonly SegmentedControl _range = new("时间范围", "24 小时", "7 天", "30 天");
-    private readonly ComboBox _from = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230, AccessibleName = "起始快照" };
-    private readonly ComboBox _to = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230, AccessibleName = "结束快照" };
+    private readonly Label _sub = Ui.Label(L.T("对比两个快照，找出哪些目录在变大"), Theme.Ui, Theme.Muted);
+    private readonly SegmentedControl _range = new(L.T("时间范围"), L.T("24 小时"), L.T("7 天"), L.T("30 天"));
+    private readonly ComboBox _from = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230, AccessibleName = L.T("起始快照") };
+    private readonly ComboBox _to = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230, AccessibleName = L.T("结束快照") };
     private readonly Label _status = new() { AutoSize = true, Font = Theme.Ui, ForeColor = Theme.Muted, UseMnemonic = false, Margin = new Padding(0, 7, 12, 0) };
-    private readonly Button _take = Ui.Button("立即创建快照");
-    private readonly Button _schedule = Ui.Button("开启每日快照");
-    private readonly StatCard _net = new("净增长");
-    private readonly StatCard _files = new("文件数变化");
-    private readonly StatCard _topOwner = new("增长最多的应用");
-    private readonly StatCard _monitor = new("写入监控覆盖");
-    private readonly BarChart _daily = new() { Dock = DockStyle.Fill, AccessibleName = "每日净增长" };
-    private readonly ItemList _changes = new("变化最大的目录", ["目录", "变化", "当前", "归属", "写入进程"], [96, 96, 190, 92], numericColumns: 2);
+    private readonly Button _take = Ui.Button(L.T("立即创建快照"));
+    private readonly Button _schedule = Ui.Button(L.T("开启每日快照"));
+    private readonly StatCard _net = new(L.T("净增长"));
+    private readonly StatCard _files = new(L.T("文件数变化"));
+    private readonly StatCard _topOwner = new(L.T("增长最多的应用"));
+    private readonly StatCard _monitor = new(L.T("写入监控覆盖"));
+    private readonly BarChart _daily = new() { Dock = DockStyle.Fill, AccessibleName = L.T("每日净增长") };
+    private readonly ItemList _changes = new(L.T("变化最大的目录"), [L.T("目录"), L.T("变化"), L.T("当前"), L.T("归属"), L.T("写入进程")], [96, 96, 190, 92], numericColumns: 2);
     private readonly Label _message = new() { Dock = DockStyle.Top, AutoSize = false, Height = 0, Font = Theme.Ui, ForeColor = Theme.Text, BackColor = Theme.AccentWeak, Padding = new Padding(12, 8, 12, 8), UseMnemonic = false, Visible = false };
     private GrowthModel? _model;
     private ScanResult? _result;
@@ -42,11 +42,11 @@ internal sealed class GrowthPage : UserControl
         BackColor = Theme.Background;
         AutoScroll = true;
         Padding = new Padding(20, 16, 20, 24);
-        AccessibleName = "增长分析";
+        AccessibleName = L.T("增长分析");
 
         // ---- 标题行：时间范围 + 两个快照 ----
         var head = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, BackColor = Color.Transparent, Margin = new Padding(0) };
-        var title = Ui.Label("增长分析", new Font(Theme.UiFontName, 15F, FontStyle.Bold));
+        var title = Ui.Label(L.T("增长分析"), new Font(Theme.UiFontName, 15F, FontStyle.Bold));
         title.Margin = new Padding(0, 0, 12, 0);
         _sub.Margin = new Padding(0, 8, 24, 0);
         _range.Margin = new Padding(0, 2, 12, 0);
@@ -72,24 +72,23 @@ internal sealed class GrowthPage : UserControl
             cards.Controls.Add(card, i, 0);
         }
 
-        _monitor.Set("未开启", "写入监控在后续版本加入：现在能看到哪里变了，看不到是哪个程序写的", null);
+        _monitor.Set(L.T("未开启"), L.T("写入监控在后续版本加入：现在能看到哪里变了，看不到是哪个程序写的"), null);
 
         // ---- 每日净增长 + 写入监控覆盖时段 ----
         var charts = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, RowCount = 1, Height = 236, BackColor = Color.Transparent, Padding = new Padding(0, 12, 0, 0) };
         charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
         charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        charts.Controls.Add(Card("每日净增长", _daily), 0, 0);
-        var monitorText = Ui.Label("写入监控（ETW 诊断）还没有开启，这一版也还没有这个功能。快照对比只知道哪里变了、变了多少，不知道是谁写的；" +
-            "开启后这里会显示有监控记录的时段。", Theme.Ui, Theme.Muted);
+        charts.Controls.Add(Card(L.T("每日净增长"), _daily), 0, 0);
+        var monitorText = Ui.Label(L.T("写入监控（ETW 诊断）还没有开启，这一版也还没有这个功能。快照对比只知道哪里变了、变了多少，不知道是谁写的；开启后这里会显示有监控记录的时段。"), Theme.Ui, Theme.Muted);
         monitorText.Dock = DockStyle.Fill; // 不自动大小，按卡片宽度换行
         monitorText.AutoSize = false;
-        var diagnose = Ui.Button("开启诊断（后续版本）");
+        var diagnose = Ui.Button(L.T("开启诊断（后续版本）"));
         diagnose.Enabled = false;
         diagnose.Dock = DockStyle.Bottom;
         var monitorBody = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Card };
         monitorBody.Controls.Add(monitorText);
         monitorBody.Controls.Add(diagnose);
-        charts.Controls.Add(Card("写入监控覆盖时段", monitorBody), 1, 0);
+        charts.Controls.Add(Card(L.T("写入监控覆盖时段"), monitorBody), 1, 0);
         foreach (Control c in charts.Controls)
         {
             c.Dock = DockStyle.Fill;
@@ -120,7 +119,7 @@ internal sealed class GrowthPage : UserControl
                 NavigateRequested?.Invoke(this, node);
             }
         };
-        ShowEmpty("正在扫描…");
+        ShowEmpty(L.T("正在扫描…"));
     }
 
     public event EventHandler<int>? NavigateRequested;
@@ -168,16 +167,16 @@ internal sealed class GrowthPage : UserControl
         public override string ToString() => Text;
     }
 
-    public void ShowScanning() => ShowEmpty("正在扫描…");
+    public void ShowScanning() => ShowEmpty(L.T("正在扫描…"));
 
     /// <summary>每日快照任务的状态（null 表示还没查询到）。</summary>
     public void SetSchedule(Shell.ScheduledSnapshot.Status? status)
     {
-        _schedule.Text = status is { Registered: true } ? "关闭每日快照" : "开启每日快照";
+        _schedule.Text = status is { Registered: true } ? L.T("关闭每日快照") : L.T("开启每日快照");
         _schedule.AccessibleName = _schedule.Text;
         _scheduleText = status is null ? "" : status.Registered
-            ? $"每日快照：已开启，每天 {status.Time ?? "定时"}{(status.Highest ? "（管理员权限，MFT 扫描）" : "（普通权限，遍历扫描）")}"
-            : "每日快照：未开启";
+            ? L.F("每日快照：已开启，每天 {0}{1}", status.Time ?? L.T("定时"), (status.Highest ? L.T("（管理员权限，MFT 扫描）") : L.T("（普通权限，遍历扫描）")))
+            : L.T("每日快照：未开启");
         UpdateStatus();
     }
 
@@ -190,11 +189,11 @@ internal sealed class GrowthPage : UserControl
         _classification = classification;
         _owners = owners;
         _take.Enabled = model is not null && result is not null && !model.CurrentSaved;
-        _take.Text = model is { CurrentSaved: true } ? "当前扫描已保存为快照" : "立即创建快照";
+        _take.Text = model is { CurrentSaved: true } ? L.T("当前扫描已保存为快照") : L.T("立即创建快照");
         UpdateStatus();
         if (model is null)
         {
-            ShowEmpty(error ?? "没有扫描结果。");
+            ShowEmpty(error ?? L.T("没有扫描结果。"));
             return;
         }
 
@@ -206,20 +205,20 @@ internal sealed class GrowthPage : UserControl
         {
             var isCurrent = model.CurrentSaved && model.Current?.Info.Id == s.Id;
             _from.Items.Add(new Choice(s, false, Describe(s)));
-            _to.Items.Add(new Choice(s, isCurrent, isCurrent ? "当前扫描（已保存）" : Describe(s)));
+            _to.Items.Add(new Choice(s, isCurrent, isCurrent ? L.T("当前扫描（已保存）") : Describe(s)));
         }
 
         if (!model.CurrentSaved && model.Current is { } current)
         {
-            _to.Items.Insert(0, new Choice(current.Info, true, "当前扫描"));
+            _to.Items.Insert(0, new Choice(current.Info, true, L.T("当前扫描")));
         }
 
         _suppress = false;
         if (_from.Items.Count == 0 || _to.Items.Count == 0 || model.Snapshots.Count + (model.CurrentSaved ? 0 : 1) < 2)
         {
             ShowEmpty(model.Snapshots.Count == 0
-                ? "还没有快照。快照记录各个目录当时的大小，至少要两次才能对比。可以现在创建第一个快照，或者开启每日快照。"
-                : "只有一个快照，还不能对比。下次扫描（距离上次超过 6 小时会自动保存）或者每日快照之后就能看到变化。");
+                ? L.T("还没有快照。快照记录各个目录当时的大小，至少要两次才能对比。可以现在创建第一个快照，或者开启每日快照。")
+                : L.T("只有一个快照，还不能对比。下次扫描（距离上次超过 6 小时会自动保存）或者每日快照之后就能看到变化。"));
             return;
         }
 
@@ -227,14 +226,14 @@ internal sealed class GrowthPage : UserControl
     }
 
     private static string Describe(SnapshotInfo s) =>
-        $"{s.TakenAtUtc.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)} 快照（{(s.ScanMode == "mft" ? "MFT" : "遍历")}）";
+        L.F("{0} 快照（{1}）", s.TakenAtUtc.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture), (s.ScanMode == "mft" ? "MFT" : L.T("遍历")));
 
     private void UpdateStatus()
     {
         var parts = new List<string>();
         if (_model is { } m)
         {
-            parts.Add(m.Snapshots.Count == 0 ? "还没有快照" : $"共 {m.Snapshots.Count} 个快照，最早 {m.Snapshots[0].TakenAtUtc.ToLocalTime():yyyy-MM-dd}，快照库 {ByteSize.Format(m.Store.FileBytes)}");
+            parts.Add(m.Snapshots.Count == 0 ? L.T("还没有快照") : L.F("共 {0} 个快照，最早 {1:yyyy-MM-dd}，快照库 {2}", m.Snapshots.Count, m.Snapshots[0].TakenAtUtc.ToLocalTime(), ByteSize.Format(m.Store.FileBytes)));
         }
 
         if (_scheduleText.Length > 0)
@@ -274,7 +273,7 @@ internal sealed class GrowthPage : UserControl
 
         if (!to.IsCurrent && from.Info.Id == to.Info.Id)
         {
-            ShowEmpty("起点和终点是同一个快照，请换一个。");
+            ShowEmpty(L.T("起点和终点是同一个快照，请换一个。"));
             return;
         }
 
@@ -317,7 +316,7 @@ internal sealed class GrowthPage : UserControl
             {
                 if (version == _version && !IsDisposed)
                 {
-                    ShowEmpty("读取快照失败：" + ex.Message);
+                    ShowEmpty(L.F("读取快照失败：{0}", ex.Message));
                 }
             }
         }
@@ -331,18 +330,18 @@ internal sealed class GrowthPage : UserControl
         _net.Set("—", "", null);
         _files.Set("—", "", null);
         _topOwner.Set("—", "", null);
-        _daily.SetData([], "没有可以对比的快照");
+        _daily.SetData([], L.T("没有可以对比的快照"));
         _changes.SetItems([]);
-        _changes.SetPlaceholder("没有可以对比的快照");
+        _changes.SetPlaceholder(L.T("没有可以对比的快照"));
     }
 
     private void ShowDiff(SnapshotDiff diff, List<GrowthHotspot> hot, List<(DateOnly Day, long Change)> daily)
     {
         _message.Visible = false;
-        _net.Set(BarChart.Signed(diff.NetChange), $"增加 {ByteSize.Format(diff.Increase)} · 减少 {ByteSize.Format(diff.Decrease)}（按快照记录的目录汇总）", null);
+        _net.Set(BarChart.Signed(diff.NetChange), L.F("增加 {0} · 减少 {1}（按快照记录的目录汇总）", ByteSize.Format(diff.Increase), ByteSize.Format(diff.Decrease)), null);
         var files = diff.FileCountChange;
         _files.Set((files > 0 ? "+" : files < 0 ? "−" : "") + Math.Abs(files).ToString("N0", CultureInfo.InvariantCulture),
-            "快照只记总数，分不出新建和删除", null);
+            L.T("快照只记总数，分不出新建和删除"), null);
 
         var growing = hot.Where(h => h.Change > 0).Select(h => (Hot: h, Owner: OwnerText(h.Path))).ToList();
         var byOwner = growing.Where(x => x.Owner.Known)
@@ -352,30 +351,30 @@ internal sealed class GrowthPage : UserControl
             .ToList();
         if (byOwner.Count == 0)
         {
-            _topOwner.Set("—", growing.Count == 0 ? "没有超过 100 MB 的增长" : "增长的位置都还没认出是谁的", null);
+            _topOwner.Set("—", growing.Count == 0 ? L.T("没有超过 100 MB 的增长") : L.T("增长的位置都还没认出是谁的"), null);
         }
         else
         {
-            var second = byOwner.Count > 1 ? $" · 其次 {byOwner[1].Name} {BarChart.Signed(byOwner[1].Bytes)}" : "";
+            var second = byOwner.Count > 1 ? L.F(" · 其次 {0} {1}", byOwner[1].Name, BarChart.Signed(byOwner[1].Bytes)) : "";
             _topOwner.Set(byOwner[0].Name, BarChart.Signed(byOwner[0].Bytes) + second, null);
         }
 
         _daily.SetData(daily.Select(d => (d.Day.ToString("MM-dd", CultureInfo.InvariantCulture), d.Change)).ToList(),
-            "每天至少要有一个快照才能画出每日变化");
+            L.T("每天至少要有一个快照才能画出每日变化"));
 
         var notMonitored = new RuleView.TagStyle(ColorTranslator.FromHtml("#f3f3f3"), Theme.Subtle);
         var tree = _result?.Tree;
         var items = hot.Select(h =>
         {
             var node = tree?.FindPath(h.Path) ?? -1;
-            var path = PathDisplay.Shorten(h.Path) + (h.IsRemainder ? "（其余部分）" : "");
+            var path = PathDisplay.Shorten(h.Path) + (h.IsRemainder ? L.T("（其余部分）") : "");
             var (owner, _) = OwnerText(h.Path);
-            var note = $"增加 {ByteSize.Format(h.Increase)}，减少 {ByteSize.Format(h.Decrease)}；之前 {ByteSize.Format(h.Previous)}" + (node < 0 ? "；当前扫描里已经没有这个位置" : "");
-            return new ListItem(node, [path, BarChart.Signed(h.Change), ByteSize.Format(h.Current), owner, ""], note, notMonitored, "未监控",
+            var note = L.F("增加 {0}，减少 {1}；之前 {2}{3}", ByteSize.Format(h.Increase), ByteSize.Format(h.Decrease), ByteSize.Format(h.Previous), (node < 0 ? L.T("；当前扫描里已经没有这个位置") : ""));
+            return new ListItem(node, [path, BarChart.Signed(h.Change), ByteSize.Format(h.Current), owner, ""], note, notMonitored, L.T("未监控"),
                 h.Change > 0 ? Theme.Up : h.Change < 0 ? Theme.Down : null);
         }).ToList();
         _changes.SetItems(items);
-        _changes.SetPlaceholder(items.Count == 0 ? "这段时间里没有超过 100 MB 的变化" : null);
+        _changes.SetPlaceholder(items.Count == 0 ? L.T("这段时间里没有超过 100 MB 的变化") : null);
     }
 
     /// <summary>归属判断：当前扫描里的归属；没有归属时用规则类别；都没有时是"未识别"。</summary>
@@ -385,7 +384,7 @@ internal sealed class GrowthPage : UserControl
         var node = tree?.FindPath(path) ?? -1;
         if (node < 0)
         {
-            return ("当前已不存在", false);
+            return (L.T("当前已不存在"), false);
         }
 
         if (_owners?.OwnerOf(node) is { } owner)
@@ -393,6 +392,6 @@ internal sealed class GrowthPage : UserControl
             return (owner.Display, true);
         }
 
-        return _classification?.RuleOf(node) is { } rule ? (Names.Display(rule.Kind), true) : ("未识别", false);
+        return _classification?.RuleOf(node) is { } rule ? (Names.Display(rule.Kind), true) : (L.T("未识别"), false);
     }
 }

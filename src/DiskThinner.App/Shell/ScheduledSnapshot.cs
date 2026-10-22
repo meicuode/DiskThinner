@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using DiskThinner.Core;
 
 namespace DiskThinner.App.Shell;
 
@@ -22,7 +23,7 @@ internal static partial class ScheduledSnapshot
     {
         if (!TimePattern().IsMatch(time))
         {
-            throw new ArgumentException("时间格式应为 HH:mm", nameof(time));
+            throw new ArgumentException(L.T("时间格式应为 HH:mm"), nameof(time));
         }
 
         var action = $"\"{exePath}\" snapshot" + (drive is null ? "" : $" --drive {drive.TrimEnd('\\')}");
@@ -75,7 +76,7 @@ internal static partial class ScheduledSnapshot
             if (!p.WaitForExit(15_000))
             {
                 p.Kill();
-                return (false, "schtasks 没有响应");
+                return (false, L.T("schtasks 没有响应"));
             }
 
             return (p.ExitCode == 0, p.ExitCode == 0 ? output.Result : (error.Result + output.Result).Trim());

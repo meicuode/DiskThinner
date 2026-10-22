@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Rules;
 
 /// <summary>枚举在规则文件里的写法和界面上的中文名。</summary>
@@ -15,12 +17,12 @@ public static class Names
 
     public static string Display(Risk risk) => risk switch
     {
-        Risk.Safe => "安全",
-        Risk.Low => "需重新下载",
-        Risk.Medium => "丢历史或登录态",
-        Risk.High => "丢用户数据",
-        Risk.Guide => "系统工具处理",
-        _ => "不能删",
+        Risk.Safe => L.T("安全"),
+        Risk.Low => L.T("需重新下载"),
+        Risk.Medium => L.T("丢历史或登录态"),
+        Risk.High => L.T("丢用户数据"),
+        Risk.Guide => L.T("系统工具处理"),
+        _ => L.T("不能删"),
     };
 
     public static string Code(Kind kind) => kind switch
@@ -48,25 +50,25 @@ public static class Names
 
     public static string Display(Kind kind) => kind switch
     {
-        Kind.Cache => "缓存",
-        Kind.Temp => "临时文件",
-        Kind.Log => "日志",
-        Kind.CrashDump => "崩溃转储",
-        Kind.UpdateCache => "更新缓存",
-        Kind.PackageCache => "包缓存",
-        Kind.BuildOutput => "构建产物",
-        Kind.Model => "模型文件",
-        Kind.VmDisk => "虚拟磁盘",
-        Kind.SessionHistory => "会话记录",
-        Kind.BrowserData => "浏览器数据",
-        Kind.AppData => "应用数据",
-        Kind.UserData => "用户数据",
-        Kind.Config => "配置",
-        Kind.Credential => "凭据",
-        Kind.Program => "程序",
-        Kind.System => "系统",
-        Kind.Backup => "备份",
-        _ => "回收站",
+        Kind.Cache => L.T("缓存"),
+        Kind.Temp => L.T("临时文件"),
+        Kind.Log => L.T("日志"),
+        Kind.CrashDump => L.T("崩溃转储"),
+        Kind.UpdateCache => L.T("更新缓存"),
+        Kind.PackageCache => L.T("包缓存"),
+        Kind.BuildOutput => L.T("构建产物"),
+        Kind.Model => L.T("模型文件"),
+        Kind.VmDisk => L.T("虚拟磁盘"),
+        Kind.SessionHistory => L.T("会话记录"),
+        Kind.BrowserData => L.T("浏览器数据"),
+        Kind.AppData => L.T("应用数据"),
+        Kind.UserData => L.T("用户数据"),
+        Kind.Config => L.T("配置"),
+        Kind.Credential => L.T("凭据"),
+        Kind.Program => L.T("程序"),
+        Kind.System => L.T("系统"),
+        Kind.Backup => L.T("备份"),
+        _ => L.T("回收站"),
     };
 
     /// <summary>

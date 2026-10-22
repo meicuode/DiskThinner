@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using DiskThinner.Cleanup.Native;
+using DiskThinner.Core;
 
 namespace DiskThinner.Cleanup;
 
@@ -15,7 +16,7 @@ public sealed record AccountInfo(string ProcessUser, string? SessionUser, bool E
 
     /// <summary>界面上说明为什么禁用了用户目录的清理。</summary>
     public string? MismatchText => Mismatch
-        ? $"DiskThinner 以 {ProcessUser} 的身份运行，而登录的是 {SessionUser}。为避免清到别人的目录，这次不清理用户目录、不运行官方命令，只清理系统位置。"
+        ? L.F("DiskThinner 以 {0} 的身份运行，而登录的是 {1}。为避免清到别人的目录，这次不清理用户目录、不运行官方命令，只清理系统位置。", ProcessUser, SessionUser)
         : null;
 
     public static AccountInfo Current()

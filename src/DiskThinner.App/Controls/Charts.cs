@@ -30,7 +30,7 @@ internal sealed class BarChart : Control
     {
         _bars = bars;
         _empty = emptyText;
-        AccessibleDescription = bars.Count == 0 ? emptyText : string.Join("，", bars.Select(b => $"{b.Label} {Signed(b.Value)}"));
+        AccessibleDescription = bars.Count == 0 ? emptyText : string.Join(L.T("，"), bars.Select(b => $"{b.Label} {Signed(b.Value)}"));
         Invalidate();
     }
 
@@ -124,7 +124,7 @@ internal sealed class TrendChart : Control
         _empty = emptyText;
         AccessibleDescription = points.Count < 2
             ? emptyText
-            : $"从 {points[0].Local:MM-dd} 的 {ByteSize.Format(points[0].Value)} 到 {points[^1].Local:MM-dd} 的 {ByteSize.Format(points[^1].Value)}，最低 {ByteSize.Format(points.Min(p => p.Value))}";
+            : L.F("从 {0:MM-dd} 的 {1} 到 {2:MM-dd} 的 {3}，最低 {4}", points[0].Local, ByteSize.Format(points[0].Value), points[^1].Local, ByteSize.Format(points[^1].Value), ByteSize.Format(points.Min(p => p.Value)));
         Invalidate();
     }
 

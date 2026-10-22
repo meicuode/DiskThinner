@@ -1,3 +1,4 @@
+using DiskThinner.Core;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.App.Explorer;
@@ -15,7 +16,7 @@ internal sealed class Breadcrumb : FlowLayoutPanel
         BackColor = Color.Transparent;
         Padding = new Padding(0);
         Margin = new Padding(0);
-        AccessibleName = "当前位置";
+        AccessibleName = L.T("当前位置");
         AccessibleRole = AccessibleRole.ToolBar;
     }
 
@@ -49,7 +50,7 @@ internal sealed class Breadcrumb : FlowLayoutPanel
             var skip = Math.Max(0, chain.Count - MaxSegments);
             if (skip > 0)
             {
-                AddSeparator("…");
+                AddSeparator(L.T("…"));
             }
 
             for (var i = skip; i < chain.Count; i++)
@@ -77,7 +78,7 @@ internal sealed class Breadcrumb : FlowLayoutPanel
                         LinkBehavior = LinkBehavior.HoverUnderline,
                         Margin = new Padding(0, 4, 0, 0),
                         UseMnemonic = false,
-                        AccessibleName = "转到 " + name,
+                        AccessibleName = L.F("转到 {0}", name),
                         Tag = n,
                     };
                     link.LinkClicked += (_, _) => NodeClicked?.Invoke(this, (int)link.Tag!);

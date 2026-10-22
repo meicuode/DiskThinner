@@ -16,14 +16,14 @@ internal sealed class CleanupPage : UserControl
     private const int ColSelect = 0, ColTitle = 1, ColPath = 2, ColSize = 3, ColSource = 4, ColMethod = 5, ColHint = 6, ColAction = 7;
 
     private readonly DataGridView _grid = new();
-    private readonly Label _sub = Ui.Label("按风险分组，每组有默认的处理方式，可以逐项修改", Theme.Ui, Theme.Muted);
+    private readonly Label _sub = Ui.Label(L.T("按风险分组，每组有默认的处理方式，可以逐项修改"), Theme.Ui, Theme.Muted);
     private readonly Label _banner = new() { Dock = DockStyle.Top, AutoSize = false, Height = 0, Visible = false, Font = Theme.Ui, ForeColor = Theme.WarnText, BackColor = Theme.WarnBack, Padding = new Padding(12, 8, 12, 8), UseMnemonic = false };
     private readonly Label _summary = Ui.Label("", Theme.UiBold);
-    private readonly Label _note = Ui.Label("删除是永久的，不经过回收站（C 盘的回收站不释放空间）。每一项都会写入操作记录。", Theme.Small, Theme.Muted);
-    private readonly Button _clear = Ui.Button("清空计划", accessibleDescription: "取消勾选全部项目");
-    private readonly Button _export = Ui.Button("导出清单");
-    private readonly Button _run = Ui.Button("执行清理", primary: true, accessibleDescription: "先显示确认框，确认后才会删除");
-    private readonly Label _empty = Ui.Label("正在扫描…", Theme.Ui, Theme.Muted);
+    private readonly Label _note = Ui.Label(L.T("删除是永久的，不经过回收站（C 盘的回收站不释放空间）。每一项都会写入操作记录。"), Theme.Small, Theme.Muted);
+    private readonly Button _clear = Ui.Button(L.T("清空计划"), accessibleDescription: L.T("取消勾选全部项目"));
+    private readonly Button _export = Ui.Button(L.T("导出清单"));
+    private readonly Button _run = Ui.Button(L.T("执行清理"), primary: true, accessibleDescription: L.T("先显示确认框，确认后才会删除"));
+    private readonly Label _empty = Ui.Label(L.T("正在扫描…"), Theme.Ui, Theme.Muted);
     private readonly HashSet<PlanItem> _opened = [];
     private CleanupPlan _plan = CleanupPlan.Empty;
     private bool _binding;
@@ -32,13 +32,13 @@ internal sealed class CleanupPage : UserControl
     {
         BackColor = Theme.Background;
         Padding = new Padding(20, 16, 20, 16);
-        AccessibleName = "清理计划";
+        AccessibleName = L.T("清理计划");
 
         var head = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, RowCount = 1, BackColor = Color.Transparent, Margin = new Padding(0), Padding = new Padding(0, 0, 0, 12) };
         head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         head.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var title = Ui.Label("清理计划", new Font(Theme.UiFontName, 15F, FontStyle.Bold));
+        var title = Ui.Label(L.T("清理计划"), new Font(Theme.UiFontName, 15F, FontStyle.Bold));
         title.Margin = new Padding(0, 0, 12, 0);
         _sub.Margin = new Padding(0, 8, 0, 0);
         _clear.Margin = new Padding(0, 2, 0, 0);
@@ -110,7 +110,7 @@ internal sealed class CleanupPage : UserControl
         _plan = CleanupPlan.Empty;
         _grid.Rows.Clear();
         _grid.Visible = false;
-        _empty.Text = "正在扫描…";
+        _empty.Text = L.T("正在扫描…");
         _empty.Visible = true;
         SetBanner(null);
         UpdateSummary();
@@ -136,7 +136,7 @@ internal sealed class CleanupPage : UserControl
         _binding = false;
         _grid.Visible = plan.Items.Count > 0;
         _empty.Visible = plan.Items.Count == 0;
-        _empty.Text = message ?? "没有可以清理的位置：规则认识的位置都不到 1 MB，或者都受保护。";
+        _empty.Text = message ?? L.T("没有可以清理的位置：规则认识的位置都不到 1 MB，或者都受保护。");
         SetBanner(plan.Warning);
         UpdateSummary();
     }
@@ -193,10 +193,9 @@ internal sealed class CleanupPage : UserControl
         var run = _plan.ToRun.ToList();
         var manual = _plan.Items.Count(i => i.Selectable && i.Selected && i.Method?.Kind == MethodKind.Manual);
         _summary.Text = run.Count == 0
-            ? "没有选择要执行的项目"
-            : $"已选 {run.Count} 项 · {ByteSize.Format(run.Sum(i => i.Bytes))}　预计释放 {ByteSize.Format(run.Sum(i => i.EstimatedBytes))}";
-        _note.Text = "删除是永久的，不经过回收站（C 盘的回收站不释放空间）。每一项都会写入操作记录。" +
-            (manual > 0 ? $"另有 {manual} 项是手动清理，工具不会删除，处理完后点\u201c重新测量\u201d。" : "");
+            ? L.T("没有选择要执行的项目")
+            : L.F("已选 {0} 项 · {1}　预计释放 {2}", run.Count, ByteSize.Format(run.Sum(i => i.Bytes)), ByteSize.Format(run.Sum(i => i.EstimatedBytes)));
+        _note.Text = L.F("删除是永久的，不经过回收站（C 盘的回收站不释放空间）。每一项都会写入操作记录。{0}", (manual > 0 ? L.F("另有 {0} 项是手动清理，工具不会删除，处理完后点“重新测量”。", manual) : ""));
         _run.Enabled = run.Count > 0;
         _export.Enabled = _plan.Items.Count > 0;
         _clear.Enabled = _plan.Items.Any(i => i.Selected);
@@ -252,15 +251,15 @@ internal sealed class CleanupPage : UserControl
             WrapMode = DataGridViewTriState.False,
         };
         g.RowTemplate.Height = 34;
-        g.AccessibleName = "清理计划";
+        g.AccessibleName = L.T("清理计划");
 
-        g.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "选", Resizable = DataGridViewTriState.False });
-        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "项目", ReadOnly = true });
-        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "路径", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true });
-        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "大小", ReadOnly = true, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight } });
-        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "来源", ReadOnly = true });
-        g.Columns.Add(new DataGridViewComboBoxColumn { HeaderText = "处理方式", FlatStyle = FlatStyle.Flat, DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton });
-        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "提示", ReadOnly = true });
+        g.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = L.T("选"), Resizable = DataGridViewTriState.False });
+        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("项目"), ReadOnly = true });
+        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("路径"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true });
+        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("大小"), ReadOnly = true, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight } });
+        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("来源"), ReadOnly = true });
+        g.Columns.Add(new DataGridViewComboBoxColumn { HeaderText = L.T("处理方式"), FlatStyle = FlatStyle.Flat, DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton });
+        g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("提示"), ReadOnly = true });
         g.Columns.Add(new DataGridViewLinkColumn { HeaderText = "", ReadOnly = true, TrackVisitedState = false, LinkColor = Theme.Accent, ActiveLinkColor = Theme.AccentHover });
         foreach (DataGridViewColumn c in g.Columns)
         {
@@ -327,9 +326,9 @@ internal sealed class CleanupPage : UserControl
         };
 
         var menu = new ContextMenuStrip();
-        var view = menu.Items.Add("在空间浏览中查看", null, (_, _) => { if (CurrentItem is { Node: >= 0 } i) NavigateRequested?.Invoke(this, i.Node); });
-        var open = menu.Items.Add("打开所在位置，自己清理", null, (_, _) => { if (CurrentItem is { } i) Open(i); });
-        var measure = menu.Items.Add("重新测量", null, (_, _) => { if (CurrentItem is { } i) MeasureRequested?.Invoke(this, i); });
+        var view = menu.Items.Add(L.T("在空间浏览中查看"), null, (_, _) => { if (CurrentItem is { Node: >= 0 } i) NavigateRequested?.Invoke(this, i.Node); });
+        var open = menu.Items.Add(L.T("打开所在位置，自己清理"), null, (_, _) => { if (CurrentItem is { } i) Open(i); });
+        var measure = menu.Items.Add(L.T("重新测量"), null, (_, _) => { if (CurrentItem is { } i) MeasureRequested?.Invoke(this, i); });
         menu.Opening += (_, e) =>
         {
             var item = CurrentItem;
@@ -399,8 +398,8 @@ internal sealed class CleanupPage : UserControl
         var bytes = items.Sum(i => i.Bytes);
         row.Cells[ColTitle].Value = CleanupText.GroupTitle(group);
         row.Cells[ColPath].Value = group == PlanGroup.Blocked
-            ? $"{CleanupText.GroupNote(group)} · {items.Count} 项"
-            : $"{CleanupText.GroupNote(group)} · {items.Count} 项 · {ByteSize.Format(bytes)}";
+            ? L.F("{0} · {1} 项", CleanupText.GroupNote(group), items.Count)
+            : L.F("{0} · {1} 项 · {2}", CleanupText.GroupNote(group), items.Count, ByteSize.Format(bytes));
         row.DefaultCellStyle.BackColor = Theme.HeaderBack;
         row.DefaultCellStyle.SelectionBackColor = Theme.HeaderBack;
     }
@@ -437,14 +436,14 @@ internal sealed class CleanupPage : UserControl
         else
         {
             row.Cells[ColSelect].Value = "";
-            row.Cells[ColMethod].Value = item.Source == "系统设置" ? "系统设置中处理" : "不可删除";
+            row.Cells[ColMethod].Value = item.Source == PlanSource.SystemSettings ? L.T("系统设置中处理") : L.T("不可删除");
             row.ReadOnly = true;
         }
 
         row.Cells[ColTitle].Value = item.Title;
         row.Cells[ColPath].Value = PathDisplay.Shorten(item.Path);
         row.Cells[ColSize].Value = ByteSize.Format(item.Bytes);
-        row.Cells[ColSource].Value = item.Source;
+        row.Cells[ColSource].Value = item.SourceText;
         row.Cells[ColHint].Value = item.ResultText ?? item.Hint ?? "";
         row.Cells[ColHint].Style.ForeColor = item.State switch
         {
@@ -452,25 +451,37 @@ internal sealed class CleanupPage : UserControl
             PlanItemState.Failed or PlanItemState.NotRun or PlanItemState.Partial => Theme.WarnText,
             _ => Theme.Muted,
         };
-        row.Cells[ColAction].Value = ActionText(item);
+        row.Cells[ColAction].Value = ActionTitle(ActionOf(item));
         var muted = !item.Selectable || done;
         row.DefaultCellStyle.ForeColor = muted ? Theme.Subtle : Theme.Text;
     }
 
-    private string ActionText(PlanItem item)
+    /// <summary>最后一列的链接做什么。</summary>
+    private enum RowAction { None, View, Open, Measure, Steps }
+
+    private RowAction ActionOf(PlanItem item)
     {
         if (item.Group == PlanGroup.Blocked)
         {
-            return item.Source == "系统设置" ? "查看步骤" : "";
+            return item.Source == PlanSource.SystemSettings ? RowAction.Steps : RowAction.None;
         }
 
         if (item.Method?.Kind == MethodKind.Manual || item.State == PlanItemState.Measured)
         {
-            return _opened.Contains(item) || item.State == PlanItemState.Measured ? "重新测量" : "打开位置";
+            return _opened.Contains(item) || item.State == PlanItemState.Measured ? RowAction.Measure : RowAction.Open;
         }
 
-        return item.Node >= 0 ? "查看" : "";
+        return item.Node >= 0 ? RowAction.View : RowAction.None;
     }
+
+    private static string ActionTitle(RowAction a) => a switch
+    {
+        RowAction.View => L.T("查看"),
+        RowAction.Open => L.T("打开位置"),
+        RowAction.Measure => L.T("重新测量"),
+        RowAction.Steps => L.T("查看步骤"),
+        _ => "",
+    };
 
     private void Open(PlanItem item)
     {
@@ -486,18 +497,18 @@ internal sealed class CleanupPage : UserControl
             return;
         }
 
-        switch (ActionText(item))
+        switch (ActionOf(item))
         {
-            case "查看":
+            case RowAction.View:
                 NavigateRequested?.Invoke(this, item.Node);
                 break;
-            case "打开位置":
+            case RowAction.Open:
                 Open(item);
                 break;
-            case "重新测量":
+            case RowAction.Measure:
                 MeasureRequested?.Invoke(this, item);
                 break;
-            case "查看步骤":
+            case RowAction.Steps:
                 MessageBox.Show(FindForm(), item.Hint ?? item.BlockReason, item.Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 break;
         }
@@ -562,12 +573,12 @@ internal sealed class CleanupPage : UserControl
             var tagHeight = Math.Min(e.CellBounds.Height - Ui.Scale(this, 10), Ui.Scale(this, 20));
             var style = item.Source switch
             {
-                "规则" => RuleView.RuleSource,
-                "系统设置" => RuleView.RiskStyle(Risk.Guide),
-                "用户文件" => RuleView.RiskStyle(Risk.High),
+                PlanSource.Rule => RuleView.RuleSource,
+                PlanSource.SystemSettings => RuleView.RiskStyle(Risk.Guide),
+                PlanSource.UserFiles => RuleView.RiskStyle(Risk.High),
                 _ => RuleView.RiskStyle(Risk.Never),
             };
-            RuleView.DrawTag(e.Graphics, item.Source, Theme.Small, new Point(e.CellBounds.Left + Ui.Scale(this, 6), e.CellBounds.Top + (e.CellBounds.Height - tagHeight) / 2), tagHeight, style);
+            RuleView.DrawTag(e.Graphics, item.SourceText, Theme.Small, new Point(e.CellBounds.Left + Ui.Scale(this, 6), e.CellBounds.Top + (e.CellBounds.Height - tagHeight) / 2), tagHeight, style);
             e.Handled = true;
         }
     }

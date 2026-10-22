@@ -1,3 +1,4 @@
+using DiskThinner.Core;
 using DiskThinner.Rules;
 
 namespace DiskThinner.Cleanup;
@@ -21,6 +22,22 @@ public enum PlanGroup
     Blocked,
 }
 
+/// <summary>计划里一项的来源（"来源"列）。</summary>
+public enum PlanSource
+{
+    /// <summary>规则给出的位置。</summary>
+    Rule,
+
+    /// <summary>保护名单拦下的（凭据、程序和系统目录、你添加的保护目录）。</summary>
+    Protection,
+
+    /// <summary>只能在系统设置里处理（分页文件、组件存储、还原点）。</summary>
+    SystemSettings,
+
+    /// <summary>软保护的用户文件（文档、桌面等）。</summary>
+    UserFiles,
+}
+
 public enum MethodKind
 {
     Delete,
@@ -33,7 +50,7 @@ public enum MethodKind
 /// <summary>一项的处理方式和按这种方式预计的释放量。</summary>
 public sealed record PlanMethod(MethodKind Kind, string Display)
 {
-    public static readonly PlanMethod Manual = new(MethodKind.Manual, "手动清理（打开所在位置）");
+    public static readonly PlanMethod Manual = new(MethodKind.Manual, L.T("手动清理（打开所在位置）"));
 
     public DeleteAction? Delete { get; init; }
 
@@ -117,8 +134,11 @@ public sealed class PlanItem
     /// <summary>已拦截的原因（保护名单、系统设置、账户不一致、其他用户的目录）。</summary>
     public string? BlockReason { get; init; }
 
-    /// <summary>"来源"列：规则、保护名单、系统设置。</summary>
-    public string Source { get; init; } = "规则";
+    /// <summary>"来源"列：规则、保护名单、系统设置、用户文件。</summary>
+    public PlanSource Source { get; init; } = PlanSource.Rule;
+
+    /// <summary>"来源"列的文字。</summary>
+    public string SourceText => CleanupText.SourceTitle(Source);
 
     /// <summary>规则要求先关闭、而现在正在运行的程序。</summary>
     public IReadOnlyList<string> RunningApps { get; init; } = [];
@@ -156,11 +176,11 @@ public static class CleanupText
         var filters = Filters(d);
         var what = d.Scope switch
         {
-            DeleteScope.Children => "逐个删除子项",
-            DeleteScope.Self => "删除",
-            _ => "清空内容",
+            DeleteScope.Children => L.T("逐个删除子项"),
+            DeleteScope.Self => L.T("删除"),
+            _ => L.T("清空内容"),
         };
-        return filters is null ? what : $"{what}（{filters}）";
+        return filters is null ? what : L.F("{0}（{1}）", what, filters);
     }
 
     /// <summary>过滤条件："只删 1 天前的文件，保留最新的 2 个"；没有时返回 null。</summary>
@@ -169,32 +189,49 @@ public static class CleanupText
         var parts = new List<string>();
         if (d.OlderThanDays is { } days)
         {
-            parts.Add(days == 1 ? "只删 24 小时前的文件" : $"只删 {days} 天前的文件");
+            parts.Add(days == 1 ? L.T("只删 24 小时前的文件") : L.F("只删 {0} 天前的文件", days));
         }
 
         if (d.KeepLatest is { } keep)
         {
-            parts.Add($"保留最新的 {keep} 个");
+            parts.Add(L.F("保留最新的 {0} 个", keep));
         }
 
-        return parts.Count == 0 ? null : string.Join("，", parts);
+        return parts.Count == 0 ? null : string.Join(L.T("，"), parts);
     }
 
     public static string GroupTitle(PlanGroup g) => g switch
     {
-        PlanGroup.Safe => "安全",
-        PlanGroup.Redownload => "需重新下载",
-        PlanGroup.Irreversible => "无法恢复",
-        PlanGroup.Ai => "AI 建议",
-        _ => "已拦截",
+        PlanGroup.Safe => L.T("安全"),
+        PlanGroup.Redownload => L.T("需重新下载"),
+        PlanGroup.Irreversible => L.T("无法恢复"),
+        PlanGroup.Ai => L.T("AI 建议"),
+        _ => L.T("已拦截"),
     };
 
     public static string GroupNote(PlanGroup g) => g switch
     {
-        PlanGroup.Safe => "会自动重建 · 默认直接删除",
-        PlanGroup.Redownload => "默认运行官方清理命令",
-        PlanGroup.Irreversible => "删除后不可恢复，确认时列出明细",
-        PlanGroup.Ai => "默认不勾选，确认时逐项勾选",
-        _ => "不会执行",
+        PlanGroup.Safe => L.T("会自动重建 · 默认直接删除"),
+        PlanGroup.Redownload => L.T("默认运行官方清理命令"),
+        PlanGroup.Irreversible => L.T("删除后不可恢复，确认时列出明细"),
+        PlanGroup.Ai => L.T("默认不勾选，确认时逐项勾选"),
+        _ => L.T("不会执行"),
+    };
+
+    public static string SourceTitle(PlanSource s) => s switch
+    {
+        PlanSource.Rule => L.T("规则"),
+        PlanSource.Protection => L.T("保护名单"),
+        PlanSource.SystemSettings => L.T("系统设置"),
+        _ => L.T("用户文件"),
+    };
+
+    /// <summary>保护名单的级别对应的来源。</summary>
+    public static PlanSource SourceOf(Rules.ProtectionLevel level) => level switch
+    {
+        Rules.ProtectionLevel.Hard => PlanSource.Protection,
+        Rules.ProtectionLevel.Guide => PlanSource.SystemSettings,
+        Rules.ProtectionLevel.Soft => PlanSource.UserFiles,
+        _ => PlanSource.Rule,
     };
 }

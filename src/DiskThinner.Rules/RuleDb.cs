@@ -1,4 +1,5 @@
 using System.Globalization;
+using DiskThinner.Core;
 using Microsoft.Data.Sqlite;
 
 namespace DiskThinner.Rules;
@@ -89,7 +90,7 @@ public static class RuleDb
                             DeleteAction d => ["delete", ScopeCode(d.Scope), d.OlderThanDays, d.KeepLatest, null, null, null],
                             CommandAction c => ["command", null, null, null, c.CommandId, null, null],
                             GuideAction g => ["guide", null, null, null, null, g.Text, g.Url],
-                            _ => throw new InvalidOperationException("未知的动作类型"),
+                            _ => throw new InvalidOperationException(L.T("未知的动作类型")),
                         };
                         Insert(conn, "INSERT INTO actions VALUES ($ord, $a, $t, $s, $o, $k, $c, $x, $u)",
                             ("$ord", i), ("$a", a), ("$t", v[0]), ("$s", v[1]), ("$o", v[2]), ("$k", v[3]), ("$c", v[4]), ("$x", v[5]), ("$u", v[6]));
@@ -120,7 +121,7 @@ public static class RuleDb
 
         if (Scalar(conn, "PRAGMA user_version") is not long version || version != FormatVersion)
         {
-            throw new InvalidDataException($"规则库格式版本不符（需要 {FormatVersion}）");
+            throw new InvalidDataException(L.F("规则库格式版本不符（需要 {0}）", FormatVersion));
         }
 
         var objects = new List<string>();
@@ -136,12 +137,12 @@ public static class RuleDb
 
         if (!objects.SequenceEqual(Tables.Select(t => "table:" + t)))
         {
-            throw new InvalidDataException("规则库的表结构不符，拒绝加载：" + string.Join(", ", objects));
+            throw new InvalidDataException(L.F("规则库的表结构不符，拒绝加载：{0}", string.Join(", ", objects)));
         }
 
         if (Scalar(conn, "PRAGMA quick_check") as string != "ok")
         {
-            throw new InvalidDataException("规则库文件损坏");
+            throw new InvalidDataException(L.T("规则库文件损坏"));
         }
 
         var meta = Query(conn, "SELECT key, value FROM meta", r => (r.GetString(0), r.GetString(1))).ToDictionary(x => x.Item1, x => x.Item2);

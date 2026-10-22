@@ -8,6 +8,8 @@
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
     <!-- 只在 dtrule（规则维护工具）里使用 -->
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
+    <!-- 只在 tools/i18n（界面文字的改写和 resx 生成）里使用，不进产品 -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
   </ItemGroup>
   <ItemGroup>
     <!-- 仅测试项目使用 -->

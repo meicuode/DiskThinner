@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.App.Controls;
 
 /// <summary>左侧导航（原型 .nav）：图标 + 文字，选中项浅蓝底色并带左侧竖条。支持 Tab、方向键、回车和空格。</summary>
@@ -11,7 +13,7 @@ internal sealed class NavBar : Panel
         Width = 188;
         BackColor = Theme.Surface;
         Padding = new Padding(8);
-        AccessibleName = "主导航";
+        AccessibleName = L.T("主导航");
         AccessibleRole = AccessibleRole.List;
     }
 
@@ -222,7 +224,7 @@ internal sealed class NavBar : Panel
             public override AccessibleStates State =>
                 base.State | AccessibleStates.Focusable | (owner.Checked ? AccessibleStates.Checked : AccessibleStates.None);
 
-            public override string DefaultAction => "切换";
+            public override string DefaultAction => L.T("切换");
 
             public override void DoDefaultAction() => owner.Activated?.Invoke(owner, EventArgs.Empty);
         }

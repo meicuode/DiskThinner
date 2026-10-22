@@ -43,14 +43,14 @@ internal sealed class GroupListView : ListView
         BorderStyle = BorderStyle.None;
         HeaderStyle = ColumnHeaderStyle.Nonclickable;
         Font = Theme.Ui;
-        AccessibleName = "汇总列表";
+        AccessibleName = L.T("汇总列表");
 
-        Columns.Add("名称", BaseColumnWidths[0]);
-        Columns.Add("大小", BaseColumnWidths[1], HorizontalAlignment.Right);
-        Columns.Add("占比", BaseColumnWidths[2]);
-        Columns.Add("最后写入", BaseColumnWidths[3]);
-        Columns.Add("归属", BaseColumnWidths[4]);
-        Columns.Add("类别 / 风险", BaseColumnWidths[5]);
+        Columns.Add(L.T("名称"), BaseColumnWidths[0]);
+        Columns.Add(L.T("大小"), BaseColumnWidths[1], HorizontalAlignment.Right);
+        Columns.Add(L.T("占比"), BaseColumnWidths[2]);
+        Columns.Add(L.T("最后写入"), BaseColumnWidths[3]);
+        Columns.Add(L.T("归属"), BaseColumnWidths[4]);
+        Columns.Add(L.T("类别 / 风险"), BaseColumnWidths[5]);
 
         RetrieveVirtualItem += OnRetrieveVirtualItem;
         DrawColumnHeader += (_, e) => e.DrawDefault = true;
@@ -359,7 +359,7 @@ internal sealed class GroupListView : ListView
         var loc = group.Locations[l];
         var kind = loc.Rule >= 0 && _classification is { } c
             ? $"{Names.Display(c.Engine.Rules.Locations[loc.Rule].Kind)} {RiskText(loc)}"
-            : loc.IsRemainder ? "" : "未识别";
+            : loc.IsRemainder ? "" : L.T("未识别");
         var owner = ByOwner || loc.Owner is null ? "" : loc.Owner.Display;
         var lastWrite = loc.Node >= 0 && _tree is not null ? TimeText.Relative(_tree[loc.Node].LastWriteUtc, _now) : "";
         return [LocationTitle(loc), ByteSize.Format(loc.Bytes), Percent(loc.Bytes, Math.Max(1, group.Bytes)), lastWrite, owner, kind];
@@ -376,7 +376,7 @@ internal sealed class GroupListView : ListView
     {
         if (ByOwner)
         {
-            return g.IsUnknown ? "未识别" : g.Owner is { } o ? RuleView.SourceTag(o.Source).Text : "";
+            return g.IsUnknown ? L.T("未识别") : g.Owner is { } o ? RuleView.SourceTag(o.Source).Text : "";
         }
 
         var owners = g.Locations.Where(l => l.Owner is not null).GroupBy(l => l.Owner!.Key)
@@ -385,15 +385,15 @@ internal sealed class GroupListView : ListView
         return owners.Count switch
         {
             0 => "",
-            <= 2 => string.Join("、", owners),
-            _ => $"{owners[0]}、{owners[1]} 等 {owners.Count} 个",
+            <= 2 => string.Join(L.T("、"), owners),
+            _ => L.F("{0}、{1} 等 {2} 个", owners[0], owners[1], owners.Count),
         };
     }
 
     private static string GroupSummary(SpaceGroup g)
     {
-        var count = $"{g.LocationCount.ToString("N0", CultureInfo.InvariantCulture)} 处";
-        return g.CleanableBytes > 0 ? $"{count} · 可释放 {ByteSize.Format(g.CleanableBytes)}" : count;
+        var count = L.F("{0} 处", g.LocationCount.ToString("N0", CultureInfo.InvariantCulture));
+        return g.CleanableBytes > 0 ? L.F("{0} · 可释放 {1}", count, ByteSize.Format(g.CleanableBytes)) : count;
     }
 
     private string LocationTitle(SpaceLocation loc)
@@ -401,12 +401,12 @@ internal sealed class GroupListView : ListView
         if (loc.IsRemainder)
         {
             return loc.MergedCount > 0
-                ? $"其他 {loc.MergedCount.ToString("N0", CultureInfo.InvariantCulture)} 处"
-                : $"零散的小位置（各不到 {ByteSize.Format(SpaceGroups.DefaultUnknownThreshold)}）";
+                ? L.F("其他 {0} 处", loc.MergedCount.ToString("N0", CultureInfo.InvariantCulture))
+                : L.F("零散的小位置（各不到 {0}）", ByteSize.Format(SpaceGroups.DefaultUnknownThreshold));
         }
 
         var path = _tree is null ? "" : PathDisplay.Shorten(_tree.GetPath(loc.Node));
-        return loc.IsParentRemainder ? path + "（其余部分）" : path;
+        return loc.IsParentRemainder ? L.F("{0}（其余部分）", path) : path;
     }
 
     private string RiskText(SpaceLocation loc)
@@ -526,7 +526,7 @@ internal sealed class GroupListView : ListView
                 {
                     if (group.IsUnknown)
                     {
-                        RuleView.DrawTag(g, "未识别", _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
+                        RuleView.DrawTag(g, L.T("未识别"), _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
                     }
                     else if (group.Owner is { } o)
                     {
@@ -575,7 +575,7 @@ internal sealed class GroupListView : ListView
                 }
                 else if (!loc.IsRemainder)
                 {
-                    RuleView.DrawTag(g, "未识别", _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
+                    RuleView.DrawTag(g, L.T("未识别"), _fonts.Small, new Point(x, tagY), tagH, RuleView.Unknown);
                 }
 
                 break;

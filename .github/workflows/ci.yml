@@ -26,6 +26,10 @@ jobs:
       - name: 规则校验
         run: dotnet run --project tools/dtrule -c Release -- validate rules
 
+      # 界面文字：Strings.resx 和源代码同步、没有没包成 L.T / L.F 的中文（见 tools/i18n/README.md）
+      - name: 界面文字检查
+        run: dotnet run --project tools/i18n -c Release -- check src src/DiskThinner.Core/Strings.resx
+
       - name: 构建
         run: dotnet build DiskThinner.slnx -c Release
 

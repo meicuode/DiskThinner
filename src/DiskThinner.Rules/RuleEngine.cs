@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using DiskThinner.Core;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.Rules;
@@ -46,7 +47,7 @@ public sealed class RuleEngine
             var pattern = CompiledPattern.Compile(PathTokens.ExpandProtection(Protections[i].Pattern, context));
             if (pattern.Segments.Count > MaxSegments)
             {
-                throw new FormatException($"路径层数过多：{Protections[i].Pattern}");
+                throw new FormatException(L.F("路径层数过多：{0}", Protections[i].Pattern));
             }
 
             entries.Add(new Entry(pattern, -1, i, MatchMode.Dir, []));
@@ -57,7 +58,7 @@ public sealed class RuleEngine
     }
 
     /// <summary>NTFS 元数据文件（$MFT 等）由扫描器标记，不靠路径匹配。</summary>
-    private static readonly ProtectionEntry MetadataProtection = new("", ProtectionLevel.Hard, "NTFS 内部文件，由文件系统管理");
+    private static readonly ProtectionEntry MetadataProtection = new("", ProtectionLevel.Hard, L.T("NTFS 内部文件，由文件系统管理"));
 
     public RuleSet Rules { get; }
 
@@ -72,7 +73,7 @@ public sealed class RuleEngine
         var compiled = CompiledPattern.Compile(PathTokens.Expand(pattern, context));
         if (compiled.Segments.Count > MaxSegments)
         {
-            throw new FormatException($"路径层数过多：{pattern}");
+            throw new FormatException(L.F("路径层数过多：{0}", pattern));
         }
 
         return compiled;

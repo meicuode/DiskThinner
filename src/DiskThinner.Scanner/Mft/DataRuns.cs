@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Scanner.Mft;
 
 /// <summary>一段连续的簇。<see cref="Lcn"/> 为 -1 表示稀疏段（磁盘上没有数据）。</summary>
@@ -29,7 +31,7 @@ internal static class DataRuns
             var offsetSize = header >> 4;
             if (lengthSize == 0 || lengthSize > 8 || offsetSize > 8 || pos + lengthSize + offsetSize > runs.Length)
             {
-                throw new InvalidDataException("数据段列表格式错误");
+                throw new InvalidDataException(L.T("数据段列表格式错误"));
             }
 
             long length = 0;

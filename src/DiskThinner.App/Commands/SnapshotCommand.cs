@@ -32,7 +32,7 @@ internal static class SnapshotCommand
         {
             if (Flag("--register"))
             {
-                var exe = Environment.ProcessPath ?? throw new InvalidOperationException("取不到程序路径");
+                var exe = Environment.ProcessPath ?? throw new InvalidOperationException(L.T("取不到程序路径"));
                 var highest = VolumeScanner.IsElevated();
                 var (ok, message) = ScheduledSnapshot.Register(exe, Value("--time") ?? ScheduledSnapshot.DefaultTime, highest, AppOptions.NormalizeDrive(Value("--drive")));
                 Log(ok ? $"已注册每日快照任务{(highest ? "（最高权限）" : "")}" : "注册每日快照任务失败：" + message);

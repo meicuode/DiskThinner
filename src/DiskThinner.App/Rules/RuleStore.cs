@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using DiskThinner.Core;
 using DiskThinner.Rules;
 
 namespace DiskThinner.App.Rules;
@@ -16,7 +17,7 @@ internal static class RuleStore
     public static RuleSet LoadBuiltIn()
     {
         using var stream = typeof(RuleStore).Assembly.GetManifestResourceStream(ResourceName)
-            ?? throw new InvalidOperationException("程序里没有内置规则库");
+            ?? throw new InvalidOperationException(L.T("程序里没有内置规则库"));
         var bytes = new byte[stream.Length];
         stream.ReadExactly(bytes);
         var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));

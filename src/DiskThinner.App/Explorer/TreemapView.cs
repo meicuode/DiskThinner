@@ -28,7 +28,7 @@ internal sealed class TreemapView : Control
         TabStop = true;
         BackColor = Color.White;
         Font = Theme.Ui;
-        AccessibleName = "方块图";
+        AccessibleName = L.T("方块图");
         AccessibleRole = AccessibleRole.Graphic;
         _resizeTimer.Tick += (_, _) =>
         {
@@ -459,14 +459,14 @@ internal sealed class TreemapView : Control
                 var tree = owner._tree;
                 if (tree is null || owner._selected < 0)
                 {
-                    return "未选中";
+                    return L.T("未选中");
                 }
 
-                return $"{tree.GetPath(owner._selected)}，{ByteSize.Format(tree[owner._selected].AllocSize)}";
+                return L.F("{0}，{1}", tree.GetPath(owner._selected), ByteSize.Format(tree[owner._selected].AllocSize));
             }
         }
 
-        public override string? Description => "方向键在方块之间移动，Enter 进入目录，Backspace 返回上一级";
+        public override string? Description => L.T("方向键在方块之间移动，Enter 进入目录，Backspace 返回上一级");
     }
 
     protected override void Dispose(bool disposing)

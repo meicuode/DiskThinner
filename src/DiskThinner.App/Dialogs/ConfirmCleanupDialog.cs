@@ -17,7 +17,7 @@ internal sealed class ConfirmCleanupDialog : Form
 
     private readonly CheckBox _ask = new()
     {
-        Text = "有文件被占用时，问我要不要请占用它的程序正常关闭（不会强制结束）",
+        Text = L.T("有文件被占用时，问我要不要请占用它的程序正常关闭（不会强制结束）"),
         AutoSize = true,
         Font = Theme.Ui,
         Margin = new Padding(0, 10, 0, 0),
@@ -36,7 +36,7 @@ internal sealed class ConfirmCleanupDialog : Form
         _ask.Checked = askWhenLocked;
         var total = toRun.Sum(i => i.Bytes);
         var estimate = toRun.Sum(i => i.EstimatedBytes);
-        Text = "确认清理";
+        Text = L.T("确认清理");
         Font = Theme.Ui;
         BackColor = Theme.Card;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -47,7 +47,7 @@ internal sealed class ConfirmCleanupDialog : Form
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96F, 96F);
 
-        _body.Controls.Add(Wrapped(Ui.Label($"确认清理 {toRun.Count} 项，共 {ByteSize.Format(total)}", Theme.Title)));
+        _body.Controls.Add(Wrapped(Ui.Label(L.F("确认清理 {0} 项，共 {1}", toRun.Count, ByteSize.Format(total)), Theme.Title)));
 
         // ---- 按处理方式汇总 ----
         _table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 66));
@@ -56,10 +56,10 @@ internal sealed class ConfirmCleanupDialog : Form
         var irreversible = toRun.Where(i => i.Group == PlanGroup.Irreversible).ToList();
         var commands = toRun.Where(i => i.Group != PlanGroup.Irreversible && i.Method?.Kind == MethodKind.Command).ToList();
         var deletes = toRun.Where(i => i.Group != PlanGroup.Irreversible && i.Method?.Kind == MethodKind.Delete).ToList();
-        var names = string.Join("、", commands.Select(c => Path.GetFileNameWithoutExtension(c.Method!.Command!.Exe)).Distinct());
-        Line("直接删除（会自动重建的缓存、临时文件、崩溃转储等）", deletes);
-        Line($"运行官方清理命令（{names}）", commands);
-        Line("删除后无法恢复", irreversible);
+        var names = string.Join(L.T("、"), commands.Select(c => Path.GetFileNameWithoutExtension(c.Method!.Command!.Exe)).Distinct());
+        Line(L.T("直接删除（会自动重建的缓存、临时文件、崩溃转储等）"), deletes);
+        Line(L.F("运行官方清理命令（{0}）", names), commands);
+        Line(L.T("删除后无法恢复"), irreversible);
         _fullWidth.Add(_table);
         _body.Controls.Add(_table);
 
@@ -69,32 +69,31 @@ internal sealed class ConfirmCleanupDialog : Form
             var lines = irreversible.Take(MaxListed).Select(Describe).ToList();
             if (irreversible.Count > MaxListed)
             {
-                lines.Add($"等 {irreversible.Count} 项");
+                lines.Add(L.F("等 {0} 项", irreversible.Count));
             }
 
-            var details = Ui.Button("查看明细");
+            var details = Ui.Button(L.T("查看明细"));
             details.Margin = new Padding(0, 8, 0, 0);
             details.Click += (_, _) => ShowDetails(irreversible);
-            _body.Controls.Add(Callout("以下内容删除后无法恢复", string.Join("\n", lines), Theme.WarnBack, Theme.WarnText, details));
+            _body.Controls.Add(Callout(L.T("以下内容删除后无法恢复"), string.Join("\n", lines), Theme.WarnBack, Theme.WarnText, details));
         }
 
         // ---- 正在运行的程序 ----
         var running = toRun.Where(i => i.RunningApps.Count > 0).ToList();
         if (running.Count > 0)
         {
-            var text = string.Join("\n", running.Take(MaxListed).Select(i => $"{string.Join("、", i.RunningApps)} 正在运行，{i.Title}中被占用的文件会跳过。"));
+            var text = string.Join("\n", running.Take(MaxListed).Select(i => L.F("{0} 正在运行，{1}中被占用的文件会跳过。", string.Join(L.T("、"), i.RunningApps), i.Title)));
             _body.Controls.Add(Callout(null, text, Theme.AccentWeak, Theme.Text, null));
         }
 
         _body.Controls.Add(_ask);
-        var note = Ui.Label($"删除是永久的，不经过回收站。预计释放 {ByteSize.Format(estimate)}，所有操作都会写入操作记录。" +
-            (manualCount > 0 ? $"另有 {manualCount} 项是手动清理，不会执行。" : ""), Theme.Small, Theme.Muted);
+        var note = Ui.Label(L.F("删除是永久的，不经过回收站。预计释放 {0}，所有操作都会写入操作记录。{1}", ByteSize.Format(estimate), (manualCount > 0 ? L.F("另有 {0} 项是手动清理，不会执行。", manualCount) : "")), Theme.Small, Theme.Muted);
         note.Margin = new Padding(0, 10, 0, 4);
         _body.Controls.Add(Wrapped(note));
 
         // ---- 按钮 ----
-        var start = Ui.Button("开始清理", primary: true, accessibleDescription: "按上面的清单删除，删除是永久的");
-        var back = Ui.Button("返回修改");
+        var start = Ui.Button(L.T("开始清理"), primary: true, accessibleDescription: L.T("按上面的清单删除，删除是永久的"));
+        var back = Ui.Button(L.T("返回修改"));
         start.DialogResult = DialogResult.OK;
         back.DialogResult = DialogResult.Cancel;
         start.Margin = new Padding(8, 0, 0, 0);
@@ -148,11 +147,11 @@ internal sealed class ConfirmCleanupDialog : Form
     {
         var m = i.Method!;
         var range = m.OldestUtc is { } a && m.NewestUtc is { } b
-            ? $"，最早 {a.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture)}、最晚 {b.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture)}"
+            ? L.F("，最早 {0}、最晚 {1}", a.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture), b.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture))
             : "";
         return m.Kind == MethodKind.Delete
-            ? $"{i.Title}：{m.Files:N0} 个文件{range}（{ByteSize.Format(m.EstimatedBytes)}）"
-            : $"{i.Title}：运行 {m.Display}（{ByteSize.Format(i.Bytes)}）";
+            ? L.F("{0}：{1:N0} 个文件{2}（{3}）", i.Title, m.Files, range, ByteSize.Format(m.EstimatedBytes))
+            : L.F("{0}：运行 {1}（{2}）", i.Title, m.Display, ByteSize.Format(i.Bytes));
     }
 
     private void Line(string what, List<PlanItem> items)
@@ -165,7 +164,7 @@ internal sealed class ConfirmCleanupDialog : Form
         var r = _table.RowCount++;
         _table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         _table.Controls.Add(Cell(what, ContentAlignment.MiddleLeft), 0, r);
-        _table.Controls.Add(Cell($"{items.Count} 项", ContentAlignment.MiddleRight), 1, r);
+        _table.Controls.Add(Cell(L.F("{0} 项", items.Count), ContentAlignment.MiddleRight), 1, r);
         _table.Controls.Add(Cell(ByteSize.Format(items.Sum(i => i.Bytes)), ContentAlignment.MiddleRight), 2, r);
     }
 
@@ -214,7 +213,7 @@ internal sealed class ConfirmCleanupDialog : Form
     {
         using var dlg = new Form
         {
-            Text = "删除后无法恢复的内容",
+            Text = L.T("删除后无法恢复的内容"),
             Font = Theme.Ui,
             StartPosition = FormStartPosition.CenterParent,
             AutoScaleMode = AutoScaleMode.Dpi,
@@ -223,12 +222,12 @@ internal sealed class ConfirmCleanupDialog : Form
             MinimizeBox = false,
             ShowInTaskbar = false,
         };
-        var list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, AccessibleName = "明细" };
-        list.Columns.Add("项目", 200);
-        list.Columns.Add("路径", 300);
-        list.Columns.Add("文件数", 70, HorizontalAlignment.Right);
-        list.Columns.Add("最早", 80);
-        list.Columns.Add("最晚", 80);
+        var list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, AccessibleName = L.T("明细") };
+        list.Columns.Add(L.T("项目"), 200);
+        list.Columns.Add(L.T("路径"), 300);
+        list.Columns.Add(L.T("文件数"), 70, HorizontalAlignment.Right);
+        list.Columns.Add(L.T("最早"), 80);
+        list.Columns.Add(L.T("最晚"), 80);
         foreach (var i in items)
         {
             var m = i.Method!;

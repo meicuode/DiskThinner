@@ -1,3 +1,4 @@
+using DiskThinner.Core;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.Rules;
@@ -163,7 +164,7 @@ public static class SpaceGroups
             {
                 groups[groupKey] = group = cell.Owner is { } o
                     ? new SpaceGroup { Key = groupKey, Name = o.Display, Owner = o }
-                    : new SpaceGroup { Key = groupKey, Name = "不知道归谁", IsUnknown = true };
+                    : new SpaceGroup { Key = groupKey, Name = L.T("不知道归谁"), IsUnknown = true };
             }
             else if (cell.Owner is { Source: OwnerSource.Rule } ruleOwner && group.Owner is { Source: OwnerSource.Inferred })
             {
@@ -208,7 +209,7 @@ public static class SpaceGroups
         var total = c.Unexplained(c.Tree.Root);
         if (total > 0)
         {
-            var unknown = new SpaceGroup { Key = "unknown", Name = "未识别", IsUnknown = true };
+            var unknown = new SpaceGroup { Key = "unknown", Name = L.T("未识别"), IsUnknown = true };
             long listed = 0;
             foreach (var (node, bytes, isRemainder) in c.UnexplainedHotspots(unknownThreshold))
             {

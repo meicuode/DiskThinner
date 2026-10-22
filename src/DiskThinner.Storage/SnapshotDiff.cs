@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Storage;
 
 /// <summary>"变化最大的目录"里的一项。</summary>
@@ -65,7 +67,7 @@ public sealed class SnapshotDiff
     {
         if (from.PathId(0) != to.PathId(0) && !string.Equals(from.Name(0), to.Name(0), StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException("两次快照不是同一个盘或同一个文件夹");
+            throw new ArgumentException(L.T("两次快照不是同一个盘或同一个文件夹"));
         }
 
         var diff = new SnapshotDiff(from, to);

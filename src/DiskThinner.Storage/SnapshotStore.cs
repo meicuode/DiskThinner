@@ -1,4 +1,5 @@
 using System.Globalization;
+using DiskThinner.Core;
 using DiskThinner.Scanner;
 using Microsoft.Data.Sqlite;
 
@@ -33,7 +34,7 @@ public sealed class SnapshotStore
         var version = Convert.ToInt32(Scalar(conn, "PRAGMA user_version"), CultureInfo.InvariantCulture);
         if (version > FormatVersion)
         {
-            throw new InvalidDataException($"快照库来自更新的版本（格式 {version}），请升级 DiskThinner");
+            throw new InvalidDataException(L.F("快照库来自更新的版本（格式 {0}），请升级 DiskThinner", version));
         }
 
         using var tx = conn.BeginTransaction();
@@ -182,7 +183,7 @@ public sealed class SnapshotStore
             using var r = cmd.ExecuteReader();
             if (!r.Read())
             {
-                throw new KeyNotFoundException($"没有编号为 {id} 的快照");
+                throw new KeyNotFoundException(L.F("没有编号为 {0} 的快照", id));
             }
 
             info = ReadInfo(r);
@@ -218,7 +219,7 @@ public sealed class SnapshotStore
     {
         var byParent = raw.ToLookup(x => x.ParentId, x => x.Entry);
         var ids = raw.Select(x => x.Entry.PathId).ToHashSet();
-        var root = raw.FirstOrDefault(x => !ids.Contains(x.ParentId)).Entry ?? throw new InvalidDataException("快照里没有根目录");
+        var root = raw.FirstOrDefault(x => !ids.Contains(x.ParentId)).Entry ?? throw new InvalidDataException(L.T("快照里没有根目录"));
         var ordered = new List<SnapshotEntry> { root };
         root.Parent = -1;
         for (var i = 0; i < ordered.Count; i++)

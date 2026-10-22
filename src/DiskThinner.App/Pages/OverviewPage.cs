@@ -16,23 +16,23 @@ namespace DiskThinner.App.Pages;
 internal sealed class OverviewPage : UserControl
 {
     private readonly Label _sub = Ui.Label("", Theme.Ui, Theme.Muted);
-    private readonly StatCard _used = new("C 盘已用");
-    private readonly StatCard _growth = new("近 7 天净增长");
-    private readonly StatCard _cleanable = new("可释放（规则判定）");
-    private readonly StatCard _unknown = new("未识别");
-    private readonly ItemList _suggest = new("建议先处理", ["项目", "大小", "风险", ""]);
-    private readonly ItemList _largest = new("占用最多", ["位置", "大小", "归属", "风险"]);
-    private readonly Label _empty = Ui.Label("正在扫描…", Theme.Ui, Theme.Muted);
+    private readonly StatCard _used = new(L.T("C 盘已用"));
+    private readonly StatCard _growth = new(L.T("近 7 天净增长"));
+    private readonly StatCard _cleanable = new(L.T("可释放（规则判定）"));
+    private readonly StatCard _unknown = new(L.T("未识别"));
+    private readonly ItemList _suggest = new(L.T("建议先处理"), [L.T("项目"), L.T("大小"), L.T("风险"), ""]);
+    private readonly ItemList _largest = new(L.T("占用最多"), [L.T("位置"), L.T("大小"), L.T("归属"), L.T("风险")]);
+    private readonly Label _empty = Ui.Label(L.T("正在扫描…"), Theme.Ui, Theme.Muted);
 
     public OverviewPage()
     {
         BackColor = Theme.Background;
         AutoScroll = true;
         Padding = new Padding(20, 16, 20, 24);
-        AccessibleName = "概览";
+        AccessibleName = L.T("概览");
 
         var head = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0, 0, 0, 12) };
-        var title = Ui.Label("概览", new Font(Theme.UiFontName, 15F, FontStyle.Bold));
+        var title = Ui.Label(L.T("概览"), new Font(Theme.UiFontName, 15F, FontStyle.Bold));
         title.Margin = new Padding(0, 0, 12, 0);
         _sub.Margin = new Padding(0, 8, 0, 0);
         head.Controls.Add(title);
@@ -54,7 +54,7 @@ internal sealed class OverviewPage : UserControl
             c.Margin = new Padding(0, 0, 12, 0);
         }
 
-        var trendCard = new ItemCard("可用空间（近 30 天）", _trend, "数据来自快照");
+        var trendCard = new ItemCard(L.T("可用空间（近 30 天）"), _trend, L.T("数据来自快照"));
         var row2 = Row(390, 57.5f, trendCard, _suggest);
         var row3 = Row(350, 50, _largest, _fastest);
 
@@ -67,9 +67,9 @@ internal sealed class OverviewPage : UserControl
         Controls.Add(_empty);
         Controls.Add(head);
 
-        _growth.Set("—", "需要相隔半天以上的两次快照", null);
-        _trend.SetData([], "快照少于两个，还画不出趋势");
-        _fastest.SetPlaceholder("需要相隔半天以上的两次快照");
+        _growth.Set("—", L.T("需要相隔半天以上的两次快照"), null);
+        _trend.SetData([], L.T("快照少于两个，还画不出趋势"));
+        _fastest.SetPlaceholder(L.T("需要相隔半天以上的两次快照"));
         _suggest.Activated += (_, node) => NavigateRequested?.Invoke(this, node);
         _largest.Activated += (_, node) => NavigateRequested?.Invoke(this, node);
         _fastest.Activated += (_, node) =>
@@ -93,8 +93,8 @@ internal sealed class OverviewPage : UserControl
         return row;
     }
 
-    private readonly TrendChart _trend = new() { AccessibleName = "可用空间趋势" };
-    private readonly ItemList _fastest = new("增长最快（近 7 天）", ["目录", "变化", "归属"], [86, 150]);
+    private readonly TrendChart _trend = new() { AccessibleName = L.T("可用空间趋势") };
+    private readonly ItemList _fastest = new(L.T("增长最快（近 7 天）"), [L.T("目录"), L.T("变化"), L.T("归属")], [86, 150]);
 
     internal ItemList Fastest => _fastest;
 
@@ -111,7 +111,7 @@ internal sealed class OverviewPage : UserControl
         var now = model?.NowPoint;
         if (model is null || now is null)
         {
-            _growth.Set("—", "快照库不可用", null);
+            _growth.Set("—", L.T("快照库不可用"), null);
             return;
         }
 
@@ -121,36 +121,36 @@ internal sealed class OverviewPage : UserControl
             points.Add(now.Value);
         }
 
-        _trend.SetData(points.Select(p => (p.TakenAtUtc.ToLocalTime(), p.FreeBytes)).ToList(), "快照少于两个，还画不出趋势");
+        _trend.SetData(points.Select(p => (p.TakenAtUtc.ToLocalTime(), p.FreeBytes)).ToList(), L.T("快照少于两个，还画不出趋势"));
 
         if (model.WeekBaseline is not { } baseline || model.WeekDiff is null)
         {
-            _growth.Title = "近 7 天净增长";
-            _growth.Set("—", model.Snapshots.Count == 0 ? "还没有快照，扫描整个盘后会自动保存" : "需要相隔半天以上的两次快照", null);
+            _growth.Title = L.T("近 7 天净增长");
+            _growth.Set("—", model.Snapshots.Count == 0 ? L.T("还没有快照，扫描整个盘后会自动保存") : L.T("需要相隔半天以上的两次快照"), null);
             _fastest.SetItems([]);
-            _fastest.SetPlaceholder("需要相隔半天以上的两次快照");
+            _fastest.SetPlaceholder(L.T("需要相隔半天以上的两次快照"));
             return;
         }
 
         var (change, days, toFull) = GrowthStats.Rate(GrowthStats.Of(baseline), now.Value);
-        var label = days >= 6.5 ? "近 7 天" : $"近 {Math.Max(1, (int)Math.Round(days))} 天";
-        _growth.Title = label + "净增长";
-        _fastest.Title = $"增长最快（{label}）";
+        var label = days >= 6.5 ? L.T("近 7 天") : L.F("近 {0} 天", Math.Max(1, (int)Math.Round(days)));
+        _growth.Title = L.F("{0}净增长", label);
+        _fastest.Title = L.F("增长最快（{0}）", label);
         var foot = toFull is { } d && d < 3650
-            ? $"按此速度约 {Math.Max(1, (int)Math.Round(d))} 天后写满"
-            : change <= 0 ? "没有在增长" : "按此速度短期内不会写满";
+            ? L.F("按此速度约 {0} 天后写满", Math.Max(1, (int)Math.Round(d)))
+            : change <= 0 ? L.T("没有在增长") : L.T("按此速度短期内不会写满");
         _growth.Set(BarChart.Signed(change), foot, null);
 
         var items = model.WeekHotspots.Take(8).Select(h =>
         {
             var node = tree?.FindPath(h.Path) ?? -1;
             var owner = node >= 0 ? owners?.OwnerOf(node)?.Display ?? (c?.RuleOf(node) is { } r ? Names.Display(r.Kind) : null) : null;
-            return new ListItem(node, [Redact(h.Path) + (h.IsRemainder ? "（其余部分）" : ""), BarChart.Signed(h.Change), owner ?? ""],
-                $"之前 {ByteSize.Format(h.Previous)}，现在 {ByteSize.Format(h.Current)}", RuleView.Unknown, node < 0 ? "已不存在" : "未识别",
+            return new ListItem(node, [Redact(h.Path) + (h.IsRemainder ? L.T("（其余部分）") : ""), BarChart.Signed(h.Change), owner ?? ""],
+                L.F("之前 {0}，现在 {1}", ByteSize.Format(h.Previous), ByteSize.Format(h.Current)), RuleView.Unknown, node < 0 ? L.T("已不存在") : L.T("未识别"),
                 h.Change > 0 ? Theme.Up : h.Change < 0 ? Theme.Down : null);
         }).ToList();
         _fastest.SetItems(items);
-        _fastest.SetPlaceholder(items.Count == 0 ? "这段时间里没有超过 100 MB 的变化" : null);
+        _fastest.SetPlaceholder(items.Count == 0 ? L.T("这段时间里没有超过 100 MB 的变化") : null);
     }
 
     /// <summary>带标题和边框的卡片，里面放一个控件（趋势图）。</summary>
@@ -192,7 +192,7 @@ internal sealed class OverviewPage : UserControl
 
     internal StatCard CleanableCard => _cleanable;
 
-    public void ShowScanning() => _empty.Text = "正在扫描…";
+    public void ShowScanning() => _empty.Text = L.T("正在扫描…");
 
     public void SetResult(ScanResult? result, Classification? c, OwnerMap? owners = null)
     {
@@ -200,23 +200,23 @@ internal sealed class OverviewPage : UserControl
         _empty.Visible = result is null;
         if (result is null)
         {
-            _empty.Text = "没有扫描结果。";
+            _empty.Text = L.T("没有扫描结果。");
             return;
         }
 
         var (tree, stats) = result;
         var drive = stats.Root.TrimEnd('\\');
-        var mode = stats.Mode == ScanMode.Mft ? "MFT" : "遍历，估算";
-        _sub.Text = $"上次扫描：{DateTime.Now:HH:mm}（{mode}，{stats.TotalDuration.TotalSeconds:F1} 秒）";
+        var mode = stats.Mode == ScanMode.Mft ? "MFT" : L.T("遍历，估算");
+        _sub.Text = L.F("上次扫描：{0:HH:mm}（{1}，{2:F1} 秒）", DateTime.Now, mode, stats.TotalDuration.TotalSeconds);
 
         // ---- 卡片 ----
         var used = stats.VolumeTotalBytes - stats.VolumeFreeBytes;
         var isVolume = tree.GetPath(tree.Root).Length <= 3;
-        _used.Title = isVolume ? $"{drive} 已用" : "扫描范围";
+        _used.Title = isVolume ? L.F("{0} 已用", drive) : L.T("扫描范围");
         if (isVolume && stats.VolumeTotalBytes > 0)
         {
             _used.Set($"{ByteSize.Format(used)} / {ByteSize.Format(stats.VolumeTotalBytes)}",
-                $"可用 {ByteSize.Format(stats.VolumeFreeBytes)}", used / (double)stats.VolumeTotalBytes);
+                L.F("可用 {0}", ByteSize.Format(stats.VolumeFreeBytes)), used / (double)stats.VolumeTotalBytes);
         }
         else
         {
@@ -225,7 +225,7 @@ internal sealed class OverviewPage : UserControl
 
         if (c is null)
         {
-            _cleanable.Set("—", "规则没有加载", null);
+            _cleanable.Set("—", L.T("规则没有加载"), null);
             _unknown.Set("—", "", null);
             _suggest.SetItems([]);
             _largest.SetItems([]);
@@ -233,10 +233,10 @@ internal sealed class OverviewPage : UserControl
         }
 
         _cleanable.Set(ByteSize.Format(c.TotalCleanable),
-            $"安全 {ByteSize.Format(c.CleanableBytes(Risk.Safe))} · 需重新下载 {ByteSize.Format(c.CleanableBytes(Risk.Low))} · 丢历史 {ByteSize.Format(c.CleanableBytes(Risk.Medium))}", null);
+            L.F("安全 {0} · 需重新下载 {1} · 丢历史 {2}", ByteSize.Format(c.CleanableBytes(Risk.Safe)), ByteSize.Format(c.CleanableBytes(Risk.Low)), ByteSize.Format(c.CleanableBytes(Risk.Medium))), null);
 
         var hotspots = c.UnexplainedHotspots(100L << 20);
-        _unknown.Set(ByteSize.Format(c.Unexplained(tree.Root)), $"其中 {hotspots.Count} 处超过 100 MB", null);
+        _unknown.Set(ByteSize.Format(c.Unexplained(tree.Root)), L.F("其中 {0} 处超过 100 MB", hotspots.Count), null);
 
         _suggest.SetItems(BuildSuggestions(tree, c, hotspots, _owners!));
         _largest.SetItems(BuildLargest(tree, c, _owners!));
@@ -257,23 +257,23 @@ internal sealed class OverviewPage : UserControl
                      .OrderByDescending(x => x.Bytes).Take(6))
         {
             var largest = g.Roots.MaxBy(r => r.CleanableBytes)!;
-            var count = g.Roots.Count > 1 ? $"（{g.Roots.Count} 处）" : "";
-            items.Add(new ListItem(largest.Node, [TitleAt(g.Rule, largest.Node) + count, ByteSize.Format(g.Bytes), "", "查看"], g.Rule.Purpose,
-                RuleView.RiskStyle(g.Rule.Risk), RuleView.RiskLabel(g.Rule.Risk, g.Rule)));
+            var count = g.Roots.Count > 1 ? L.F("（{0} 处）", g.Roots.Count) : "";
+            items.Add(new ListItem(largest.Node, [TitleAt(g.Rule, largest.Node) + count, ByteSize.Format(g.Bytes), "", L.T("查看")], g.Rule.Purpose,
+                RuleView.RiskStyle(g.Rule.Risk), RuleView.RiskLabel(g.Rule.Risk, g.Rule), LinkLast: true));
         }
 
         foreach (var root in c.Roots.Where(r => rules.Locations[r.Rule].Risk == Risk.Guide && r.Bytes >= 1L << 30)
                      .OrderByDescending(r => r.Bytes).Take(2))
         {
             var rule = rules.Locations[root.Rule];
-            items.Add(new ListItem(root.Node, [TitleAt(rule, root.Node), ByteSize.Format(root.Bytes), "", "查看步骤"], rule.Purpose,
-                RuleView.RiskStyle(Risk.Guide), RuleView.RiskLabel(Risk.Guide, rule)));
+            items.Add(new ListItem(root.Node, [TitleAt(rule, root.Node), ByteSize.Format(root.Bytes), "", L.T("查看步骤")], rule.Purpose,
+                RuleView.RiskStyle(Risk.Guide), RuleView.RiskLabel(Risk.Guide, rule), LinkLast: true));
         }
 
         if (hotspots.FirstOrDefault(h => !h.IsRemainder) is { Bytes: > 0 } spot)
         {
-            items.Add(new ListItem(spot.Node, [Redact(tree.GetPath(spot.Node)), ByteSize.Format(spot.Bytes), "", "查看"], "没有规则认识这里",
-                RuleView.Unknown, "未识别"));
+            items.Add(new ListItem(spot.Node, [Redact(tree.GetPath(spot.Node)), ByteSize.Format(spot.Bytes), "", L.T("查看")], L.T("没有规则认识这里"),
+                RuleView.Unknown, L.T("未识别"), LinkLast: true));
         }
 
         return items;
@@ -297,7 +297,7 @@ internal sealed class OverviewPage : UserControl
             if (rule is null)
             {
                 // 没有规则认识，但可能推断出了归属
-                items.Add(new ListItem(node, [path, ByteSize.Format(bytes), owner ?? "未识别", ""], null, RuleView.Unknown, "未识别"));
+                items.Add(new ListItem(node, [path, ByteSize.Format(bytes), owner ?? L.T("未识别"), ""], null, RuleView.Unknown, L.T("未识别")));
                 continue;
             }
 
@@ -316,7 +316,8 @@ internal sealed class OverviewPage : UserControl
     internal static string Redact(string path) => PathDisplay.Shorten(path);
 
     /// <summary>一行数据：点击后跳到 <see cref="Node"/>。</summary>
-    internal sealed record ListItem(int Node, string[] Cells, string? Note, RuleView.TagStyle TagStyle, string Tag, Color? ValueColor = null);
+    /// <param name="LinkLast">最后一列是链接（"查看""查看步骤"），画成链接色。</param>
+    internal sealed record ListItem(int Node, string[] Cells, string? Note, RuleView.TagStyle TagStyle, string Tag, Color? ValueColor = null, bool LinkLast = false);
 
     /// <summary>原型 .stat 卡片：标题、大数字、说明和可选的进度条。</summary>
     internal sealed class StatCard : Panel
@@ -355,7 +356,7 @@ internal sealed class OverviewPage : UserControl
             _value.Text = value;
             _foot.Text = foot;
             _meter = meter;
-            AccessibleDescription = $"{value}，{foot}";
+            AccessibleDescription = L.F("{0}，{1}", value, foot);
             PerformLayout();
             Invalidate();
         }
@@ -413,7 +414,7 @@ internal sealed class OverviewPage : UserControl
             Padding = new Padding(14, 10, 14, 10);
             var heading = new Label { Text = title, Dock = DockStyle.Top, Height = 26, Font = Theme.UiBold, ForeColor = Theme.Text, UseMnemonic = false };
             _heading = heading;
-            var hint = new Label { Text = "双击或按回车在空间浏览中查看", Dock = DockStyle.Bottom, Height = 20, Font = Theme.Small, ForeColor = Theme.Subtle, UseMnemonic = false };
+            var hint = new Label { Text = L.T("双击或按回车在空间浏览中查看"), Dock = DockStyle.Bottom, Height = 20, Font = Theme.Small, ForeColor = Theme.Subtle, UseMnemonic = false };
             _view = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -562,7 +563,7 @@ internal sealed class OverviewPage : UserControl
                 return;
             }
 
-            if (e.ColumnIndex == item.Cells.Length - 1 && text is "查看" or "查看步骤")
+            if (e.ColumnIndex == item.Cells.Length - 1 && item.LinkLast)
             {
                 TextRenderer.DrawText(g, text, _fonts.Regular, cell, Theme.Accent, flags);
                 return;

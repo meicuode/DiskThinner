@@ -208,7 +208,8 @@ public sealed class SafetyTests : IDisposable
         var env = PlanCache();
         var blocked = env.Plan.Items.Single(i => i.Group == PlanGroup.Blocked);
         Assert.Equal(login, blocked.Path, ignoreCase: true);
-        Assert.Equal("保护名单", blocked.Source);
+        Assert.Equal(PlanSource.Protection, blocked.Source);
+        Assert.Equal("保护名单", blocked.SourceText);
         Assert.Equal(256 * Kb, env.Item(Cache).EstimatedBytes);
 
         var r = Assert.Single(env.Run(env.Item(Cache)).Results);

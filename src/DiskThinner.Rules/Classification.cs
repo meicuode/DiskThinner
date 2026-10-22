@@ -1,3 +1,4 @@
+using DiskThinner.Core;
 using DiskThinner.Scanner;
 
 namespace DiskThinner.Rules;
@@ -37,7 +38,7 @@ public sealed class Classification
         Tree = tree;
         if (engine.Protections.Count > short.MaxValue)
         {
-            throw new InvalidOperationException("保护名单项太多");
+            throw new InvalidOperationException(L.T("保护名单项太多"));
         }
 
         _rootOf = new int[tree.Count];

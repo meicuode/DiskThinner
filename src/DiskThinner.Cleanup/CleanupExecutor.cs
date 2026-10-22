@@ -56,7 +56,7 @@ public sealed class CleanupExecutor(RuleEngine engine, AuditLog? audit, Executor
             var item = toRun[i];
             if (token.IsCancellationRequested)
             {
-                results.Add(Finish(item, runId, AuditResult.NotRun, 0, "取消了，没有执行", null, null, log: false));
+                results.Add(Finish(item, runId, AuditResult.NotRun, 0, L.T("取消了，没有执行"), null, null, log: false));
                 continue;
             }
 
@@ -74,7 +74,7 @@ public sealed class CleanupExecutor(RuleEngine engine, AuditLog? audit, Executor
         var verify = Verifier.Verify(item, engine, _protection, options);
         if (verify.Status == VerifyStatus.Missing)
         {
-            return Finish(item, runId, AuditResult.NotRun, 0, "执行时已经不在了", null, null);
+            return Finish(item, runId, AuditResult.NotRun, 0, L.T("执行时已经不在了"), null, null);
         }
 
         if (verify.Status == VerifyStatus.Refused)
@@ -103,10 +103,10 @@ public sealed class CleanupExecutor(RuleEngine engine, AuditLog? audit, Executor
             var cmd = CommandRunner.Run(method.Command!, method.CommandPath!, options.CommandTimeout, token);
             var freed = Freed(volume, before);
             var result = cmd.Succeeded ? AuditResult.Succeeded : cmd.Cancelled ? AuditResult.NotRun : AuditResult.Failed;
-            var text = cmd.Succeeded ? $"成功，释放 {ByteSize.Format(freed)}"
-                : cmd.TimedOut ? $"超过 {options.CommandTimeout.TotalMinutes:0} 分钟没有结束，已停止"
-                : cmd.Cancelled ? "取消了"
-                : cmd.Error ?? $"退出码 {cmd.ExitCode}";
+            var text = cmd.Succeeded ? L.F("成功，释放 {0}", ByteSize.Format(freed))
+                : cmd.TimedOut ? L.F("超过 {0:0} 分钟没有结束，已停止", options.CommandTimeout.TotalMinutes)
+                : cmd.Cancelled ? L.T("取消了")
+                : cmd.Error ?? L.F("退出码 {0}", cmd.ExitCode);
             return Finish(item, runId, result, freed, text, null, cmd);
         }
 
@@ -213,28 +213,28 @@ public sealed class CleanupExecutor(RuleEngine engine, AuditLog? audit, Executor
 
     private static string Describe(DeleteOutcome o, long freed)
     {
-        var parts = new List<string> { $"释放 {ByteSize.Format(freed)}" };
+        var parts = new List<string> { L.F("释放 {0}", ByteSize.Format(freed)) };
         if (o.LockedCount > 0)
         {
-            parts.Add($"{o.LockedCount} 个文件被占用已跳过");
+            parts.Add(L.F("{0} 个文件被占用已跳过", o.LockedCount));
         }
 
         if (o.ErrorCount > 0)
         {
-            parts.Add($"{o.ErrorCount} 个出错");
+            parts.Add(L.F("{0} 个出错", o.ErrorCount));
         }
 
         if (o.ProtectedCount > 0)
         {
-            parts.Add($"{o.ProtectedCount} 处受保护已跳过");
+            parts.Add(L.F("{0} 处受保护已跳过", o.ProtectedCount));
         }
 
         if (o.Cancelled)
         {
-            parts.Add("中途取消");
+            parts.Add(L.T("中途取消"));
         }
 
-        return string.Join("，", parts);
+        return string.Join(L.T("，"), parts);
     }
 
     /// <summary>写进操作记录的明细：数量、跳过的原因、前几条被占用和出错的路径。</summary>
@@ -242,38 +242,38 @@ public sealed class CleanupExecutor(RuleEngine engine, AuditLog? audit, Executor
     {
         var lines = new List<string>
         {
-            $"删除 {o.FilesDeleted} 个文件（{ByteSize.Format(o.BytesDeleted)}）、{o.DirsDeleted} 个目录、{o.LinksRemoved} 个链接",
+            L.F("删除 {0} 个文件（{1}）、{2} 个目录、{3} 个链接", o.FilesDeleted, ByteSize.Format(o.BytesDeleted), o.DirsDeleted, o.LinksRemoved),
         };
         if (o.SharedBytes > 0)
         {
-            lines.Add($"其中 {ByteSize.Format(o.SharedBytes)} 还有别的硬链接名，没有释放");
+            lines.Add(L.F("其中 {0} 还有别的硬链接名，没有释放", ByteSize.Format(o.SharedBytes)));
         }
 
         if (o.Kept > 0)
         {
-            lines.Add($"按条件保留 {o.Kept} 项");
+            lines.Add(L.F("按条件保留 {0} 项", o.Kept));
         }
 
         if (o.OtherReparseSkipped > 0)
         {
-            lines.Add($"跳过 {o.OtherReparseSkipped} 个占位符或特殊链接");
+            lines.Add(L.F("跳过 {0} 个占位符或特殊链接", o.OtherReparseSkipped));
         }
 
         if (o.LockedCount > 0)
         {
             var holders = RestartManager.WhoLocks(o.Locked);
-            var who = holders.Count == 0 ? "" : "（" + string.Join("、", holders.Select(h => h.Name).Distinct().Take(5)) + "）";
-            lines.Add($"{o.LockedCount} 个文件被占用已跳过{who}：" + string.Join("；", o.Locked.Take(5)));
+            var who = holders.Count == 0 ? "" : L.F("（{0}）", string.Join(L.T("、"), holders.Select(h => h.Name).Distinct().Take(5)));
+            lines.Add(L.F("{0} 个文件被占用已跳过{1}：{2}", o.LockedCount, who, string.Join(L.T("；"), o.Locked.Take(5))));
         }
 
         if (o.ErrorCount > 0)
         {
-            lines.Add($"{o.ErrorCount} 个出错：" + string.Join("；", o.Errors.Take(5)));
+            lines.Add(L.F("{0} 个出错：{1}", o.ErrorCount, string.Join(L.T("；"), o.Errors.Take(5))));
         }
 
         if (o.Cancelled)
         {
-            lines.Add("中途取消");
+            lines.Add(L.T("中途取消"));
         }
 
         return string.Join("\n", lines);

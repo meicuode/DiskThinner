@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using DiskThinner.Core;
 
 namespace DiskThinner.Scanner.Mft;
 
@@ -321,7 +322,7 @@ internal sealed class MftTables
         var root = rootRecord < RecordCount ? recordToNode[rootRecord] : -1;
         if (root < 0)
         {
-            throw new InvalidDataException("MFT 中找不到根目录记录");
+            throw new InvalidDataException(L.T("MFT 中找不到根目录记录"));
         }
 
         tree.Rename(root, rootName);

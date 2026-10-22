@@ -72,7 +72,7 @@ public static class PlanBuilder
             {
                 if (root.Bytes >= o.MinGuideBytes)
                 {
-                    blocked.Add(Blocked(tree, node, root.Rule, rule, title, root.Bytes, "系统设置中处理", "系统设置",
+                    blocked.Add(Blocked(tree, node, root.Rule, rule, title, root.Bytes, L.T("系统设置中处理"), PlanSource.SystemSettings,
                         rule.Actions.OfType<GuideAction>().FirstOrDefault()?.Text));
                 }
 
@@ -89,7 +89,7 @@ public static class PlanBuilder
                 // 规则说可以删，但保护名单把它拦下了
                 if (c.ProtectionOf(node) is { } p && root.Bytes >= o.MinBytes)
                 {
-                    blocked.Add(Blocked(tree, node, root.Rule, rule, title, root.Bytes, p.Reason, ProtectionList.Display(p.Level), null));
+                    blocked.Add(Blocked(tree, node, root.Rule, rule, title, root.Bytes, p.Reason, CleanupText.SourceOf(p.Level), null));
                 }
 
                 continue;
@@ -102,7 +102,7 @@ public static class PlanBuilder
 
             if (UserBlock(path, profiles, o) is { } userBlock)
             {
-                blocked.Add(Blocked(tree, node, root.Rule, rule, title, root.CleanableBytes, userBlock, "规则", null));
+                blocked.Add(Blocked(tree, node, root.Rule, rule, title, root.CleanableBytes, userBlock, PlanSource.Rule, null));
                 continue;
             }
 
@@ -117,7 +117,7 @@ public static class PlanBuilder
                     case DeleteAction d:
                         var minAge = d.OlderThanDays is { } ruleDays && rule.Kind == Kind.Temp && o.MinTempAgeDays is { } setting && setting > ruleDays ? setting : d.OlderThanDays;
                         var est = Simulate(tree, c, node, d with { OlderThanDays = minAge }, allowSoft, o.NowUtc, methods.Any(m => m.Kind == MethodKind.Delete) ? null : protectedNodes);
-                        methods.Add(new PlanMethod(MethodKind.Delete, "直接删除")
+                        methods.Add(new PlanMethod(MethodKind.Delete, L.T("直接删除"))
                         {
                             Delete = d,
                             MinAgeDays = minAge,
@@ -148,7 +148,7 @@ public static class PlanBuilder
                         }
                         else
                         {
-                            hints.Add($"没有找到 {known.Exe}，不能运行 {known.Display}");
+                            hints.Add(L.F("没有找到 {0}，不能运行 {1}", known.Exe, known.Display));
                         }
 
                         break;
@@ -168,25 +168,25 @@ public static class PlanBuilder
 
             if (root.SharedBytes > 0)
             {
-                hints.Add($"{ByteSize.Format(root.SharedBytes)} 与其他位置用硬链接共享，删掉这里不释放");
+                hints.Add(L.F("{0} 与其他位置用硬链接共享，删掉这里不释放", ByteSize.Format(root.SharedBytes)));
             }
 
             var running = RunningApps(rules, rule, o.RunningExes);
             if (running.Count > 0)
             {
-                hints.Add($"{string.Join("、", running)} 正在运行，被占用的文件会跳过");
+                hints.Add(L.F("{0} 正在运行，被占用的文件会跳过", string.Join(L.T("、"), running)));
             }
 
             if (protectedNodes.Count > 0)
             {
-                hints.Add($"其中 {protectedNodes.Count} 处受保护，执行时跳过");
+                hints.Add(L.F("其中 {0} 处受保护，执行时跳过", protectedNodes.Count));
             }
 
             // 项目里的依赖（node_modules、虚拟环境）：规则用 ** 在用户目录里到处匹配，属于用户自己的项目，默认不勾选
             var projectDeps = rule.Kind == Kind.BuildOutput && rule.Pattern.Contains(@"\**\", StringComparison.Ordinal);
             if (projectDeps)
             {
-                hints.Add("你的项目的依赖，默认不勾选");
+                hints.Add(L.T("你的项目的依赖，默认不勾选"));
             }
 
             items.Add(new PlanItem
@@ -205,7 +205,7 @@ public static class PlanBuilder
                 Methods = methods,
                 Method = first,
                 Selected = first.Kind != MethodKind.Manual && !projectDeps,
-                Hint = hints.Count == 0 ? null : string.Join("；", hints),
+                Hint = hints.Count == 0 ? null : string.Join(L.T("；"), hints),
                 RunningApps = running,
             });
 
@@ -220,8 +220,8 @@ public static class PlanBuilder
                     Node = pn,
                     Bytes = tree[pn].AllocSize,
                     BlockReason = entry.Reason,
-                    Source = ProtectionList.Display(entry.Level),
-                    Hint = $"在\u201c{title}\u201d里，执行时跳过",
+                    Source = CleanupText.SourceOf(entry.Level),
+                    Hint = L.F("在“{0}”里，执行时跳过", title),
                 });
             }
         }
@@ -234,13 +234,13 @@ public static class PlanBuilder
         string?[] warnings =
         [
             o.Account?.MismatchText,
-            o.HardLinksKnown ? null : "这次是普通权限的遍历扫描，识别不了硬链接：和别处共享的文件也算进了预计释放，实际释放可能更少。以管理员身份扫描更准确。",
+            o.HardLinksKnown ? null : L.T("这次是普通权限的遍历扫描，识别不了硬链接：和别处共享的文件也算进了预计释放，实际释放可能更少。以管理员身份扫描更准确。"),
         ];
         var warning = string.Join("\n", warnings.OfType<string>());
         return new CleanupPlan(ordered, warning.Length == 0 ? null : warning);
     }
 
-    private static PlanItem Blocked(NodeTree tree, int node, int ruleIndex, LocationRule rule, string title, long bytes, string reason, string source, string? hint) => new()
+    private static PlanItem Blocked(NodeTree tree, int node, int ruleIndex, LocationRule rule, string title, long bytes, string reason, PlanSource source, string? hint) => new()
     {
         Path = tree.GetPath(node),
         IsDirectory = tree[node].IsDirectory,
@@ -266,10 +266,10 @@ public static class PlanBuilder
 
         if (o.Account is { Mismatch: true })
         {
-            return "提权账户和登录用户不一致，不清理用户目录";
+            return L.T("提权账户和登录用户不一致，不清理用户目录");
         }
 
-        return o.CurrentProfile is { } me && !IsUnder(path, me) ? "其他用户的目录" : null;
+        return o.CurrentProfile is { } me && !IsUnder(path, me) ? L.T("其他用户的目录") : null;
     }
 
     /// <summary>官方命令清的是当前用户自己的缓存：账户不一致、或者这个位置不在当前用户目录下时不能用。</summary>
@@ -277,10 +277,10 @@ public static class PlanBuilder
     {
         if (o.Account is { Mismatch: true })
         {
-            return "提权账户和登录用户不一致，不运行官方命令";
+            return L.T("提权账户和登录用户不一致，不运行官方命令");
         }
 
-        return o.CurrentProfile is { } me && !IsUnder(path, me) ? "官方命令只清理当前用户自己的缓存" : null;
+        return o.CurrentProfile is { } me && !IsUnder(path, me) ? L.T("官方命令只清理当前用户自己的缓存") : null;
     }
 
     internal static bool IsUnder(string path, string dir) =>

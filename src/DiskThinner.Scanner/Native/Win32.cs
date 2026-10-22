@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using DiskThinner.Core;
 using Microsoft.Win32.SafeHandles;
 
 namespace DiskThinner.Scanner.Native;
@@ -68,12 +69,12 @@ internal static partial class Win32
         {
             if (!ReadFile(handle, p, buffer.Length, out var read, &overlapped))
             {
-                throw new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError(), $"读取卷失败（偏移 {offset}）");
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError(), L.F("读取卷失败（偏移 {0}）", offset));
             }
 
             if (read != buffer.Length)
             {
-                throw new IOException($"读取卷时数据不完整：期望 {buffer.Length} 字节，实际 {read} 字节（偏移 {offset}）");
+                throw new IOException(L.F("读取卷时数据不完整：期望 {0} 字节，实际 {1} 字节（偏移 {2}）", buffer.Length, read, offset));
             }
         }
     }

@@ -1,3 +1,5 @@
+using DiskThinner.Core;
+
 namespace DiskThinner.Inventory;
 
 /// <summary>已装软件的来源。</summary>
@@ -49,12 +51,12 @@ public sealed record InstalledApp
 
     public string SourceText => Source switch
     {
-        AppSource.Registry => "已装软件",
-        AppSource.Store => "商店应用",
-        AppSource.Npm => "npm 全局包",
+        AppSource.Registry => L.T("已装软件"),
+        AppSource.Store => L.T("商店应用"),
+        AppSource.Npm => L.T("npm 全局包"),
         AppSource.Scoop => "scoop",
-        AppSource.CommandLine => "命令行工具",
-        _ => "运行中的程序",
+        AppSource.CommandLine => L.T("命令行工具"),
+        _ => L.T("运行中的程序"),
     };
 }
 

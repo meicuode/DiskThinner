@@ -26,9 +26,9 @@ internal sealed class ExplorerPage : UserControl
     private readonly SplitContainer _outer;
     private readonly SplitContainer _left;
     private readonly FlowLayoutPanel _legend;
-    private readonly CheckBox _onlyCleanable = Ui.Chip("只看可清理");
-    private readonly CheckBox _onlyUnknown = Ui.Chip("只看未识别");
-    private readonly SegmentedControl _view = new("视图", "按目录", "按归属汇总", "按类别汇总");
+    private readonly CheckBox _onlyCleanable = Ui.Chip(L.T("只看可清理"));
+    private readonly CheckBox _onlyUnknown = Ui.Chip(L.T("只看未识别"));
+    private readonly SegmentedControl _view = new(L.T("视图"), L.T("按目录"), L.T("按归属汇总"), L.T("按类别汇总"));
     private readonly GroupListView _groups = new() { Dock = DockStyle.Fill, Visible = false };
     private ScanResult? _result;
     private Classification? _classification;
@@ -44,7 +44,7 @@ internal sealed class ExplorerPage : UserControl
 
         // 顶部：标题 + 面包屑
         var bar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.Surface, Padding = new Padding(12, 6, 12, 6) };
-        var title = Ui.Label("空间浏览", Theme.PageTitle);
+        var title = Ui.Label(L.T("空间浏览"), Theme.PageTitle);
         title.Dock = DockStyle.Left;
         title.Padding = new Padding(0, 4, 12, 0);
         var chips = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Padding = new Padding(0, 2, 0, 0) };
@@ -71,7 +71,7 @@ internal sealed class ExplorerPage : UserControl
         // 遍历扫描提示条（原型 .callout.warn）
         _banner = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Theme.WarnBack, Visible = false, Padding = new Padding(14, 0, 10, 0) };
         _bannerText = new Label { Dock = DockStyle.Fill, ForeColor = Theme.WarnText, TextAlign = ContentAlignment.MiddleLeft, UseMnemonic = false, AutoEllipsis = true };
-        var restart = Ui.Button("以管理员身份重启");
+        var restart = Ui.Button(L.T("以管理员身份重启"));
         restart.Dock = DockStyle.Right;
         restart.Image = SystemIcons.GetStockIcon(StockIconId.Shield, 16).ToBitmap();
         restart.ImageAlign = ContentAlignment.MiddleLeft;
@@ -91,7 +91,7 @@ internal sealed class ExplorerPage : UserControl
         BuildLegend(byRule: false);
 
         var mapHead = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = Color.White, Padding = new Padding(8, 2, 8, 2) };
-        _zoomOut = Ui.Button("返回上一级");
+        _zoomOut = Ui.Button(L.T("返回上一级"));
         _zoomOut.Dock = DockStyle.Right;
         _zoomOut.Enabled = false;
         _zoomOut.Click += (_, _) => _map.ZoomOut();
@@ -132,9 +132,9 @@ internal sealed class ExplorerPage : UserControl
         _overlay.CancelRequested += (_, _) => CancelRequested?.Invoke(this, EventArgs.Empty);
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("打开所在位置，自己清理", null, (_, _) => OpenLocation(_list.SelectedNode));
-        menu.Items.Add("复制路径", null, (_, _) => CopyPath(_list.SelectedNode));
-        menu.Items.Add("在方块图中只显示这个目录", null, (_, _) => _map.SetMapRoot(_list.SelectedNode));
+        menu.Items.Add(L.T("打开所在位置，自己清理"), null, (_, _) => OpenLocation(_list.SelectedNode));
+        menu.Items.Add(L.T("复制路径"), null, (_, _) => CopyPath(_list.SelectedNode));
+        menu.Items.Add(L.T("在方块图中只显示这个目录"), null, (_, _) => _map.SetMapRoot(_list.SelectedNode));
         _list.ContextMenuStrip = menu;
 
         _groups.NodeSelected += (_, n) => SelectFrom(n, _groups);
@@ -142,9 +142,9 @@ internal sealed class ExplorerPage : UserControl
         _groups.RevealRequested += (_, n) => RevealInTree(n);
         _groups.CopyPathRequested += (_, n) => CopyPath(n);
         var groupMenu = new ContextMenuStrip();
-        var openItem = groupMenu.Items.Add("打开所在位置，自己清理", null, (_, _) => OpenLocation(_groups.SelectedNode));
-        var copyItem = groupMenu.Items.Add("复制路径", null, (_, _) => CopyPath(_groups.SelectedNode));
-        var revealItem = groupMenu.Items.Add("在目录视图中定位", null, (_, _) => RevealInTree(_groups.SelectedNode));
+        var openItem = groupMenu.Items.Add(L.T("打开所在位置，自己清理"), null, (_, _) => OpenLocation(_groups.SelectedNode));
+        var copyItem = groupMenu.Items.Add(L.T("复制路径"), null, (_, _) => CopyPath(_groups.SelectedNode));
+        var revealItem = groupMenu.Items.Add(L.T("在目录视图中定位"), null, (_, _) => RevealInTree(_groups.SelectedNode));
         groupMenu.Opening += (_, _) => openItem.Enabled = copyItem.Enabled = revealItem.Enabled = _groups.SelectedNode >= 0;
         _groups.ContextMenuStrip = groupMenu;
     }
@@ -215,7 +215,7 @@ internal sealed class ExplorerPage : UserControl
             return;
         }
 
-        _crumb.ShowText(_view.SelectedIndex == 1 ? "按归属汇总" : "按类别汇总", group.Name);
+        _crumb.ShowText(_view.SelectedIndex == 1 ? L.T("按归属汇总") : L.T("按类别汇总"), group.Name);
         _map.SelectNode(-1);
         _detail.ShowGroup(_result.Tree, group, _classification, _owners);
     }
@@ -361,7 +361,7 @@ internal sealed class ExplorerPage : UserControl
         }
         else
         {
-            _legend.Controls.Add(new Label { Text = "按文件类型：", AutoSize = true, Font = Theme.Small, ForeColor = Theme.Subtle, Margin = new Padding(0, 2, 6, 0) });
+            _legend.Controls.Add(new Label { Text = L.T("按文件类型："), AutoSize = true, Font = Theme.Small, ForeColor = Theme.Subtle, Margin = new Padding(0, 2, 6, 0) });
             foreach (var kind in FileKinds.LegendOrder)
             {
                 Item(FileKinds.ColorOf(kind), FileKinds.NameOf(kind));
@@ -433,7 +433,7 @@ internal sealed class ExplorerPage : UserControl
         }
 
         var root = _map.MapRoot;
-        _mapScope.Text = $"方块图范围：{tree.GetPath(root)}（{ByteSize.Format(tree[root].AllocSize)}）· 点击定位，双击进入下一级";
+        _mapScope.Text = L.F("方块图范围：{0}（{1}）· 点击定位，双击进入下一级", tree.GetPath(root), ByteSize.Format(tree[root].AllocSize));
         _zoomOut.Enabled = root != tree.Root;
     }
 
@@ -446,9 +446,9 @@ internal sealed class ExplorerPage : UserControl
             return;
         }
 
-        var reason = string.IsNullOrEmpty(stats.MftUnavailableReason) ? "" : $"（{stats.MftUnavailableReason}）";
-        _bannerText.Text = $"遍历扫描{reason}：结果为估算。以管理员身份运行可改用 MFT 扫描，几秒完成。";
-        _bannerTip.SetToolTip(_bannerText, "遍历扫描较慢；占用按簇估算；正在写入的文件大小可能偏小；硬链接会重复计算。");
+        var reason = string.IsNullOrEmpty(stats.MftUnavailableReason) ? "" : L.F("（{0}）", stats.MftUnavailableReason);
+        _bannerText.Text = L.F("遍历扫描{0}：结果为估算。以管理员身份运行可改用 MFT 扫描，几秒完成。", reason);
+        _bannerTip.SetToolTip(_bannerText, L.T("遍历扫描较慢；占用按簇估算；正在写入的文件大小可能偏小；硬链接会重复计算。"));
         _banner.Visible = true;
     }
 
@@ -489,7 +489,7 @@ internal sealed class ExplorerPage : UserControl
         private readonly Label _title = new() { AutoSize = true, Font = Theme.Title, ForeColor = Theme.Text, UseMnemonic = false };
         private readonly Label _detail = new() { AutoSize = true, Font = Theme.Ui, ForeColor = Theme.Muted, UseMnemonic = false };
         private readonly ProgressBar _bar = new() { Width = 420, Height = 8, Minimum = 0, Maximum = 100, Style = ProgressBarStyle.Continuous };
-        private readonly Button _cancel = Ui.Button("取消扫描");
+        private readonly Button _cancel = Ui.Button(L.T("取消扫描"));
         private readonly Panel _box = new() { BackColor = Color.White, Size = new Size(480, 150) };
 
         public ProgressOverlay()
@@ -503,8 +503,8 @@ internal sealed class ExplorerPage : UserControl
                 using var pen = new Pen(Theme.Border);
                 e.Graphics.DrawRectangle(pen, 0, 0, _box.Width - 1, _box.Height - 1);
             };
-            AccessibleName = "扫描进度";
-            _bar.AccessibleName = "扫描进度";
+            AccessibleName = L.T("扫描进度");
+            _bar.AccessibleName = L.T("扫描进度");
         }
 
         public event EventHandler? CancelRequested;
@@ -541,7 +541,7 @@ internal sealed class ExplorerPage : UserControl
     internal static string Describe(ScanStats stats)
     {
         var files = stats.Nodes.ToString("N0", CultureInfo.InvariantCulture);
-        var mode = stats.Mode == ScanMode.Mft ? "MFT 扫描" : "遍历扫描（估算）";
-        return $"{stats.Root.TrimEnd('\\')} · {mode} {files} 项，用时 {stats.TotalDuration.TotalSeconds:F1} 秒";
+        var mode = stats.Mode == ScanMode.Mft ? L.T("MFT 扫描") : L.T("遍历扫描（估算）");
+        return L.F("{0} · {1} {2} 项，用时 {3:F1} 秒", stats.Root.TrimEnd('\\'), mode, files, stats.TotalDuration.TotalSeconds);
     }
 }

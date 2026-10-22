@@ -1,3 +1,4 @@
+using DiskThinner.Core;
 using DiskThinner.Rules;
 
 namespace DiskThinner.App.Rules;
@@ -56,15 +57,15 @@ internal static class RuleView
 
     public static string NameOf(Group g) => g switch
     {
-        Group.System => "系统",
-        Group.Program => "程序",
-        Group.Cache => "缓存",
-        Group.Temp => "临时 / 转储 / 日志",
-        Group.Package => "包缓存 / 下载",
-        Group.UserData => "用户与应用数据",
-        Group.VmDisk => "虚拟磁盘",
-        Group.Unknown => "未识别",
-        _ => "其他",
+        Group.System => L.T("系统"),
+        Group.Program => L.T("程序"),
+        Group.Cache => L.T("缓存"),
+        Group.Temp => L.T("临时 / 转储 / 日志"),
+        Group.Package => L.T("包缓存 / 下载"),
+        Group.UserData => L.T("用户与应用数据"),
+        Group.VmDisk => L.T("虚拟磁盘"),
+        Group.Unknown => L.T("未识别"),
+        _ => L.T("其他"),
     };
 
     public static readonly Group[] LegendOrder =
@@ -74,7 +75,7 @@ internal static class RuleView
     public static readonly TagStyle ObservedSource = new(Color.White, Theme.Accent, ColorTranslator.FromHtml("#8db8e3"));
 
     /// <summary>归属的来源标签：规则 = 实线框，推断 = 虚线框。</summary>
-    public static (string Text, TagStyle Style) SourceTag(OwnerSource source) => source == OwnerSource.Rule ? ("规则", RuleSource) : ("推断", InferredSource);
+    public static (string Text, TagStyle Style) SourceTag(OwnerSource source) => source == OwnerSource.Rule ? (L.T("规则"), RuleSource) : (L.T("推断"), InferredSource);
 
     /// <summary>证据的标签样式：本机上看到的（程序、进程、命令行工具）用实测样式，按名称对上的用推断样式。</summary>
     public static TagStyle EvidenceStyle(OwnerEvidenceKind kind) => kind switch
