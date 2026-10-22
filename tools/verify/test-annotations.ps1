@@ -1,5 +1,6 @@
 # 把 dotnet test 生成的 trx 里失败的用例写成 GitHub Actions 的 ::error 注解（不登录也能在运行页面上看到），
 # 同时打印到日志。测试进程崩溃或卡住（--blame-hang-timeout）时 trx 里只有运行信息，也一并输出。
+# 这个脚本只用来显示原因，总是以 0 退出：它自己失败会让人以为是它出了问题，盖住真正的测试失败。
 # 用法：pwsh -File tools/verify/test-annotations.ps1 -ResultsDir TestResults
 param(
     [Parameter(Mandatory)] [string] $ResultsDir,
@@ -30,30 +31,39 @@ if ($files.Count -eq 0) {
 
 $ns = @{ t = 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010' }
 foreach ($file in $files) {
-    [xml] $xml = Get-Content $file.FullName -Raw -Encoding utf8
-    $summary = Select-Xml -Xml $xml -XPath '//t:ResultSummary' -Namespace $ns | Select-Object -First 1
-    $counters = Select-Xml -Xml $xml -XPath '//t:ResultSummary/t:Counters' -Namespace $ns | Select-Object -First 1
-    $outcome = $summary.Node.outcome
-    $c = $counters.Node
-    Write-Host "$($file.Name)：$outcome，共 $($c.total) 个，通过 $($c.passed)，失败 $($c.failed)"
+    try {
+        [xml] $xml = Get-Content $file.FullName -Raw -Encoding utf8
+        $summary = Select-Xml -Xml $xml -XPath '//t:ResultSummary' -Namespace $ns | Select-Object -First 1
+        $counters = Select-Xml -Xml $xml -XPath '//t:ResultSummary/t:Counters' -Namespace $ns | Select-Object -First 1
+        $outcome = $summary.Node.outcome
+        $c = $counters.Node
+        Write-Host "$($file.Name)：$outcome，共 $($c.total) 个，通过 $($c.passed)，失败 $($c.failed)"
 
-    foreach ($r in Select-Xml -Xml $xml -XPath '//t:UnitTestResult[@outcome="Failed"]' -Namespace $ns) {
-        $node = $r.Node
-        $message = (Select-Xml -Xml $node -XPath './t:Output/t:ErrorInfo/t:Message' -Namespace $ns | Select-Object -First 1).Node.InnerText
-        $stack = (Select-Xml -Xml $node -XPath './t:Output/t:ErrorInfo/t:StackTrace' -Namespace $ns | Select-Object -First 1).Node.InnerText
-        $frames = @($stack -split "`n" | Where-Object { $_ -match ' in .*:line \d+' } | Select-Object -First 3 | ForEach-Object { $_.Trim() })
-        Annotate "测试失败：$($node.testName)" ("$message`n" + ($frames -join "`n")).Trim()
-    }
-
-    # 测试进程崩溃、卡住被 blame 结束时，原因在 RunInfos 里
-    if ($outcome -ne 'Completed' -and $outcome -ne 'Passed') {
-        foreach ($info in Select-Xml -Xml $xml -XPath '//t:ResultSummary/t:RunInfos/t:RunInfo' -Namespace $ns) {
-            $text = (Select-Xml -Xml $info.Node -XPath './t:Text' -Namespace $ns).Node.InnerText
-            if ($text) { Annotate "测试运行：$($file.BaseName)" $text.Trim() }
+        foreach ($r in Select-Xml -Xml $xml -XPath '//t:UnitTestResult[@outcome="Failed"]' -Namespace $ns) {
+            $node = $r.Node
+            $message = (Select-Xml -Xml $node -XPath './t:Output/t:ErrorInfo/t:Message' -Namespace $ns | Select-Object -First 1).Node.InnerText
+            $stack = (Select-Xml -Xml $node -XPath './t:Output/t:ErrorInfo/t:StackTrace' -Namespace $ns | Select-Object -First 1).Node.InnerText
+            $frames = @("$stack" -split "`n" | Where-Object { $_ -match ' in .*:line \d+' } | Select-Object -First 3 | ForEach-Object { $_.Trim() })
+            Annotate "测试失败：$($node.testName)" ("$message`n" + ($frames -join "`n")).Trim()
         }
+
+        # 测试进程崩溃、卡住被 blame 结束时，原因在 RunInfos 里（[FAIL] 行和 blame 的说明也在这里，和上面重复的不再输出）
+        if ($outcome -ne 'Completed' -and $outcome -ne 'Passed') {
+            foreach ($info in Select-Xml -Xml $xml -XPath '//t:ResultSummary/t:RunInfos/t:RunInfo' -Namespace $ns) {
+                $text = "$((Select-Xml -Xml $info.Node -XPath './t:Text' -Namespace $ns).Node.InnerText)".Trim()
+                if ($text -and $text -notmatch '\[FAIL\]$' -and $text -notmatch 'All tests finished running') {
+                    Annotate "测试运行：$($file.BaseName)" $text
+                }
+            }
+        }
+    }
+    catch {
+        Write-Host "读取 $($file.Name) 时出错：$_"
     }
 }
 
 if ($script:count -gt $MaxAnnotations) {
     Write-Host "::error title=还有更多失败::共 $($script:count) 条，只显示了前 $MaxAnnotations 条注解，其余见日志。"
 }
+
+exit 0

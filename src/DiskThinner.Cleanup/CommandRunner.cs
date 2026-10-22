@@ -58,6 +58,11 @@ public static class CommandRunner
         }
 
         var output = new StringBuilder();
+
+        // 两个输出流各自读到结尾时（收到 Data == null）置位。不能只等进程退出：输出是异步送达的，
+        // 进程退出时最后几行可能还没处理完；也不能无限等结尾：命令留下的后台子进程会一直拿着管道。
+        using var stdoutDone = new ManualResetEventSlim();
+        using var stderrDone = new ManualResetEventSlim();
         void Append(string? line)
         {
             if (line is null)
@@ -76,8 +81,24 @@ public static class CommandRunner
 
         var sw = Stopwatch.StartNew();
         using var process = new Process { StartInfo = psi };
-        process.OutputDataReceived += (_, e) => Append(e.Data);
-        process.ErrorDataReceived += (_, e) => Append(e.Data);
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stdoutDone.Set();
+            }
+
+            Append(e.Data);
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                stderrDone.Set();
+            }
+
+            Append(e.Data);
+        };
         try
         {
             process.Start();
@@ -113,9 +134,12 @@ public static class CommandRunner
             }
         }
 
-        // 进程已经退出（或被结束）。不能用无参的 WaitForExit() 等输出读完：命令留下的后台子进程（npm 的更新检查、
-        // start /b 启动的程序）会一直拿着输出管道，那样会等到子进程结束。最多再等 2 秒，然后不再读取。
-        process.WaitForExit(TimeSpan.FromSeconds(2));
+        // 进程已经退出（或被结束）。等两个输出流读到结尾，最多 5 秒：命令留下的后台子进程（npm 的更新检查、
+        // start /b 启动的程序）会一直拿着输出管道，这时不再等它们，停止读取。
+        var grace = Stopwatch.StartNew();
+        var limit = TimeSpan.FromSeconds(5);
+        stdoutDone.Wait(limit);
+        stderrDone.Wait(limit - grace.Elapsed is var left && left > TimeSpan.Zero ? left : TimeSpan.Zero);
         try
         {
             process.CancelOutputRead();

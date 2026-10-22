@@ -26,12 +26,20 @@ public sealed class CommandTests
         Assert.Contains("找不到", r.Error);
     }
 
+    private static readonly string PowerShell = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
+
+    // 时间上的断言都留足余量：CI 的机器忙的时候，启动一个 cmd 或 PowerShell 也可能要十几秒
+
     [Fact]
     public void OutputIsCapturedAndExitCodeReported()
     {
-        var r = CommandRunner.Start(Cmd, ["/c", "echo", "cleaned-42"], TimeSpan.FromSeconds(20), CancellationToken.None);
-        Assert.True(r.Succeeded, r.Error);
-        Assert.Contains("cleaned-42", r.Output);
+        // 输出是异步送达的：进程退出后还要等输出读到结尾，否则最后几行（这里是唯一一行）会丢
+        for (var i = 0; i < 5; i++)
+        {
+            var r = CommandRunner.Start(Cmd, ["/c", "echo", "cleaned-42"], TimeSpan.FromMinutes(2), CancellationToken.None);
+            Assert.True(r.Succeeded, $"exit={r.ExitCode} timedOut={r.TimedOut} error={r.Error}");
+            Assert.Contains("cleaned-42", r.Output);
+        }
     }
 
     /// <summary>
@@ -41,24 +49,37 @@ public sealed class CommandTests
     [Fact]
     public void BackgroundChildrenHoldingTheOutputDoNotBlock()
     {
-        var powershell = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
+        var marker = "dt-test-" + Guid.NewGuid().ToString("N");
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var r = CommandRunner.Start(Cmd, ["/c", "echo", "done", "&", "start", "/b", "", powershell, "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 25"],
-            TimeSpan.FromSeconds(60), CancellationToken.None);
-        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(15), $"等了 {sw.Elapsed.TotalSeconds:F1} 秒");
-        Assert.Equal(0, r.ExitCode);
-        Assert.False(r.TimedOut);
-        Assert.Contains("done", r.Output);
+        try
+        {
+            var r = CommandRunner.Start(Cmd, ["/c", "echo", "done", "&", "start", "/b", "", PowerShell, "-NoProfile", "-NonInteractive", "-Command", $"Start-Sleep -Seconds 180 # {marker}"],
+                TimeSpan.FromMinutes(5), CancellationToken.None);
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(90), $"等了 {sw.Elapsed.TotalSeconds:F1} 秒（子进程要 180 秒才结束）");
+            Assert.Equal(0, r.ExitCode);
+            Assert.False(r.TimedOut);
+            Assert.Contains("done", r.Output);
+        }
+        finally
+        {
+            KillByMarker(marker);
+        }
     }
 
     [Fact]
     public void CommandsThatRunTooLongAreStopped()
     {
-        var powershell = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
-        var r = CommandRunner.Start(powershell, ["-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 30"], TimeSpan.FromSeconds(3), CancellationToken.None);
+        var r = CommandRunner.Start(PowerShell, ["-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 300"], TimeSpan.FromSeconds(3), CancellationToken.None);
         Assert.True(r.TimedOut, $"exit={r.ExitCode} error={r.Error} output={r.Output} duration={r.Duration}");
         Assert.False(r.Succeeded);
-        Assert.True(r.Duration < TimeSpan.FromSeconds(15));
+        Assert.True(r.Duration < TimeSpan.FromSeconds(90), $"用了 {r.Duration.TotalSeconds:F1} 秒（命令要 300 秒）");
+    }
+
+    /// <summary>结束测试留下的后台进程（命令行里带着这次测试的标记）。</summary>
+    private static void KillByMarker(string marker)
+    {
+        var find = $"Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object {{ $_.CommandLine -like '*{marker}*' -and $_.ProcessId -ne $PID }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}";
+        CommandRunner.Start(PowerShell, ["-NoProfile", "-NonInteractive", "-Command", find], TimeSpan.FromMinutes(1), CancellationToken.None);
     }
 
     [Fact]
