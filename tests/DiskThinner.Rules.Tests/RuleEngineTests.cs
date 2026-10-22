@@ -16,6 +16,23 @@ public class RuleEngineTests
         (@"C:\pagefile.sys", 5000),
         (@"C:\Unknown\blob.bin", 700));
     [Fact]
+    public void DeepTreesAreClassified()
+    {
+        // 5000 层嵌套，路径约 1 万个字符（NTFS 允许 32767 个）；带 ** 的规则要对每一层求值
+        var deep = @"C:\Users\demo\AppData\Local\Temp" + string.Concat(Enumerable.Repeat(@"\d", 5000));
+        var other = @"C:\Users\demo\proj" + string.Concat(Enumerable.Repeat(@"\p", 5000));
+        var tree = Tree((deep + @"\f.tmp", 1000), (other + @"\.venv\pyvenv.cfg", 1), (other + @"\.venv\lib.py", 300));
+        var c = Classify(tree,
+            Rule("temp", MatchMode.Dir, @"%LOCALAPPDATA%\Temp"),
+            Rule("venv", MatchMode.Dir, @"%USERPROFILE%\**\.venv", Risk.Low, Kind.BuildOutput, Tier.Reviewed,
+                new Condition(ConditionType.HasAny, ["pyvenv.cfg"])));
+        Assert.Equal("temp", c.RuleIdAt(deep + @"\f.tmp"));
+        Assert.Equal("venv", c.RuleIdAt(other + @"\.venv\lib.py"));
+        Assert.Equal(1301, c.TotalCleanable);
+        Assert.Equal(1301, c.Cleanable(tree.FindPath(@"C:\Users\demo")));
+    }
+
+    [Fact]
     public void UnexplainedHotspotsDoNotOverlap()
     {
         var c = Classify(Sample, Rule("temp", MatchMode.Dir, @"%LOCALAPPDATA%\Temp"));
