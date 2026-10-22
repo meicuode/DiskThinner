@@ -403,7 +403,8 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 **M5 设置、打包与发布（3 到 4 人日）**
 
 > 2026-10-21 设置页、settings.json、日志和异常兜底、两种发布包完成，见 `docs/m5-report.md`。两个包在开发机上解压后都能运行，管理员下 MFT 扫描正常。
-> 未完成：干净 Windows 10 / 11 虚拟机上的验收（开发机是 Windows 11 家庭版，没有 Hyper-V 和沙盒），以及发布 v0.1.0（推送标签后由 `.github/workflows/release.yml` 自动构建并创建 GitHub Release）。
+> 2026-10-22 发布 v0.1.0：https://github.com/meicuode/DiskThinner/releases/tag/v0.1.0 （推送标签后由 `.github/workflows/release.yml` 检查、打包、在 windows-2022 / 2025 上冒烟测试后自动发布）。
+> 未完成：干净的 Windows 10 / 11 桌面版上的验收（开发机是 Windows 11 家庭版，没有 Hyper-V 和沙盒；Windows Server 2022 / 2025 上的冒烟测试已通过）。
 > 调整：单文件自包含版不开启单文件压缩（压缩后启动时解压程序集，峰值内存多约 100 MB，zip 只小 1 MB）。界面文字没有放进 resx，留到做英文界面时一起处理。
 
 - 设置页（快照、清理、保护名单、规则）、settings.json、日志、未处理异常的兜底。
