@@ -764,6 +764,10 @@
     <value>列出目录</value>
     <comment>DiskThinner.Scanner/Walk/WalkScanner.cs</comment>
   </data>
+  <data name="列表和方块图之间的分隔条" xml:space="preserve">
+    <value>列表和方块图之间的分隔条</value>
+    <comment>DiskThinner.App/Explorer/ExplorerPage.cs</comment>
+  </data>
   <data name="刚刚" xml:space="preserve">
     <value>刚刚</value>
     <comment>DiskThinner.App/Formatting/TimeText.cs</comment>
@@ -1912,6 +1916,10 @@
     <value>注册表卸载项</value>
     <comment>DiskThinner.Inventory/InventoryCollector.cs</comment>
   </data>
+  <data name="注意" xml:space="preserve">
+    <value>注意</value>
+    <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
   <data name="浏览器 Cookie" xml:space="preserve">
     <value>浏览器 Cookie</value>
     <comment>DiskThinner.Rules/ProtectionList.cs</comment>
@@ -2252,6 +2260,10 @@
     <value>视图</value>
     <comment>DiskThinner.App/Explorer/ExplorerPage.cs</comment>
   </data>
+  <data name="警告" xml:space="preserve">
+    <value>警告</value>
+    <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
   <data name="设置" xml:space="preserve">
     <value>设置</value>
     <comment>DiskThinner.App/MainForm.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
@@ -2290,6 +2302,14 @@
   </data>
   <data name="详情" xml:space="preserve">
     <value>详情</value>
+    <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
+  <data name="详情面板的分隔条" xml:space="preserve">
+    <value>详情面板的分隔条</value>
+    <comment>DiskThinner.App/Explorer/ExplorerPage.cs</comment>
+  </data>
+  <data name="说明" xml:space="preserve">
+    <value>说明</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
   <data name="说明 {0}" xml:space="preserve">

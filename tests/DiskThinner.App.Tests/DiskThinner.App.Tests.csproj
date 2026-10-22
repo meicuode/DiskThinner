@@ -2,6 +2,8 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- 只为了 UI Automation 客户端（System.Windows.Automation，UiAutomationTests 用它像读屏软件一样遍历界面） -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
@@ -11,6 +13,8 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <!-- UseWPF 会去掉隐式的 System.IO（避免和 System.Windows.Shapes.Path 冲突），这里不用 WPF 的形状，加回来 -->
+    <Using Include="System.IO" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DiskThinner.App\DiskThinner.App.csproj" />

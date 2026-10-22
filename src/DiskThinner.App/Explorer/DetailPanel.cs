@@ -742,6 +742,9 @@ internal sealed class DetailPanel : Panel
             Padding = new Padding(Ui.Scale(this, 10), 6, 8, 6),
             Margin = new Padding(0, 8, 0, 0),
             BackColor = back,
+            // 不设名字时 WinForms 会借用前面一个标签的文字，读屏软件会读出不相干的内容
+            AccessibleName = danger ? L.T("警告") : info ? L.T("说明") : L.T("注意"),
+            AccessibleRole = AccessibleRole.Grouping,
         };
         var label = new Label
         {

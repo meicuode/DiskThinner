@@ -104,12 +104,21 @@ internal sealed class ExplorerPage : UserControl
         mapPanel.Controls.Add(mapHead);
         mapPanel.Controls.Add(legend);
 
-        _left = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, FixedPanel = FixedPanel.Panel2, BackColor = Theme.Border, SplitterWidth = 4 };
+        // 分隔条能用 Tab 选中、方向键拖动，读屏软件要读得出是哪一条
+        _left = new SplitContainer
+        {
+            Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, FixedPanel = FixedPanel.Panel2, BackColor = Theme.Border, SplitterWidth = 4,
+            AccessibleName = L.T("列表和方块图之间的分隔条"),
+        };
         _left.Panel1.Controls.Add(_list);
         _left.Panel1.Controls.Add(_groups);
         _left.Panel2.Controls.Add(mapPanel);
 
-        _outer = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, FixedPanel = FixedPanel.Panel2, BackColor = Theme.Border, SplitterWidth = 4 };
+        _outer = new SplitContainer
+        {
+            Dock = DockStyle.Fill, Orientation = Orientation.Vertical, FixedPanel = FixedPanel.Panel2, BackColor = Theme.Border, SplitterWidth = 4,
+            AccessibleName = L.T("详情面板的分隔条"),
+        };
         _outer.Panel1.Controls.Add(_left);
         _outer.Panel2.Controls.Add(_detail);
 
@@ -348,7 +357,7 @@ internal sealed class ExplorerPage : UserControl
         _legend.Controls.Clear();
         void Item(Color color, string text)
         {
-            _legend.Controls.Add(new LegendSwatch(color));
+            _legend.Controls.Add(new LegendSwatch(color, text));
             _legend.Controls.Add(new Label { Text = text, AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted, Margin = new Padding(0, 2, 10, 0) });
         }
 
@@ -472,14 +481,18 @@ internal sealed class ExplorerPage : UserControl
         }
     }
 
+    /// <summary>图例的色块：不能拿焦点（只是颜色），读屏软件读作它后面那个类别的名字。</summary>
     private sealed class LegendSwatch : Control
     {
-        public LegendSwatch(Color color)
+        public LegendSwatch(Color color, string name)
         {
+            SetStyle(ControlStyles.Selectable, false);
+            TabStop = false;
             BackColor = color;
             Size = new Size(10, 10);
             Margin = new Padding(0, 5, 4, 0);
             AccessibleRole = AccessibleRole.Graphic;
+            AccessibleName = name;
         }
     }
 

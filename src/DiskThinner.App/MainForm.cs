@@ -91,26 +91,26 @@ internal sealed class MainForm : Form
         Controls.Add(BuildToolbar());
         Controls.Add(BuildStatusBar());
 
-        _nav.AddItem("overview", L.T("概览"), "\uE80A");
-        _nav.AddItem("explorer", L.T("空间浏览"), "\uE8B7");
-        _nav.AddItem("growth", L.T("增长分析"), "\uE9D2");
-        _nav.AddItem("cleanup", L.T("清理计划"), "\uE74D");
-        _nav.AddItem("log", L.T("操作记录"), "\uE81C");
-        _nav.AddItem("settings", L.T("设置"), "\uE713");
-        _nav.Selected += (_, key) => ShowPage(key);
-
-        _pages["explorer"] = _explorer;
-        _pages["overview"] = _overview;
-        _pages["growth"] = _growthPage;
-        _pages["cleanup"] = _cleanupPage;
-        _pages["log"] = _historyPage;
-        _pages["settings"] = _settingsPage;
-        foreach (var page in _pages.Values)
+        (string Key, string Text, string Glyph, Control Page)[] pages =
+        [
+            ("overview", L.T("概览"), "\uE80A", _overview),
+            ("explorer", L.T("空间浏览"), "\uE8B7", _explorer),
+            ("growth", L.T("增长分析"), "\uE9D2", _growthPage),
+            ("cleanup", L.T("清理计划"), "\uE74D", _cleanupPage),
+            ("log", L.T("操作记录"), "\uE81C", _historyPage),
+            ("settings", L.T("设置"), "\uE713", _settingsPage),
+        ];
+        foreach (var (key, text, glyph, page) in pages)
         {
+            _nav.AddItem(key, text, glyph);
+            _pages[key] = page;
             page.Dock = DockStyle.Fill;
             page.Visible = false;
+            page.AccessibleName = text; // 读屏软件进入页面时读出页面名，而不是"窗格"
             _pageHost.Controls.Add(page);
         }
+
+        _nav.Selected += (_, key) => ShowPage(key);
 
         _growthPage.NavigateRequested += (_, node) =>
         {

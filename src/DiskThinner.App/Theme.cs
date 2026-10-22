@@ -10,7 +10,8 @@ internal static class Theme
     public static readonly Color BorderStrong = ColorTranslator.FromHtml("#c4c4c4");
     public static readonly Color Text = ColorTranslator.FromHtml("#1a1a1a");
     public static readonly Color Muted = ColorTranslator.FromHtml("#5c5c5c");
-    public static readonly Color Subtle = ColorTranslator.FromHtml("#808080");
+    // 原型里是 #808080：白底上只有 3.95:1，达不到 WCAG AA 的 4.5:1；加深到在最深的背景（#eceef1）上也有 4.5:1（见 ContrastTests）
+    public static readonly Color Subtle = ColorTranslator.FromHtml("#6b6b6b");
     public static readonly Color Accent = ColorTranslator.FromHtml("#0a5fb4");
     public static readonly Color AccentHover = ColorTranslator.FromHtml("#09539d");
     public static readonly Color AccentWeak = ColorTranslator.FromHtml("#e6f0fa");
