@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using DiskThinner.App.Explorer;
 using DiskThinner.App.Pages;
 using DiskThinner.Rules;
@@ -7,39 +6,9 @@ using DiskThinner.Scanner;
 namespace DiskThinner.App.Tests;
 
 /// <summary>规则结果在界面上的表现：主窗口能正常创建，概览和空间浏览显示规则给出的信息，过滤器工作正常。</summary>
+[Collection(UiTestCollection.Name)]
 public class RulesUiTests
 {
-    private static void RunOnSta(Action body)
-    {
-        ExceptionDispatchInfo? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                Application.EnableVisualStyles();
-                body();
-            }
-            catch (Exception ex)
-            {
-                error = ExceptionDispatchInfo.Capture(ex);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        error?.Throw();
-    }
-
-    private static Form Host(Control page)
-    {
-        var form = new Form { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000), Size = new Size(1300, 850), ShowInTaskbar = false };
-        page.Dock = DockStyle.Fill;
-        form.Controls.Add(page);
-        form.Show();
-        Application.DoEvents();
-        return form;
-    }
-
     private static LocationRule Rule(string id, MatchMode mode, string pattern, Risk risk, Kind kind, params RuleAction[] actions) => new()
     {
         Id = id,
@@ -80,18 +49,18 @@ public class RulesUiTests
     }
 
     [Fact]
-    public void MainFormCanBeCreated() => RunOnSta(() =>
+    public void MainFormCanBeCreated() => UiThread.Run(() =>
     {
         using var form = new MainForm(new AppOptions());
         Assert.Equal("DiskThinner", form.Text);
     });
 
     [Fact]
-    public void OverviewShowsCleanableSuggestionsAndLargest() => RunOnSta(() =>
+    public void OverviewShowsCleanableSuggestionsAndLargest() => UiThread.Run(() =>
     {
         var (result, c, tree) = Sample();
         var page = new OverviewPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetResult(result, c);
 
         Assert.Equal("5.00 GB", page.CleanableCard.ValueText);
@@ -117,11 +86,11 @@ public class RulesUiTests
     });
 
     [Fact]
-    public void ExplorerShowsRuleColumnsAndDetail() => RunOnSta(() =>
+    public void ExplorerShowsRuleColumnsAndDetail() => UiThread.Run(() =>
     {
         var (result, c, tree) = Sample();
         var page = new ExplorerPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetResult(result, c);
 
         var cache = tree.FindPath(@"C:\Users\demo\AppData\Local\uv\cache");
@@ -137,11 +106,11 @@ public class RulesUiTests
     });
 
     [Fact]
-    public void FiltersShowOnlyCleanableOrUnknown() => RunOnSta(() =>
+    public void FiltersShowOnlyCleanableOrUnknown() => UiThread.Run(() =>
     {
         var (result, c, tree) = Sample();
         var page = new ExplorerPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetResult(result, c);
 
         page.OnlyCleanable.Checked = true;

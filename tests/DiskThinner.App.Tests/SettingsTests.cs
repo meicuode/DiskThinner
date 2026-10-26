@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using DiskThinner.App.Pages;
 using DiskThinner.App.Settings;
 using DiskThinner.Rules;
@@ -6,6 +5,7 @@ using DiskThinner.Rules;
 namespace DiskThinner.App.Tests;
 
 /// <summary>settings.json 的读写和容错、追加的保护目录、设置页。</summary>
+[Collection(UiTestCollection.Name)]
 public sealed class SettingsTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "dt-settings-" + Guid.NewGuid().ToString("N"));
@@ -82,7 +82,7 @@ public sealed class SettingsTests : IDisposable
     }
 
     [Fact]
-    public void SettingsPageRaisesChanges() => RunOnSta(() =>
+    public void SettingsPageRaisesChanges() => UiThread.Run(() =>
     {
         var page = new SettingsPage();
         using var form = new Form { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000), Size = new Size(1200, 800), ShowInTaskbar = false };
@@ -103,25 +103,4 @@ public sealed class SettingsTests : IDisposable
         Assert.Null(changed);
         Assert.Equal([@"D:\keep"], page.ProtectedList.Items.Cast<string>());
     });
-
-    private static void RunOnSta(Action body)
-    {
-        ExceptionDispatchInfo? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                Application.EnableVisualStyles();
-                body();
-            }
-            catch (Exception ex)
-            {
-                error = ExceptionDispatchInfo.Capture(ex);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        error?.Throw();
-    }
 }

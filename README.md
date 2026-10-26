@@ -92,6 +92,7 @@ git push origin v0.2.0
 - 研发方案：[docs/dev-plan-v0.2.md](docs/dev-plan-v0.2.md)
 - 验收报告：[阶段 0](docs/phase0-report.md)、[M1](docs/m1-report.md)、[M2 上半](docs/m2a-report.md)、[M2 下半](docs/m2b-report.md)、[M3](docs/m3-report.md)、[M4](docs/m4-report.md)、[M5](docs/m5-report.md)
 - 发布说明：[0.1.0](docs/release-notes-0.1.0.md)
+- 已知问题和讲述人人工检查清单：[docs/known-issues.md](docs/known-issues.md)
 - 规则格式：[rules/README.md](rules/README.md)
 - 界面原型：[prototype/index.html](prototype/index.html)（双击用浏览器打开）
 

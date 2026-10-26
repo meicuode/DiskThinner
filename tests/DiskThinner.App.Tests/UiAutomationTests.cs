@@ -10,6 +10,7 @@ namespace DiskThinner.App.Tests;
 /// 像"讲述人"一样遍历每个页面的控件树（控件视图），检查能拿到焦点的和可以操作的控件都有名字。
 /// 读出来是否通顺、焦点顺序是否合理，还是要用讲述人实际听一遍（docs/known-issues.md 里的人工检查清单）。
 /// </summary>
+[Collection(UiTestCollection.Name)]
 public sealed class UiAutomationTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "dt-uia-" + Guid.NewGuid().ToString("N")[..8]);

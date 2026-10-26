@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using DiskThinner.App.Dialogs;
 using DiskThinner.App.Explorer;
 using DiskThinner.App.Pages;
@@ -11,6 +10,7 @@ using Microsoft.Data.Sqlite;
 namespace DiskThinner.App.Tests;
 
 /// <summary>清理计划页、确认框、操作记录页、详情面板的"加入清理计划"。只用内存里的树和临时库，不删除任何东西。</summary>
+[Collection(UiTestCollection.Name)]
 public sealed class CleanupUiTests : IDisposable
 {
     private const long Mb = 1L << 20;
@@ -24,36 +24,7 @@ public sealed class CleanupUiTests : IDisposable
         Directory.Delete(_dir, recursive: true);
     }
 
-    private static void RunOnSta(Action body)
-    {
-        ExceptionDispatchInfo? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                Application.EnableVisualStyles();
-                body();
-            }
-            catch (Exception ex)
-            {
-                error = ExceptionDispatchInfo.Capture(ex);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        error?.Throw();
-    }
-
-    private static Form Host(Control page)
-    {
-        var form = new Form { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000), Size = new Size(1400, 850), ShowInTaskbar = false };
-        page.Dock = DockStyle.Fill;
-        form.Controls.Add(page);
-        form.Show();
-        Application.DoEvents();
-        return form;
-    }
+    private static Form Host(Control page) => UiThread.Host(page, width: 1400);
 
     private static LocationRule Rule(string id, string pattern, Risk risk, Kind kind, params RuleAction[] actions) => new()
     {
@@ -97,7 +68,7 @@ public sealed class CleanupUiTests : IDisposable
     }
 
     [Fact]
-    public void PlanPageShowsGroupsAndUpdatesTheSummary() => RunOnSta(() =>
+    public void PlanPageShowsGroupsAndUpdatesTheSummary() => UiThread.Run(() =>
     {
         var (_, _, plan) = Sample();
         var page = new CleanupPage();
@@ -132,7 +103,7 @@ public sealed class CleanupUiTests : IDisposable
     });
 
     [Fact]
-    public void ConfirmDialogListsWhatCannotBeUndoneAndDefaultsToGoingBack() => RunOnSta(() =>
+    public void ConfirmDialogListsWhatCannotBeUndoneAndDefaultsToGoingBack() => UiThread.Run(() =>
     {
         var (_, _, plan) = Sample();
         var toRun = plan.ToRun.ToList();
@@ -153,7 +124,7 @@ public sealed class CleanupUiTests : IDisposable
     });
 
     [Fact]
-    public void HistoryPageShowsEntriesCardsAndFilters() => RunOnSta(() =>
+    public void HistoryPageShowsEntriesCardsAndFilters() => UiThread.Run(() =>
     {
         var log = new AuditLog(Path.Combine(_dir, "user.db"));
         var t = new DateTime(2026, 10, 18, 13, 2, 0, DateTimeKind.Utc);
@@ -172,7 +143,7 @@ public sealed class CleanupUiTests : IDisposable
     });
 
     [Fact]
-    public void DetailPanelOffersToAddTheRuleLocationToThePlan() => RunOnSta(() =>
+    public void DetailPanelOffersToAddTheRuleLocationToThePlan() => UiThread.Run(() =>
     {
         var (tree, c, _) = Sample();
         var panel = new DetailPanel();

@@ -1,4 +1,4 @@
-using System.Runtime.ExceptionServices;
+using System.Runtime.CompilerServices;
 using DiskThinner.App.Explorer;
 using DiskThinner.Scanner;
 
@@ -8,44 +8,19 @@ namespace DiskThinner.App.Tests;
 /// 空间浏览页的联动和键盘操作：在 STA 线程上创建真实的窗体和控件（放在屏幕外），直接驱动各部分，
 /// 检查树形列表、方块图、面包屑、详情是否同步。
 /// </summary>
+[Collection(UiTestCollection.Name)]
 public class ExplorerPageTests
 {
-    private static void RunOnSta(Action<ExplorerPage, NodeTree> test)
+    private static void RunOnSta(Action<ExplorerPage, NodeTree> test, [CallerMemberName] string name = "") => UiThread.Run(() =>
     {
-        ExceptionDispatchInfo? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                Application.EnableVisualStyles();
-                using var form = new Form
-                {
-                    StartPosition = FormStartPosition.Manual,
-                    Location = new Point(-4000, -4000),
-                    Size = new Size(1300, 850),
-                    ShowInTaskbar = false,
-                };
-                var page = new ExplorerPage { Dock = DockStyle.Fill };
-                form.Controls.Add(page);
-                form.Show();
-                Application.DoEvents();
-
-                var tree = TestTrees.Sample();
-                page.SetResult(new ScanResult(tree, new ScanStats { Mode = ScanMode.Mft, Root = @"C:\" }));
-                Application.DoEvents();
-                test(page, tree);
-                form.Close();
-            }
-            catch (Exception ex)
-            {
-                error = ExceptionDispatchInfo.Capture(ex);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        error?.Throw();
-    }
+        var page = new ExplorerPage();
+        using var form = UiThread.Host(page);
+        var tree = TestTrees.Sample();
+        page.SetResult(new ScanResult(tree, new ScanStats { Mode = ScanMode.Mft, Root = @"C:\" }));
+        Application.DoEvents();
+        test(page, tree);
+        form.Close();
+    }, name);
 
     [Fact]
     public void SelectingInTreeUpdatesMapDetailAndBreadcrumb() => RunOnSta((page, tree) =>

@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using DiskThinner.App.Growth;
 using DiskThinner.App.Pages;
 using DiskThinner.App.Shell;
@@ -10,6 +9,7 @@ using Microsoft.Data.Sqlite;
 namespace DiskThinner.App.Tests;
 
 /// <summary>快照在界面上的表现：概览的"近 7 天净增长"和"增长最快"、增长分析页的对比、计划任务的参数。</summary>
+[Collection(UiTestCollection.Name)]
 public sealed class GrowthUiTests : IDisposable
 {
     private const long Mb = 1L << 20;
@@ -22,37 +22,6 @@ public sealed class GrowthUiTests : IDisposable
     {
         SqliteConnection.ClearAllPools();
         Directory.Delete(_dir, recursive: true);
-    }
-
-    private static void RunOnSta(Action body)
-    {
-        ExceptionDispatchInfo? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                Application.EnableVisualStyles();
-                body();
-            }
-            catch (Exception ex)
-            {
-                error = ExceptionDispatchInfo.Capture(ex);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        error?.Throw();
-    }
-
-    private static Form Host(Control page)
-    {
-        var form = new Form { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000), Size = new Size(1300, 850), ShowInTaskbar = false };
-        page.Dock = DockStyle.Fill;
-        form.Controls.Add(page);
-        form.Show();
-        Application.DoEvents();
-        return form;
     }
 
     private static ScanStats Stats(long free) => new() { Mode = ScanMode.Mft, Root = @"C:\", VolumeTotalBytes = 200L << 30, VolumeFreeBytes = free };
@@ -81,7 +50,7 @@ public sealed class GrowthUiTests : IDisposable
     }
 
     [Fact]
-    public void OverviewShowsWeeklyGrowthAndFastestDirectories() => RunOnSta(() =>
+    public void OverviewShowsWeeklyGrowthAndFastestDirectories() => UiThread.Run(() =>
     {
         var now = DateTime.UtcNow;
         var (model, result, c, owners) = Sample(now);
@@ -89,7 +58,7 @@ public sealed class GrowthUiTests : IDisposable
         Assert.False(model.CurrentSaved);
 
         var page = new OverviewPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetResult(result, c, owners);
         page.SetGrowth(model, result.Tree, c, owners);
 
@@ -105,12 +74,12 @@ public sealed class GrowthUiTests : IDisposable
     });
 
     [Fact]
-    public void GrowthPageComparesSnapshotsWithTheCurrentScan() => RunOnSta(() =>
+    public void GrowthPageComparesSnapshotsWithTheCurrentScan() => UiThread.Run(() =>
     {
         var now = DateTime.UtcNow;
         var (model, result, c, owners) = Sample(now);
         var page = new GrowthPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetModel(model, result, c, owners, null);
         Wait(page);
 
@@ -130,14 +99,14 @@ public sealed class GrowthUiTests : IDisposable
     });
 
     [Fact]
-    public void GrowthPageExplainsWhenThereIsNothingToCompare() => RunOnSta(() =>
+    public void GrowthPageExplainsWhenThereIsNothingToCompare() => UiThread.Run(() =>
     {
         var store = new SnapshotStore(Path.Combine(_dir, "empty.db"));
         var tree = TestTrees.Build((@"a.bin", 10 * Mb));
         var result = new ScanResult(tree, Stats(10L << 30));
         var model = GrowthModel.Build(store, result, null, autoSave: false, DateTime.UtcNow);
         var page = new GrowthPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetModel(model, result, null, null, null);
         Assert.Null(page.Pending);
         Assert.Empty(page.Changes.Items);
@@ -172,6 +141,7 @@ public sealed class GrowthUiTests : IDisposable
 
     private static void Wait(GrowthPage page)
     {
+        UiThread.Step("等待增长对比的结果（GrowthPage.Pending）");
         var sw = System.Diagnostics.Stopwatch.StartNew();
         while (page.Pending is { IsCompleted: false } && sw.Elapsed < TimeSpan.FromSeconds(10))
         {
@@ -180,6 +150,7 @@ public sealed class GrowthUiTests : IDisposable
         }
 
         Application.DoEvents();
-        Assert.True(page.Pending?.IsCompleted ?? true);
+        Assert.True(page.Pending?.IsCompleted ?? true, "增长对比 10 秒内没有算完");
+        UiThread.Step("增长对比已显示");
     }
 }

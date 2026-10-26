@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using DiskThinner.App.Explorer;
 using DiskThinner.Inventory;
 using DiskThinner.Rules;
@@ -7,40 +6,10 @@ using DiskThinner.Scanner;
 namespace DiskThinner.App.Tests;
 
 /// <summary>推断出的归属在界面上的表现，以及"按归属汇总""按类别汇总"两个视图的联动。</summary>
+[Collection(UiTestCollection.Name)]
 public class GroupViewTests
 {
     private const string Local = @"Users\demo\AppData\Local";
-
-    private static void RunOnSta(Action body)
-    {
-        ExceptionDispatchInfo? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                Application.EnableVisualStyles();
-                body();
-            }
-            catch (Exception ex)
-            {
-                error = ExceptionDispatchInfo.Capture(ex);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        error?.Throw();
-    }
-
-    private static Form Host(Control page)
-    {
-        var form = new Form { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000), Size = new Size(1300, 850), ShowInTaskbar = false };
-        page.Dock = DockStyle.Fill;
-        form.Controls.Add(page);
-        form.Show();
-        Application.DoEvents();
-        return form;
-    }
 
     private static LocationRule Rule(string id, MatchMode mode, string pattern, Risk risk, Kind kind) => new()
     {
@@ -83,11 +52,11 @@ public class GroupViewTests
     }
 
     [Fact]
-    public void ExplorerShowsInferredOwnerWithEvidence() => RunOnSta(() =>
+    public void ExplorerShowsInferredOwnerWithEvidence() => UiThread.Run(() =>
     {
         var (result, c, owners, tree) = Sample();
         var page = new ExplorerPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetResult(result, c, owners);
 
         var foo = tree.FindPath($@"C:\{Local}\FooTool");
@@ -103,11 +72,11 @@ public class GroupViewTests
     });
 
     [Fact]
-    public void GroupedViewsSelectGroupsAndLocations() => RunOnSta(() =>
+    public void GroupedViewsSelectGroupsAndLocations() => UiThread.Run(() =>
     {
         var (result, c, owners, tree) = Sample();
         var page = new ExplorerPage();
-        using var form = Host(page);
+        using var form = UiThread.Host(page);
         page.SetResult(result, c, owners);
         var cache = tree.FindPath($@"C:\{Local}\uv\cache");
 
