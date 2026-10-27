@@ -1,5 +1,7 @@
 # 在独立进程里运行构建或测试，完整输出写到 artifacts\logs\<名称>.log，屏幕上只打印摘要。
 # 用于避免长输出在代理终端里被截断。
+# 负载约束（docs/phase2a-design.md 8.4 节）：本进程设为低于正常优先级，启动的 dotnet、MSBuild、testhost 都继承；
+# 不复用已有的 MSBuild 节点（那些节点可能是以正常优先级启动的）；测试项目逐个跑，同一时间只有一个 testhost。
 #   pwsh -File tools\verify\run.ps1 build              构建整个解决方案
 #   pwsh -File tools\verify\run.ps1 release            发布配置构建
 #   pwsh -File tools\verify\run.ps1 test               构建并运行全部测试
@@ -10,6 +12,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+[System.Diagnostics.Process]::GetCurrentProcess().PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $logs = Join-Path $root 'artifacts\logs'
 New-Item -ItemType Directory -Force $logs | Out-Null
@@ -35,12 +38,12 @@ function Invoke-Logged([string] $name, [string[]] $arguments) {
 }
 
 switch ($Action) {
-    'build' { Invoke-Logged 'build' @('build', $Project, '-nologo', '-v', 'q') }
-    'release' { Invoke-Logged 'release' @('build', $Project, '-c', 'Release', '-nologo', '-v', 'q') }
+    'build' { Invoke-Logged 'build' @('build', $Project, '-nologo', '-v', 'q', '-nodeReuse:false') }
+    'release' { Invoke-Logged 'release' @('build', $Project, '-c', 'Release', '-nologo', '-v', 'q', '-nodeReuse:false') }
     'test' {
-        Invoke-Logged 'build' @('build', $Project, '-nologo', '-v', 'q')
+        Invoke-Logged 'build' @('build', $Project, '-nologo', '-v', 'q', '-nodeReuse:false')
         if ($script:LastCode -eq 0) {
-            Invoke-Logged 'test' @('test', $Project, '--no-build', '-nologo', '--blame-hang-timeout', '90s')
+            Invoke-Logged 'test' @('test', $Project, '--no-build', '-nologo', '--blame-hang-timeout', '90s', '-m:1', '-nodeReuse:false')
         }
     }
 }
