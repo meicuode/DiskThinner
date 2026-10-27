@@ -728,6 +728,10 @@
     <value>写入监控在后续版本（阶段 2）提供，这一版固定为“关闭”。</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
+  <data name="写入监控的数据来自更新的版本（格式 {0}），请升级 DiskThinner" xml:space="preserve">
+    <value>写入监控的数据来自更新的版本（格式 {0}），请升级 DiskThinner</value>
+    <comment>DiskThinner.Monitor/MonitorStore.cs</comment>
+  </data>
   <data name="写入监控覆盖" xml:space="preserve">
     <value>写入监控覆盖</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
