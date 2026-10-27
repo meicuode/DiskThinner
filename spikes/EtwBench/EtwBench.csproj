@@ -10,6 +10,10 @@
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" />
   </ItemGroup>
   <ItemGroup>
+    <!-- replay 子命令：把存下的原始事件送进 Monitor 的解析和汇总，做逐项比对、测处理速率（设计第 12.2 节第 6 条） -->
+    <ProjectReference Include="..\..\src\DiskThinner.Monitor\DiskThinner.Monitor.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="..\..\tests\fixtures\monitor\templates.txt" Link="templates.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

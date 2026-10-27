@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 写入监控（阶段 2a）的纯逻辑：载荷解析、进程归属、估算增长、按小时汇总和合并、抽样、存储和查询。
+       不引用 TraceEvent 和 WinForms，按 Native AOT 要求编写，2b 的常驻服务直接复用（docs/phase2a-design.md 4.1 节）。
+       Windows API 都在接口后面，测试用假的实现。 -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Monitor.Tests" />
+  </ItemGroup>
+</Project>

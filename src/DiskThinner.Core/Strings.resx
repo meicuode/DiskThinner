@@ -32,6 +32,10 @@
     <value>0 项</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
   </data>
+  <data name="10 秒到 24 小时" xml:space="preserve">
+    <value>10 秒到 24 小时</value>
+    <comment>DiskThinner.Monitor/SessionLifecycle.cs</comment>
+  </data>
   <data name="24 小时" xml:space="preserve">
     <value>24 小时</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
@@ -426,7 +430,7 @@
   </data>
   <data name="…" xml:space="preserve">
     <value>…</value>
-    <comment>DiskThinner.App/Explorer/Breadcrumb.cs</comment>
+    <comment>DiskThinner.App/Explorer/Breadcrumb.cs, DiskThinner.Monitor/Processes.cs</comment>
   </data>
   <data name="、" xml:space="preserve">
     <value>、</value>
@@ -555,6 +559,10 @@
   <data name="会自动重建 · 默认直接删除" xml:space="preserve">
     <value>会自动重建 · 默认直接删除</value>
     <comment>DiskThinner.Cleanup/CleanupPlan.cs</comment>
+  </data>
+  <data name="会话名不合法：{0}" xml:space="preserve">
+    <value>会话名不合法：{0}</value>
+    <comment>DiskThinner.Monitor/SessionLifecycle.cs</comment>
   </data>
   <data name="会话记录" xml:space="preserve">
     <value>会话记录</value>

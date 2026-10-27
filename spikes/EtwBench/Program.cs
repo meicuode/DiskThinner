@@ -31,6 +31,7 @@ internal static partial class Program
                 "list-sessions" => ListSessions(o),
                 "orphan" => Orphan(o),
                 "dump" => Dump(o),
+                "replay" => Replay.Run(o),
                 _ => Usage(),
             };
         }

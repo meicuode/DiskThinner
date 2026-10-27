@@ -10,6 +10,7 @@
     <Project Path="src/DiskThinner.Cleanup/DiskThinner.Cleanup.csproj" />
     <Project Path="src/DiskThinner.Core/DiskThinner.Core.csproj" />
     <Project Path="src/DiskThinner.Inventory/DiskThinner.Inventory.csproj" />
+    <Project Path="src/DiskThinner.Monitor/DiskThinner.Monitor.csproj" />
     <Project Path="src/DiskThinner.Rules/DiskThinner.Rules.csproj" />
     <Project Path="src/DiskThinner.Scanner/DiskThinner.Scanner.csproj" />
     <Project Path="src/DiskThinner.Storage/DiskThinner.Storage.csproj" />
@@ -18,6 +19,7 @@
     <Project Path="tests/DiskThinner.App.Tests/DiskThinner.App.Tests.csproj" />
     <Project Path="tests/DiskThinner.Cleanup.Tests/DiskThinner.Cleanup.Tests.csproj" />
     <Project Path="tests/DiskThinner.LockHolder/DiskThinner.LockHolder.csproj" />
+    <Project Path="tests/DiskThinner.Monitor.Tests/DiskThinner.Monitor.Tests.csproj" />
     <Project Path="tests/DiskThinner.Rules.Tests/DiskThinner.Rules.Tests.csproj" />
     <Project Path="tests/DiskThinner.Scanner.Tests/DiskThinner.Scanner.Tests.csproj" />
     <Project Path="tests/DiskThinner.Storage.Tests/DiskThinner.Storage.Tests.csproj" />
