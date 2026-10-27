@@ -128,6 +128,7 @@ svg.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;st
 .s-rule{color:#404040;border:1px solid #b4b4b4;background:#fff}
 .s-infer{color:#404040;border:1px dashed #9a9a9a;background:#fff}
 .s-ai{color:#5b2a86;border:1px solid #d6c1ea;background:#f8f2fd}
+.s-none{color:var(--subtle);background:#f3f3f3}
 
 /* ---------- 页面通用 ---------- */
 .page-head{display:flex;align-items:flex-end;gap:12px;margin-bottom:14px}
@@ -439,7 +440,6 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                   <tr><td class="wrap path">%LOCALAPPDATA%\ms-playwright<div class="small muted" style="font-family:inherit">未识别，47 天没有写入</div></td><td class="num">2.4 GB</td><td><span class="tag s-ai">未识别</span></td><td><label class="btn sm ai" for="v-ai">AI 分析</label></td></tr>
                 </tbody>
               </table>
-              <div class="callout mt12">写入监控未开启，增长只能按快照对比，看不到是哪个程序写的。<label for="v-dlg-etw" style="color:var(--accent);cursor:pointer;text-decoration:underline">开启 4 小时诊断</label></div>
             </div>
           </div>
 
@@ -467,16 +467,17 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                 <colgroup><col style="width:47%"><col style="width:84px"><col></colgroup>
                 <thead><tr><th scope="col">目录</th><th scope="col" class="num">变化</th><th scope="col">写入者</th></tr></thead>
                 <tbody>
-                  <tr><td class="path" title="C:\Windows\ServiceProfiles\LocalService\AppData\Local\Temp">C:\Windows\ServiceProfiles\…\Temp</td><td class="num up">+8.05 GB</td><td>崩溃转储 <span class="tag s-rule">规则</span> <span class="subtle small">未监控时段</span></td></tr>
-                  <tr><td class="path" title="%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx">…\Docker\wsl\disk\docker_data.vhdx</td><td class="num up">+3.10 GB</td><td>vmmem（WSL2）<span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path" title="C:\Windows\SoftwareDistribution\Download">C:\Windows\SoftwareDistribution\Download</td><td class="num up">+1.40 GB</td><td>Windows 更新 <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path" title="%LOCALAPPDATA%\uv\cache">%LOCALAPPDATA%\uv\cache</td><td class="num up">+1.20 GB</td><td>uv.exe ← Code.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="C:\Windows\ServiceProfiles\LocalService\AppData\Local\Temp">C:\Windows\ServiceProfiles\…\Temp</td><td class="num up">+8.05 GB</td><td>崩溃转储 <span class="tag s-none">未监控</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx">…\Docker\wsl\disk\docker_data.vhdx</td><td class="num up">+3.10 GB</td><td>虚拟磁盘 <span class="tag s-none">未监控</span></td></tr>
+                  <tr><td class="path" title="C:\Windows\SoftwareDistribution\Download">C:\Windows\SoftwareDistribution\Download</td><td class="num up">+1.40 GB</td><td title="svchost.exe（服务 wuauserv）">svchost.exe（wuauserv）<span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\uv\cache">%LOCALAPPDATA%\uv\cache</td><td class="num up">+1.20 GB</td><td title="进程链：uv.exe ← pwsh.exe ← Code.exe">uv.exe ← Code.exe <span class="tag s-obs">实测</span></td></tr>
                   <tr><td class="path" title="%LOCALAPPDATA%\Microsoft\Edge\User Data\Crashpad\reports">…\Edge\User Data\Crashpad\reports</td><td class="num up">+0.90 GB</td><td>msedge.exe <span class="tag s-obs">实测</span></td></tr>
                   <tr><td class="path" title="%USERPROFILE%\.claude\projects">%USERPROFILE%\.claude\projects</td><td class="num up">+0.62 GB</td><td>node.exe ← claude.exe <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path" title="%APPDATA%\Code\User\workspaceStorage">%APPDATA%\Code\User\workspaceStorage</td><td class="num up">+0.41 GB</td><td>Code.exe <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path" title="%LOCALAPPDATA%\Temp">%LOCALAPPDATA%\Temp</td><td class="num down">−1.90 GB</td><td>多个程序 <span class="tag s-rule">规则</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\ms-playwright">%LOCALAPPDATA%\ms-playwright</td><td class="num up">+0.30 GB</td><td><span class="tag s-ai">未识别</span></td></tr>
+                  <tr><td class="path" title="%LOCALAPPDATA%\Temp">%LOCALAPPDATA%\Temp</td><td class="num down">−1.90 GB</td><td>node.exe 等 3 个进程 <span class="tag s-obs">实测</span></td></tr>
                 </tbody>
               </table>
+              <div class="callout mt12">近 7 天只有 14 小时开了写入监控，其余时段看不到是哪个程序写的。<label for="v-dlg-etw" style="color:var(--accent);cursor:pointer;text-decoration:underline">开启 4 小时诊断</label></div>
             </div>
           </div>
 
@@ -487,6 +488,10 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <li>"按此速度约 N 天后写满"用最近 7 天快照的平均增速计算；没有快照历史时隐藏。</li>
               <li>标签区分来源：<span class="tag s-obs">实测</span> 来自 ETW 或文件占用查询，<span class="tag s-rule">规则</span> 来自内置规则，<span class="tag s-infer">推断</span> 来自路径和签名匹配，<span class="tag s-ai">AI 推断</span> 来自 AI 分析。</li>
               <li>WinForms 实现：卡片用 Panel 自绘，趋势图用 GDI 自绘，表格用 ListView（Details 视图）。</li>
+              <li>"增长最快"的写入者列有三种：监控时段里有写入的写"写入进程 ← 顶层应用"加 <span class="tag s-obs">实测</span>（完整进程链放在提示里）；没有监控、但规则知道是什么的写类别加 <span class="tag s-none">未监控</span>；规则也不认识的只有 <span class="tag s-ai">未识别</span>。</li>
+              <li>卡片底部的提示：从没开过监控时写"写入监控未开启，增长只能按快照对比，看不到是哪个程序写的。开启 4 小时诊断"；开过时写覆盖了多少小时。设置里选"关闭"时不显示这条提示。</li>
+              <li>工具栏的写入监控胶囊有四种状态："写入监控：关闭 · 开启诊断"；"写入监控：诊断中（精确）· 剩余 3 小时 12 分 · 停止"（圆点绿色）；"写入监控：另一个窗口正在监控"（普通权限下检测到别的窗口在监控）；"写入监控：上次没有正常结束 · 清理"（只有残留会话时）。</li>
+              <li>状态栏同理："写入监控：关闭"；监控时"写入监控：诊断中（精确）· 剩余 3:12 · 丢失 0.0%"。</li>
             </ul>
           </details>
         </section>
@@ -598,7 +603,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
 
               <div class="sec-t">证据</div>
               <ul class="evi">
-                <li><span class="tag s-obs">ETW</span>最近一次诊断中，uv.exe 在这里新建了 8,921 个文件；上级进程：Code.exe → pwsh.exe</li>
+                <li><span class="tag s-obs">ETW</span>最近一次诊断（10-19 08:00–10:00，精确）中，uv.exe 在这里新建了 8,921 个文件，估算增长 1.20 GB；进程链：uv.exe ← pwsh.exe ← Code.exe</li>
                 <li><span class="tag s-obs">程序</span>uv.exe 位于 <span class="path">%USERPROFILE%\.local\bin</span>，产品名 uv</li>
                 <li><span class="tag s-infer">已装软件</span>匹配到 winget 包 astral-sh.uv</li>
                 <li><span class="tag s-rule">规则</span>dev.uv.cache（官方文档：缓存目录与 UV_CACHE_DIR）</li>
@@ -623,6 +628,9 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                   <li>"按归属汇总"把同一个应用分散在多处的目录合并统计（比如 VS Code 的缓存、扩展、工作区存储）。</li>
                   <li>"可释放"要扣掉硬链接共享的部分，和"大小"不一定相等。</li>
                   <li>未识别目录的归属列直接给出"AI 分析"入口。</li>
+                  <li>ETW 证据取近 30 天的诊断。进程链一律按"写入进程 ← 上级 ← 顶层"的方向写（全原型统一）。</li>
+                  <li>监控过但这里没有写入时，按情况写：只有轻量模式的时段→"近 30 天 3 次诊断（共 14 小时）里这里没有新建、删除或重命名（轻量模式不记录写入量）"；有精确模式、但有不少写入对不上目录→"……没有记录到能对上这里的写入；另有 3.2 GB 的写入对不上目录（监控开始前已打开的文件）"；其余→"近 30 天 3 次诊断（共 14 小时）里没有程序在这里写入"。从没监控过时不显示这一条。</li>
+                  <li>"按归属汇总""按类别汇总"里选中一个组时不显示 ETW 证据；选中组里的具体目录时照常显示。</li>
                 </ul>
               </details>
             </aside>
@@ -646,7 +654,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
             <div class="card stat"><div class="k">净增长</div><div class="v up">+12.4 GB</div><div class="foot muted">增加 15.9 GB · 减少 3.5 GB</div></div>
             <div class="card stat"><div class="k">新建文件</div><div class="v">38,214</div><div class="foot muted">删除 9,102 个</div></div>
             <div class="card stat"><div class="k">增长最多的应用</div><div class="v" style="font-size:18px;margin-top:6px">崩溃转储 8.05 GB</div><div class="foot muted">其次 Docker 3.10 GB</div></div>
-            <div class="card stat"><div class="k">写入监控覆盖</div><div class="v">14 <small>/ 168 小时</small></div><div class="foot"><label for="v-dlg-etw" style="color:var(--accent);cursor:pointer">开启常驻监控可覆盖全天</label></div></div>
+            <div class="card stat"><div class="k">写入监控覆盖</div><div class="v">14 <small>/ 168 小时</small></div><div class="foot"><span class="muted">丢失 0.2% ·</span> <label for="v-dlg-etw" style="color:var(--accent);cursor:pointer">开启诊断</label></div></div>
           </div>
 
           <div class="grid2 mt12">
@@ -675,9 +683,9 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <div class="tl-labels"><span>10-13</span><span>10-15</span><span>10-17</span><span>10-19</span></div>
               <table class="tbl mt12">
                 <tbody>
-                  <tr><td>10-14 14:00 – 18:00</td><td>诊断 · 轻量模式</td><td class="num">4 小时</td></tr>
-                  <tr><td>10-16 09:00 – 17:00</td><td>诊断 · 轻量模式</td><td class="num">8 小时</td></tr>
-                  <tr><td>10-19 08:00 – 10:00</td><td>诊断 · 精确模式</td><td class="num">2 小时</td></tr>
+                  <tr><td>10-14 14:00 – 18:00</td><td>诊断 · 轻量模式</td><td class="num">4 小时</td><td class="num muted">丢失 0.0%</td></tr>
+                  <tr><td>10-16 09:00 – 17:00</td><td>诊断 · 轻量模式</td><td class="num">8 小时</td><td class="num muted">丢失 0.1%</td></tr>
+                  <tr><td>10-19 08:00 – 10:00</td><td>诊断 · 精确模式</td><td class="num">2 小时</td><td class="num muted">丢失 0.0%</td></tr>
                 </tbody>
               </table>
               <div class="note mt12">蓝色时段有写入进程记录。其余时段只有快照对比，只知道哪里变了，不知道是谁写的。10-15 的 8.4 GB 崩溃转储就发生在未监控时段。</div>
@@ -688,32 +696,34 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
           <div class="card mt12">
               <h2>变化最大的目录</h2>
               <table class="tbl">
-                <thead><tr><th scope="col">目录</th><th scope="col" class="num">变化</th><th scope="col" class="num">当前</th><th scope="col">写入进程</th><th scope="col">归属判断</th></tr></thead>
+                <thead><tr><th scope="col">目录</th><th scope="col" class="num">变化</th><th scope="col" class="num">当前</th><th scope="col">归属</th><th scope="col">写入进程</th></tr></thead>
                 <tbody>
-                  <tr><td class="path">C:\Windows\ServiceProfiles\LocalService\…\Temp</td><td class="num up">+8.05 GB</td><td class="num">8.62 GB</td><td><span class="subtle">未监控时段</span></td><td>崩溃转储 *.dmp <span class="tag s-rule">规则</span></td></tr>
-                  <tr><td class="path">%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx</td><td class="num up">+3.10 GB</td><td class="num">41.2 GB</td><td>vmmem（WSL2 虚拟机）</td><td>Docker Desktop <span class="tag s-obs">实测</span> <span class="tag r-medium">虚拟磁盘内部不可见</span></td></tr>
-                  <tr><td class="path">C:\Windows\SoftwareDistribution\Download</td><td class="num up">+1.40 GB</td><td class="num">1.57 GB</td><td>svchost.exe（服务 wuauserv）</td><td>Windows 更新 <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path">%LOCALAPPDATA%\uv\cache</td><td class="num up">+1.20 GB</td><td class="num">4.37 GB</td><td>uv.exe ← pwsh.exe ← Code.exe</td><td>uv <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path">…\Edge\User Data\Crashpad\reports</td><td class="num up">+0.90 GB</td><td class="num">4.07 GB</td><td>msedge.exe</td><td>Microsoft Edge <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path">%USERPROFILE%\.claude\projects</td><td class="num up">+0.62 GB</td><td class="num">1.08 GB</td><td>node.exe ← claude.exe</td><td>Claude Code <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path">%APPDATA%\Code\User\workspaceStorage</td><td class="num up">+0.41 GB</td><td class="num">1.92 GB</td><td>Code.exe</td><td>VS Code <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path">%USERPROFILE%\.codex\sessions</td><td class="num up">+0.26 GB</td><td class="num">0.64 GB</td><td>codex.exe</td><td>Codex CLI <span class="tag s-obs">实测</span></td></tr>
-                  <tr><td class="path">%LOCALAPPDATA%\Temp</td><td class="num down">−1.90 GB</td><td class="num">4.07 GB</td><td>多个进程</td><td>临时文件 <span class="tag s-rule">规则</span></td></tr>
+                  <tr><td class="path">C:\Windows\ServiceProfiles\LocalService\…\Temp</td><td class="num up">+8.05 GB</td><td class="num">8.62 GB</td><td>崩溃转储 *.dmp <span class="tag s-rule">规则</span></td><td><span class="tag s-none">未监控</span></td></tr>
+                  <tr><td class="path">%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx</td><td class="num up">+3.10 GB</td><td class="num">41.2 GB</td><td>Docker Desktop <span class="tag s-obs">实测</span></td><td class="subtle" title="监控的 14 小时里没有记录到能对上这里的写入；另有 3.2 GB 的写入对不上目录（监控开始前已打开的文件）">没有能对上这里的写入</td></tr>
+                  <tr><td class="path">C:\Windows\SoftwareDistribution\Download</td><td class="num up">+1.40 GB</td><td class="num">1.57 GB</td><td>Windows 更新 <span class="tag s-obs">实测</span></td><td>svchost.exe（服务 wuauserv）<span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%LOCALAPPDATA%\uv\cache</td><td class="num up">+1.20 GB</td><td class="num">4.37 GB</td><td>uv <span class="tag s-obs">实测</span></td><td>uv.exe ← pwsh.exe ← Code.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">…\Edge\User Data\Crashpad\reports</td><td class="num up">+0.90 GB</td><td class="num">4.07 GB</td><td>Microsoft Edge <span class="tag s-obs">实测</span></td><td title="这一段时间事件太多，按抽样估算">≈ msedge.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%USERPROFILE%\.claude\projects</td><td class="num up">+0.62 GB</td><td class="num">1.08 GB</td><td>Claude Code <span class="tag s-obs">实测</span></td><td>node.exe ← claude.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%APPDATA%\Code\User\workspaceStorage</td><td class="num up">+0.41 GB</td><td class="num">1.92 GB</td><td>VS Code <span class="tag s-obs">实测</span></td><td>Code.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%USERPROFILE%\.codex\sessions</td><td class="num up">+0.26 GB</td><td class="num">0.64 GB</td><td>Codex CLI <span class="tag s-obs">实测</span></td><td>codex.exe <span class="tag s-obs">实测</span></td></tr>
+                  <tr><td class="path">%LOCALAPPDATA%\pip\cache</td><td class="num up">+0.18 GB</td><td class="num">0.90 GB</td><td>pip <span class="tag s-rule">规则</span></td><td class="subtle">监控的 14 小时里没有写入</td></tr>
+                  <tr><td class="path">%LOCALAPPDATA%\Temp</td><td class="num down">−1.90 GB</td><td class="num">4.07 GB</td><td>临时文件 <span class="tag s-rule">规则</span></td><td>node.exe 等 3 个进程 <span class="tag s-obs">实测</span></td></tr>
                 </tbody>
               </table>
           </div>
 
           <div class="card mt12">
-            <h2>写入进程排行<span class="more muted">仅统计有监控的 14 小时</span></h2>
+            <h2>写入进程排行<span class="more muted">仅统计有监控的 14 小时 · 轻量模式的 12 小时没有写入量</span></h2>
             <table class="tbl">
-              <thead><tr><th scope="col">进程</th><th scope="col">产品 · 签名</th><th scope="col">上级应用</th><th scope="col" class="num">新建文件</th><th scope="col" class="num">写入量</th><th scope="col">主要目录</th></tr></thead>
+              <thead><tr><th scope="col">进程</th><th scope="col">产品 · 公司</th><th scope="col">上级应用</th><th scope="col" class="num">新建文件</th><th scope="col" class="num">写入量</th><th scope="col">主要目录</th></tr></thead>
               <tbody>
-                <tr><td>vmmem</td><td>WSL2 虚拟机 · Microsoft</td><td>Docker Desktop</td><td class="num">0</td><td class="num">3.10 GB</td><td class="path">…\docker_data.vhdx（看不到 Linux 内部是谁写的）</td></tr>
-                <tr><td>svchost.exe</td><td>服务 wuauserv · Microsoft</td><td>Windows 更新</td><td class="num">210</td><td class="num">1.40 GB</td><td class="path">C:\Windows\SoftwareDistribution\Download</td></tr>
-                <tr><td>uv.exe</td><td>uv · Astral</td><td>Code.exe → pwsh.exe</td><td class="num">8,921</td><td class="num">1.20 GB</td><td class="path">%LOCALAPPDATA%\uv\cache</td></tr>
+                <tr><td>vmmem</td><td>WSL2 虚拟机 · Microsoft</td><td>—</td><td class="num">0</td><td class="num">3.20 GB</td><td class="subtle">对不上目录（监控开始前已打开的文件）</td></tr>
+                <tr><td>svchost.exe</td><td>服务 wuauserv · Microsoft</td><td>—</td><td class="num">210</td><td class="num">1.40 GB</td><td class="path">C:\Windows\SoftwareDistribution\Download</td></tr>
+                <tr><td>uv.exe</td><td>uv · Astral</td><td>Code.exe（Visual Studio Code）</td><td class="num">8,921</td><td class="num">1.20 GB</td><td class="path">%LOCALAPPDATA%\uv\cache</td></tr>
                 <tr><td>node.exe</td><td>Node.js · OpenJS Foundation</td><td>claude.exe（Claude Code）</td><td class="num">12,408</td><td class="num">1.10 GB</td><td class="path">%USERPROFILE%\.claude\projects、%TEMP%</td></tr>
-                <tr><td>msedge.exe</td><td>Microsoft Edge · Microsoft</td><td></td><td class="num">3,310</td><td class="num">0.64 GB</td><td class="path">…\Edge\User Data</td></tr>
-                <tr><td>codex.exe</td><td>Codex CLI · OpenAI</td><td>WindowsTerminal.exe</td><td class="num">1,240</td><td class="num">0.26 GB</td><td class="path">%USERPROFILE%\.codex\sessions</td></tr>
+                <tr><td>系统（缓存回写或内核）</td><td>—</td><td>—</td><td class="num">0</td><td class="num">0.85 GB</td><td class="subtle">多个目录</td></tr>
+                <tr><td>msedge.exe</td><td>Microsoft Edge · Microsoft</td><td>—</td><td class="num">3,310</td><td class="num">≈ 0.64 GB</td><td class="path">…\Edge\User Data</td></tr>
+                <tr><td>codex.exe</td><td>Codex CLI · OpenAI</td><td>—</td><td class="num">1,240</td><td class="num">—</td><td class="path">%USERPROFILE%\.codex\sessions</td></tr>
               </tbody>
             </table>
           </div>
@@ -725,6 +735,13 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <li>写入进程会沿父进程链显示到顶层应用，比如 node.exe ← claude.exe。</li>
               <li>系统服务代写、虚拟磁盘、未监控时段都要明确标出来，不能猜一个进程填进去。</li>
               <li>点击任意目录跳到空间浏览的对应位置。</li>
+              <li>"上级应用"是进程链最外层的程序（壳程序 cmd、pwsh、explorer 等跳过）；"—"表示这个进程自己就是顶层。进程号 0 和 4 的写入显示为"系统（缓存回写或内核）"。</li>
+              <li>丢失率：系统来不及交给 DiskThinner、被丢掉的事件占比。数字前的"≈"表示那段时间事件太多，按抽样估算。</li>
+              <li>轻量模式只记录新建、删除、重命名，没有写入量（显示"—"）；精确模式额外记录每次写入。事件太多时自动降到轻量，并在会话里标明。</li>
+              <li>"写入量"是程序写了多少字节（覆盖写、临时文件都算）；"估算增长"是新文件最终变大了多少，用来和快照的变化量对照。目录表和空间浏览用估算增长，排行用写入量。</li>
+              <li>监控开始前就打开的文件（数据库、虚拟磁盘）的写入对不上目录，只记在排行里，主要目录写"对不上目录"；目录表里这时写"没有能对上这里的写入"，提示里给出对不上的总量。</li>
+              <li>正在监控时，覆盖时段表的最后一行是"10-19 08:00 – 进行中 · 诊断 · 精确模式 · 已 2 小时 · 剩余 2 小时 · 丢失 0.0%"，下面的按钮变成"停止监控"。上次没有正常结束的会话标"程序意外退出"。</li>
+              <li>"停止监控"先确认："停止写入监控？已经记录的数据会保留。"按钮"停止""继续监控"。</li>
             </ul>
           </details>
         </section>
@@ -949,10 +966,12 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
 
               <div class="card" id="set-monitor">
                 <h2>写入监控（ETW）</h2>
-                <label class="opt"><input type="radio" name="mon" aria-label="关闭"><div><div class="t">关闭</div><div class="d">只用扫描和每日快照，看得到哪里变了，看不到是谁写的。不需要管理员权限。</div></div></label>
-                <label class="opt on"><input type="radio" name="mon" checked aria-label="临时诊断"><div><div class="t">临时诊断（推荐）</div><div class="d">需要时手动开启 1 到 24 小时，到时自动停止。不安装后台服务。</div></div></label>
-                <label class="opt"><input type="radio" name="mon" aria-label="常驻服务"><div><div class="t">常驻服务</div><div class="d">安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。开销以实测为准。</div></div></label>
-                <div class="form-row"><div class="lbl">记录模式</div><div><div class="seg"><span class="on">轻量</span><span>精确</span></div><div class="hint">轻量：只记录新建、删除、重命名。精确：额外记录每次写入，编译、npm install 时开销更大。</div></div></div>
+                <label class="opt"><input type="radio" name="mon" aria-label="关闭"><div><div class="t">关闭</div><div class="d">不提示开启诊断。看得到哪里变了，看不到是谁写的。</div></div></label>
+                <label class="opt on"><input type="radio" name="mon" checked aria-label="临时诊断"><div><div class="t">临时诊断（推荐）</div><div class="d">需要时手动开启 1 到 24 小时，到时自动停止。需要管理员权限，不安装后台服务。</div></div></label>
+                <label class="opt" style="opacity:.6"><input type="radio" name="mon" disabled aria-label="常驻服务（后续版本）"><div><div class="t">常驻服务（后续版本）</div><div class="d">安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。</div></div></label>
+                <div class="form-row"><div class="lbl">记录模式</div><div><div class="seg"><span class="on">轻量</span><span>精确</span></div><div class="hint">轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。</div></div></div>
+                <div class="form-row"><div class="lbl">默认时长</div><div><select class="select" aria-label="写入监控默认时长"><option>1 小时</option><option selected>4 小时</option><option>8 小时</option><option>24 小时</option></select></div></div>
+                <div class="form-row"><div class="lbl">保留</div><div><select class="select" aria-label="写入监控数据保留时长"><option>30 天</option><option selected>90 天</option><option>180 天</option></select> <span class="small muted" style="margin-left:8px">当前占用 1.2 MB</span></div></div>
               </div>
 
               <div class="card" id="set-snapshot">
@@ -997,7 +1016,9 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <details class="proto-note">
                 <summary>原型说明：设置</summary>
                 <ul>
-                  <li>写入监控三档：关闭、临时诊断、常驻服务。默认临时诊断，需要时才开。</li>
+                  <li>写入监控三档：关闭、临时诊断、常驻服务。默认临时诊断，需要时才开。常驻服务是阶段 2b，这一版置灰。</li>
+                  <li>选"关闭"时概览和增长分析不出现"开启诊断"的提示，点工具栏的胶囊跳到这里。</li>
+                  <li>记录模式的默认值按实测的开销定（2a.1）：开销达标就默认精确，否则默认轻量。保留天数之外另有 64 MB 的上限，超出时删最早的会话。</li>
                   <li>MCP 只暴露只读工具，删除永远只能在 DiskThinner 界面里由用户确认。</li>
                   <li>社区规则共享、远程规则更新属于第 4 阶段，这里暂不出现。</li>
                 </ul>
@@ -1011,18 +1032,29 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
           <div class="dlg">
             <div class="dlg-h" id="h-dlg-etw">开启写入监控（临时诊断）</div>
             <div class="dlg-b">
-              <p style="margin:4px 0 12px">监控期间会记录哪个程序在 C 盘新建、删除、重命名了哪些文件，结束后在"增长分析"里查看。</p>
+              <p style="margin:4px 0 12px">监控期间会记录哪个程序在本机磁盘上新建、删除、重命名了文件（精确模式还记录写了多少），结束后在"增长分析"和"空间浏览"里查看。</p>
               <div class="form-row"><div class="lbl">时长</div><div class="chips"><span class="chip">1 小时</span><span class="chip on">4 小时</span><span class="chip">8 小时</span><span class="chip">24 小时</span></div></div>
-              <div class="form-row"><div class="lbl">模式</div><div><div class="seg"><span class="on">轻量（推荐）</span><span>精确</span></div><div class="hint">精确模式额外记录每次写入，能统计每个程序写了多少字节，但编译、npm install 时开销更大。</div></div></div>
+              <div class="form-row"><div class="lbl">模式</div><div><div class="seg"><span class="on">轻量</span><span>精确</span></div><div class="hint">轻量只记录新建、删除、重命名。精确额外记录每次写入，能估算每个程序让目录涨了多少，编译、npm install 时开销更大。</div></div></div>
               <div class="note mt12">
-                <div>· 需要管理员权限，会弹出系统的权限确认。</div>
-                <div>· 数据只保存在本机，按目录汇总，不保存文件内容。</div>
-                <div>· 到时间自动停止；程序退出时也会停止并清理监控会话。</div>
+                <div>· 需要管理员权限。现在是普通权限：点下面的按钮后 DiskThinner 会以管理员身份重新打开、重新扫描，然后开始监控。</div>
+                <div>· 监控期间请保持 DiskThinner 打开（可以最小化）；到时间或关闭窗口都会停止。</div>
+                <div>· 数据只保存在本机，按目录和程序汇总，不记录文件名和文件内容，不联网，不修改任何文件。</div>
+                <div>· 为了在程序被强制结束时也能停下来，会临时添加一个计划任务，监控结束后删除。</div>
               </div>
+              <details class="proto-note">
+                <summary>原型说明：开启写入监控</summary>
+                <ul>
+                  <li>管理员下第一条注意事项改成"需要管理员权限（当前已是管理员）"，按钮是"开始监控"。</li>
+                  <li>模式的默认值按实测开销定（设置里的"记录模式"），这里可以临时改。</li>
+                  <li>另一个窗口正在监控时：顶部提示"另一个 DiskThinner 窗口正在监控，结束后再开启"，开始按钮置灰。</li>
+                  <li>用另一个管理员账户提权时：黄色提示"你用 X 账户提权，监控数据会保存在 X 的数据目录下，用自己的账户打开 DiskThinner 时看不到"。普通权限下点了"以管理员身份重启并开始"、新窗口发现账户不一致时，不自动开始，重新打开这个对话框（保留时长和模式），显示同样的提示，按钮是"开始监控"。</li>
+                  <li>设置里选"关闭"时，概览和增长分析不出现这个对话框的入口。</li>
+                </ul>
+              </details>
             </div>
             <div class="dlg-f">
               <label class="btn" for="v-overview">取消</label>
-              <label class="btn primary" for="v-growth">以管理员身份开始</label>
+              <label class="btn primary" for="v-growth">以管理员身份重启并开始</label>
             </div>
           </div>
         </section>
