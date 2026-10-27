@@ -188,4 +188,29 @@ public sealed class UiAutomationTests : IDisposable
         Assert.Contains(items, i => i.Name == "文件树" && i.Focusable);
         Assert.Contains(items, i => i.Name == "当前位置");
     }
+
+    /// <summary>
+    /// 鼠标停在方块上（方块图给自己设了路径提示）之后，读屏读到的帮助文字仍然是操作说明，而不是路径
+    /// （docs/known-issues.md；docs/phase2a-design.md 5.12 节）。只发 WM_MOUSEMOVE 消息，不移动真实鼠标。
+    /// </summary>
+    [Fact]
+    public void TreemapHelpSurvivesHoverTooltip()
+    {
+        var items = Walk(Launch("explorer"));
+        var map = Assert.Single(items, i => i.Name == "方块图").Element;
+        var hwnd = new nint(map.Current.NativeWindowHandle);
+        Assert.NotEqual(0, hwnd);
+        var rect = map.Current.BoundingRectangle;
+        var (x, y) = ((int)(rect.Width / 2), (int)(rect.Height / 2));
+        PostMessage(hwnd, 0x0200 /* WM_MOUSEMOVE */, 0, (y << 16) | (x & 0xFFFF));
+        PostMessage(hwnd, 0x0200, 0, ((y + 1) << 16) | ((x + 1) & 0xFFFF));
+        Thread.Sleep(1000);
+        var help = (string)map.GetCurrentPropertyValue(AutomationElement.HelpTextProperty);
+        _output.WriteLine("HelpText：" + help);
+        Assert.Contains("方向键", help);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "PostMessageW")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool PostMessage(nint hwnd, uint msg, nint wParam, nint lParam);
 }

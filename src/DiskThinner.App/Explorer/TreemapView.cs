@@ -467,6 +467,9 @@ internal sealed class TreemapView : Control
         }
 
         public override string? Description => L.T("方向键在方块之间移动，Enter 进入目录，Backspace 返回上一级");
+
+        // 不覆盖时，鼠标停在方块上之后 WinForms 把提示框里的路径当作帮助文字交给读屏软件，操作说明就读不到了
+        public override string? Help => Description;
     }
 
     protected override void Dispose(bool disposing)
