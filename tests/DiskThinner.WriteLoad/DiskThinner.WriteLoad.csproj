@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 写入监控（阶段 2a）的测试写入负载：在 %TEMP%\DiskThinner-2a-* 下按固定结构写已知大小的数据，报告写了什么。
+       只给验收脚本和提权测试用，不随产品发布（docs/phase2a-design.md 8.2 节）。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+</Project>

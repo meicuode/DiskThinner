@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 阶段 2a.1：ETW 写入监控的开销实测和只能实测确认的问题（docs/phase2a-design.md 2.2、5.2 节）。需要管理员。
+       由 tools/verify/phase2a-elevated.ps1 -Part bench 运行；不随产品发布。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\tests\fixtures\monitor\templates.txt" Link="templates.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

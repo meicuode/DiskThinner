@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/spikes/">
+    <Project Path="spikes/EtwBench/EtwBench.csproj" />
     <Project Path="spikes/RuleCoverage/RuleCoverage.csproj" />
     <Project Path="spikes/ScanBench/ScanBench.csproj" />
     <Project Path="spikes/UiBench/UiBench.csproj" />
@@ -20,6 +21,7 @@
     <Project Path="tests/DiskThinner.Rules.Tests/DiskThinner.Rules.Tests.csproj" />
     <Project Path="tests/DiskThinner.Scanner.Tests/DiskThinner.Scanner.Tests.csproj" />
     <Project Path="tests/DiskThinner.Storage.Tests/DiskThinner.Storage.Tests.csproj" />
+    <Project Path="tests/DiskThinner.WriteLoad/DiskThinner.WriteLoad.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/dtrule/dtrule.csproj" />

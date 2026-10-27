@@ -93,6 +93,20 @@ public sealed class UiAutomationTests : IDisposable
     private sealed record Item(int Depth, AutomationElement Element, ControlType Type, string Name, bool Focusable, bool Enabled, bool Offscreen, string Id, string Path);
 
     /// <summary>按控件视图（讲述人默认的浏览方式）遍历，最多 3000 个元素。</summary>
+    /// <summary>窗口刚显示时页面可能还没完全交给 UI Automation（页面读成在屏幕外、子控件缺失）：最多等 15 秒，直到条件满足。</summary>
+    private static List<Item> WalkUntil(AutomationElement root, Func<List<Item>, bool> ready)
+    {
+        var sw = Stopwatch.StartNew();
+        var items = Walk(root);
+        while (!ready(items) && sw.Elapsed < TimeSpan.FromSeconds(15))
+        {
+            Thread.Sleep(500);
+            items = Walk(root);
+        }
+
+        return items;
+    }
+
     private static List<Item> Walk(AutomationElement root)
     {
         var items = new List<Item>();
@@ -159,7 +173,7 @@ public sealed class UiAutomationTests : IDisposable
     [InlineData("settings")]
     public void EveryInteractiveElementHasAName(string page)
     {
-        var items = Walk(Launch(page));
+        var items = WalkUntil(Launch(page), all => all.Count(i => i.Type == ControlType.RadioButton) >= 6);
         Dump(page, items);
 
         // 列表里内容为空的单元格（例如没有类别的行）本来就是空的，不算问题
@@ -180,7 +194,7 @@ public sealed class UiAutomationTests : IDisposable
     [Fact]
     public void TreemapIsReachableAndDescribed()
     {
-        var items = Walk(Launch("explorer"));
+        var items = WalkUntil(Launch("explorer"), all => all.Any(i => i.Name == "方块图" && !i.Offscreen));
         var map = Assert.Single(items, i => i.Name == "方块图");
         Assert.True(map.Focusable, "方块图要能用 Tab 到达");
         var help = (string)map.Element.GetCurrentPropertyValue(AutomationElement.HelpTextProperty);
@@ -196,7 +210,7 @@ public sealed class UiAutomationTests : IDisposable
     [Fact]
     public void TreemapHelpSurvivesHoverTooltip()
     {
-        var items = Walk(Launch("explorer"));
+        var items = WalkUntil(Launch("explorer"), all => all.Any(i => i.Name == "方块图" && !i.Offscreen));
         var map = Assert.Single(items, i => i.Name == "方块图").Element;
         var hwnd = new nint(map.Current.NativeWindowHandle);
         Assert.NotEqual(0, hwnd);

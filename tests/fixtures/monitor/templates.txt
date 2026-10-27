@@ -1,0 +1,257 @@
+# ETW 事件模板，由 tools/verify/export-etw-templates.ps1 从本机清单导出。不要手工改。
+# 系统：Windows 10.0.26200
+# 格式：事件 <提供程序> <事件号> v<版本> keywords=<十六进制>，然后每个字段一行：<名字> <类型>
+
+event Microsoft-Windows-Kernel-File 10 v0 keywords=0x8000000000000010
+  FileKey win:Pointer
+  FileName win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 11 v0 keywords=0x8000000000000010
+  FileKey win:Pointer
+  FileName win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 16 v0 keywords=0x8000000000000220
+  ByteOffset win:UInt64
+  Irp win:Pointer
+  ThreadId win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  IOSize win:UInt32
+  IOFlags win:UInt32
+
+event Microsoft-Windows-Kernel-File 16 v1 keywords=0x8000000000000220
+  ByteOffset win:UInt64
+  Irp win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  IssuingThreadId win:UInt32
+  IOSize win:UInt32
+  IOFlags win:UInt32
+  ExtraFlags win:UInt32
+
+event Microsoft-Windows-Kernel-File 26 v0 keywords=0x8000000000000400
+  Irp win:Pointer
+  ThreadId win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  ExtraInformation win:Pointer
+  InfoClass win:UInt32
+  FilePath win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 26 v1 keywords=0x8000000000000400
+  Irp win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  ExtraInformation win:Pointer
+  IssuingThreadId win:UInt32
+  InfoClass win:UInt32
+  FilePath win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 27 v0 keywords=0x8000000000000800
+  Irp win:Pointer
+  ThreadId win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  ExtraInformation win:Pointer
+  InfoClass win:UInt32
+  FilePath win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 27 v1 keywords=0x8000000000000800
+  Irp win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  ExtraInformation win:Pointer
+  IssuingThreadId win:UInt32
+  InfoClass win:UInt32
+  FilePath win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 28 v0 keywords=0x8000000000000800
+  Irp win:Pointer
+  ThreadId win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  ExtraInformation win:Pointer
+  InfoClass win:UInt32
+  FilePath win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 28 v1 keywords=0x8000000000000800
+  Irp win:Pointer
+  FileObject win:Pointer
+  FileKey win:Pointer
+  ExtraInformation win:Pointer
+  IssuingThreadId win:UInt32
+  InfoClass win:UInt32
+  FilePath win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 30 v0 keywords=0x8000000000001000
+  Irp win:Pointer
+  ThreadId win:Pointer
+  FileObject win:Pointer
+  CreateOptions win:UInt32
+  CreateAttributes win:UInt32
+  ShareAccess win:UInt32
+  FileName win:UnicodeString
+
+event Microsoft-Windows-Kernel-File 30 v1 keywords=0x8000000000001000
+  Irp win:Pointer
+  FileObject win:Pointer
+  IssuingThreadId win:UInt32
+  CreateOptions win:UInt32
+  CreateAttributes win:UInt32
+  ShareAccess win:UInt32
+  FileName win:UnicodeString
+
+event Microsoft-Windows-Kernel-Process 1 v0 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  SessionID win:UInt32
+  ImageName win:UnicodeString
+
+event Microsoft-Windows-Kernel-Process 1 v1 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  SessionID win:UInt32
+  Flags win:UInt32
+  ImageName win:UnicodeString
+
+event Microsoft-Windows-Kernel-Process 1 v2 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  SessionID win:UInt32
+  Flags win:UInt32
+  ImageName win:UnicodeString
+  ImageChecksum win:UInt32
+  TimeDateStamp win:UInt32
+  PackageFullName win:UnicodeString
+  PackageRelativeAppId win:UnicodeString
+
+event Microsoft-Windows-Kernel-Process 1 v3 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  ProcessSequenceNumber win:UInt64
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  ParentProcessSequenceNumber win:UInt64
+  SessionID win:UInt32
+  Flags win:UInt32
+  ProcessTokenElevationType win:UInt32
+  ProcessTokenIsElevated win:UInt32
+  MandatoryLabel win:SID
+  ImageName win:UnicodeString
+  ImageChecksum win:UInt32
+  TimeDateStamp win:UInt32
+  PackageFullName win:UnicodeString
+  PackageRelativeAppId win:UnicodeString
+
+event Microsoft-Windows-Kernel-Process 1 v4 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  ProcessSequenceNumber win:UInt64
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  ParentProcessSequenceNumber win:UInt64
+  SessionID win:UInt32
+  Flags win:UInt32
+  ProcessTokenElevationType win:UInt32
+  ProcessTokenIsElevated win:UInt32
+  MandatoryLabel win:SID
+  ImageName win:UnicodeString
+  ImageChecksum win:UInt32
+  TimeDateStamp win:UInt32
+  PackageFullName win:UnicodeString
+  PackageRelativeAppId win:UnicodeString
+  SecurityMitigations win:UInt32
+
+event Microsoft-Windows-Kernel-Process 2 v0 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  CreateTime win:FILETIME
+  ExitTime win:FILETIME
+  ExitCode win:UInt32
+  TokenElevationType win:UInt32
+  HandleCount win:UInt32
+  CommitCharge win:UInt64
+  CommitPeak win:UInt64
+  ImageName win:AnsiString
+
+event Microsoft-Windows-Kernel-Process 2 v1 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  CreateTime win:FILETIME
+  ExitTime win:FILETIME
+  ExitCode win:UInt32
+  TokenElevationType win:UInt32
+  HandleCount win:UInt32
+  CommitCharge win:UInt64
+  CommitPeak win:UInt64
+  CPUCycleCount win:UInt64
+  ReadOperationCount win:UInt32
+  WriteOperationCount win:UInt32
+  ReadTransferKiloBytes win:UInt32
+  WriteTransferKiloBytes win:UInt32
+  HardFaultCount win:UInt32
+  ImageName win:AnsiString
+
+event Microsoft-Windows-Kernel-Process 2 v2 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  ProcessSequenceNumber win:UInt64
+  CreateTime win:FILETIME
+  ExitTime win:FILETIME
+  ExitCode win:UInt32
+  TokenElevationType win:UInt32
+  HandleCount win:UInt32
+  CommitCharge win:UInt64
+  CommitPeak win:UInt64
+  CPUCycleCount win:UInt64
+  ReadOperationCount win:UInt32
+  WriteOperationCount win:UInt32
+  ReadTransferKiloBytes win:UInt32
+  WriteTransferKiloBytes win:UInt32
+  HardFaultCount win:UInt32
+  ImageName win:AnsiString
+
+event Microsoft-Windows-Kernel-Process 15 v0 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  SessionID win:UInt32
+  Flags win:UInt32
+  ImageName win:UnicodeString
+  ImageChecksum win:UInt32
+  TimeDateStamp win:UInt32
+  PackageFullName win:UnicodeString
+  PackageRelativeAppId win:UnicodeString
+
+event Microsoft-Windows-Kernel-Process 15 v1 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  ProcessSequenceNumber win:UInt64
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  ParentProcessSequenceNumber win:UInt64
+  SessionID win:UInt32
+  Flags win:UInt32
+  ProcessTokenElevationType win:UInt32
+  ProcessTokenIsElevated win:UInt32
+  MandatoryLabel win:SID
+  ImageName win:UnicodeString
+  ImageChecksum win:UInt32
+  TimeDateStamp win:UInt32
+  PackageFullName win:UnicodeString
+  PackageRelativeAppId win:UnicodeString
+
+event Microsoft-Windows-Kernel-Process 15 v2 keywords=0x8000000000000010
+  ProcessID win:UInt32
+  ProcessSequenceNumber win:UInt64
+  CreateTime win:FILETIME
+  ParentProcessID win:UInt32
+  ParentProcessSequenceNumber win:UInt64
+  SessionID win:UInt32
+  Flags win:UInt32
+  ProcessTokenElevationType win:UInt32
+  ProcessTokenIsElevated win:UInt32
+  MandatoryLabel win:SID
+  ImageName win:UnicodeString
+  ImageChecksum win:UInt32
+  TimeDateStamp win:UInt32
+  PackageFullName win:UnicodeString
+  PackageRelativeAppId win:UnicodeString
+  SecurityMitigations win:UInt32
