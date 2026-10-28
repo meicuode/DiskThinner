@@ -48,6 +48,14 @@ internal sealed class MainForm : Form
     private readonly Button _rescan = Ui.Button(L.T("重新扫描"), primary: true);
     private readonly ToolStripStatusLabel _statusScan = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripStatusLabel _statusMode = new() { TextAlign = ContentAlignment.MiddleRight };
+    private readonly ToolStripStatusLabel _statusMonitor = new() { TextAlign = ContentAlignment.MiddleRight };
+    private readonly StatusPill _pill = new() { Margin = new Padding(0) };
+    private readonly Monitor.MonitorHost _monitorHost;
+    private DiskThinner.Monitor.WriteIndex? _weekWrites;
+    private DiskThinner.Monitor.WriteIndex? _monthWrites;
+    private string? _monitorLoadError;
+    private int _writesVersion;
+    private Task? _writesLoad;
     private readonly bool _elevated = VolumeScanner.IsElevated();
     private CancellationTokenSource? _scanCts;
     private bool _suppressDriveChange;
@@ -86,6 +94,11 @@ internal sealed class MainForm : Form
 
         KeyPreview = true;
 
+        // 写入监控：这里只建宿主，第一次开始时才加载 TraceEvent（docs/phase2a-design.md 第 12.2 节第 21 条）
+        _monitorHost = new Monitor.MonitorHost(this, options.MonitorDb ?? DiskThinner.Monitor.MonitorStore.DefaultPath, options.SnapshotDb ?? SnapshotStore.DefaultPath);
+        _monitorHost.StatusChanged += (_, _) => UpdateMonitorUi();
+        _monitorHost.DataChanged += (_, _) => _writesLoad = ReloadWrites();
+
         Controls.Add(_pageHost);
         Controls.Add(_nav);
         Controls.Add(BuildToolbar());
@@ -119,6 +132,11 @@ internal sealed class MainForm : Form
         };
         _growthPage.SaveSnapshotRequested += (_, _) => SaveSnapshot();
         _growthPage.ToggleScheduleRequested += (_, _) => ToggleSchedule();
+        _growthPage.StartMonitorRequested += (_, _) => OpenMonitorDialog();
+        _growthPage.StopMonitorRequested += (_, _) => ConfirmStopMonitor();
+        _growthPage.SetMonitor(_monitorHost.Load, !_settings.Monitor.IsOff);
+        _overview.StartMonitorRequested += (_, _) => OpenMonitorDialog(hours: 4);
+        _pill.Click += (_, _) => PillClicked();
         _snapshot.Click += (_, _) => SaveSnapshot();
         _overview.NavigateRequested += (_, node) =>
         {
@@ -140,6 +158,7 @@ internal sealed class MainForm : Form
         _historyPage.SetLog(EnsureAudit(), _auditError);
         _settingsPage.SetSettings(_settings);
         _settingsPage.SetInfo(0, null, 0);
+        _settingsPage.SetMonitorInfo(_monitorHost.DbPath, _monitorHost.DbBytes);
         _settingsPage.SettingsChanged += (_, s) => ApplySettings(s);
         _settingsPage.ScheduleChanged += (_, e) => SetSchedule(e.Enabled, e.Time);
         _rescan.Click += (_, _) => StartScan(SelectedDrive());
@@ -171,6 +190,11 @@ internal sealed class MainForm : Form
         _snapshot.Margin = new Padding(0, 0, 8, 0);
         left.Controls.Add(_snapshot);
         bar.Controls.Add(left);
+
+        // 右侧：写入监控胶囊（四种状态，docs/phase2a-design.md 3.3 节 P1）
+        var right = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Padding = new Padding(0, 10, 0, 0) };
+        right.Controls.Add(_pill);
+        bar.Controls.Add(right);
         bar.Paint += (_, e) =>
         {
             using var pen = new Pen(Theme.Border);
@@ -186,6 +210,7 @@ internal sealed class MainForm : Form
         status.Items.Add(_statusScan);
         status.Items.Add(_statusSnapshot);
         status.Items.Add(_statusRules);
+        status.Items.Add(_statusMonitor);
         status.Items.Add(_statusMode);
         return status;
     }
@@ -203,10 +228,14 @@ internal sealed class MainForm : Form
         base.OnShown(e);
         LoadDrives();
         RefreshSchedule();
+        UpdateMonitorUi();
+        _monitorInit = InitMonitorAsync();
         var drive = _options.Drive ?? Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
         SelectDriveInCombo(drive);
         StartScan(drive);
     }
+
+    private Task? _monitorInit;
 
     private sealed record DriveItem(string Root, string Text)
     {
@@ -493,9 +522,24 @@ internal sealed class MainForm : Form
     }
 
     /// <summary>设置页改了设置：保存，再把能立即生效的部分应用上。</summary>
-    private void ApplySettings(Settings.AppSettings next)
+    private async void ApplySettings(Settings.AppSettings next)
     {
         var previous = _settings;
+
+        // 改成"关闭"时如果正在监控，先确认再停止；不停就恢复原来的设置（第 5.9.7 节）
+        if (next.Monitor.IsOff && !previous.Monitor.IsOff && _monitorHost.IsRunning)
+        {
+            var answer = MessageBox.Show(this, L.T("写入监控正在进行。改成\u201c关闭\u201d会停止这次监控，已经记录的数据会保留。\n\n要停止吗？"), L.T("写入监控"),
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+            if (answer != DialogResult.Yes)
+            {
+                _settingsPage.SetSettings(previous);
+                return;
+            }
+
+            await StopMonitorAsync();
+        }
+
         _settings = next;
         try
         {
@@ -507,6 +551,14 @@ internal sealed class MainForm : Form
         }
 
         AppLog.Write("设置已更新");
+        if (previous.Monitor.IsOff != next.Monitor.IsOff)
+        {
+            // "关闭"时不出现开启诊断的入口（D12）
+            _growthPage.SetMonitor(_monitorHost.Load, !next.Monitor.IsOff);
+            UpdateMonitorUi();
+            _writesLoad = ReloadWrites();
+        }
+
         if (!previous.Cleanup.ProtectedPaths.SequenceEqual(next.Cleanup.ProtectedPaths, StringComparer.OrdinalIgnoreCase))
         {
             // 执行清理时立即按新名单复核；规则引擎重新加载后，下次扫描的计划和标签也会更新
@@ -795,6 +847,14 @@ internal sealed class MainForm : Form
         _snapshot.Text = model is { CurrentSaved: true } ? L.T("已保存快照") : L.T("创建快照");
         var latest = model?.Snapshots.LastOrDefault();
         _statusSnapshot.Text = latest is null ? L.T("还没有快照") : L.F("最近快照：{0}", TimeText.Relative(new DateTimeOffset(latest.TakenAtUtc).ToFileTime(), DateTime.Now));
+
+        // 新快照的目录是写入监控合并的锚点（第 5.7 节第 1 条）；概览的写入者按新的 WeekBaseline 重新查询
+        if (model is { CurrentSaved: true })
+        {
+            _monitorHost.ReloadAnchors();
+        }
+
+        _writesLoad = ReloadWrites();
     }
 
     /// <summary>查询每日快照任务的状态（schtasks 要几十毫秒，放到后台）。</summary>
@@ -865,6 +925,21 @@ internal sealed class MainForm : Form
 
             TopMost = true;
             Activate();
+
+            // 截图前等写入监控的查询和增长对比完成（都在后台），不然截到的是"正在加载"的样子
+            foreach (var pending in new[] { _monitorInit, _writesLoad, _growthPage.Pending })
+            {
+                if (pending is not null)
+                {
+                    await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(10)));
+                }
+            }
+
+            if (_growthPage.Pending is { } again)
+            {
+                await Task.WhenAny(again, Task.Delay(TimeSpan.FromSeconds(10)));
+            }
+
             await Task.Delay(1000);
             Refresh();
 
@@ -884,6 +959,19 @@ internal sealed class MainForm : Form
                     using var dlgShot = CaptureForm(confirm, confirm.ClientRectangle);
                     dlgShot.Save(Path.ChangeExtension(shot, null) + "-confirm.png");
                     confirm.Close();
+                }
+
+                if (_options.ShowMonitorDialog)
+                {
+                    // 只显示"开启写入监控"对话框截图，不开始：截完直接关掉
+                    using var monitorDialog = new MonitorDialog(_settings.Monitor.DefaultHours, _settings.Monitor.IsPrecise, _elevated,
+                        _monitorHost.State == Monitor.MonitorUiState.OtherInstance, _account.Mismatch ? _account.ProcessUser : null);
+                    monitorDialog.Show(this);
+                    await Task.Delay(800);
+                    monitorDialog.Refresh();
+                    using var monitorShot = CaptureForm(monitorDialog, monitorDialog.ClientRectangle);
+                    monitorShot.Save(Path.ChangeExtension(shot, null) + "-monitor.png");
+                    monitorDialog.Close();
                 }
             }
 
@@ -963,6 +1051,7 @@ internal sealed class MainForm : Form
                 $"audit_entries={_audit?.List().Count}",
                 $"audit_error={_auditError}",
                 $"managed_heap_bytes={GC.GetTotalMemory(false)}",
+                .. MonitorReport(),
             ];
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))!);
             await File.WriteAllLinesAsync(report, lines);
@@ -1006,6 +1095,29 @@ internal sealed class MainForm : Form
         var area = new Rectangle(client.X - bounds.X, client.Y - bounds.Y, client.Width, client.Height);
         area.Intersect(new Rectangle(Point.Empty, full.Size));
         return full.Clone(area, full.PixelFormat);
+    }
+
+    /// <summary>报告里的写入监控（第 5.9.8 节）：状态、会话数、行数、库大小、收到 / 丢失 / 抽样、错误。</summary>
+    private IEnumerable<string> MonitorReport()
+    {
+        var host = _monitorHost;
+        var s = host.Status;
+        yield return $"monitor_state={host.State}";
+        yield return $"monitor_session={s.SessionName}";
+        yield return $"monitor_mode={(s.SessionName is null ? "" : s.Mode.ToString())}";
+        yield return $"monitor_received={s.Received}";
+        yield return $"monitor_lost={s.Lost}";
+        yield return $"monitor_sample_factor={s.SampleFactor}";
+        yield return $"monitor_end_reason={host.LastEndReason}";
+        yield return $"monitor_error={host.LastError ?? _monitorLoadError}";
+        yield return $"monitor_db_bytes={host.DbBytes}";
+        yield return $"monitor_sessions_30d={_monthWrites?.Sessions.Count}";
+        yield return $"monitor_rows_30d={_monthWrites?.Rows.Count}";
+        yield return $"monitor_week_sessions={_weekWrites?.Sessions.Count}";
+        yield return $"growth_writer_cells={string.Join('|', _growthPage.Changes.Items.Select(i => i.Cells.Length > 4 ? i.Cells[4] + (i.Tag.Length > 0 ? " " + i.Tag : "") : ""))}";
+        yield return $"growth_writers={_growthPage.Writers.Items.Count}";
+        yield return $"overview_hint={_overview.Fastest.HintText}";
+        yield return $"overview_writer_cells={string.Join('|', _overview.Fastest.Items.Select(i => i.Cells.Length > 2 ? i.Cells[2] + (i.Tag.Length > 0 ? " " + i.Tag : "") : ""))}";
     }
 
     /// <summary>报告里的已装软件、归属推断和汇总的统计。</summary>
@@ -1057,18 +1169,281 @@ internal sealed class MainForm : Form
         return _engine;
     }
 
-    private void RestartElevated()
+    private void RestartElevated(IEnumerable<string>? extraArgs = null)
     {
         _scanCts?.Cancel();
-        if (!ShellActions.RestartElevated(_currentDrive, this))
+        if (!ShellActions.RestartElevated(_currentDrive, this, extraArgs))
         {
             _statusScan.Text = L.T("已取消以管理员身份重启");
         }
     }
 
+    // ---------------- 写入监控（docs/phase2a-design.md 5.9 节） ----------------
+
+    /// <summary>
+    /// 启动时：后台判定残留会话和没有结束的会话记录（第 5.1.2 节）；带了 --start-monitor / --monitor-seconds 时在管理员下开始监控，
+    /// 账户不一致时先打开对话框（第 5.1.5 节）。
+    /// </summary>
+    private async Task InitMonitorAsync()
+    {
+        foreach (var ignored in _options.Ignored)
+        {
+            AppLog.Write("忽略了不合法的参数：" + ignored);
+        }
+
+        await _monitorHost.CheckAsync();
+        if (_options.StartMonitor is not { } duration || IsDisposed)
+        {
+            return;
+        }
+
+        var precise = _options.MonitorPrecise ?? _settings.Monitor.IsPrecise;
+        if (!_elevated)
+        {
+            AppLog.Write("--start-monitor 需要管理员权限，没有开始写入监控");
+            _statusMonitor.Text = L.T("写入监控：需要管理员权限，没有开始");
+            return;
+        }
+
+        if (_account.Mismatch && !_options.MonitorForAutomation)
+        {
+            OpenMonitorDialog(hours: Math.Clamp((int)Math.Round(duration.TotalHours), 1, 24), precise: precise, fromAutoStart: true);
+            return;
+        }
+
+        StartMonitor(duration, precise);
+    }
+
+    /// <summary>工具栏胶囊和状态栏（2 秒一次，以及状态变化时）。</summary>
+    private void UpdateMonitorUi()
+    {
+        var host = _monitorHost;
+        var s = host.Status;
+        var off = _settings.Monitor.IsOff;
+        switch (host.State)
+        {
+            case Monitor.MonitorUiState.Running:
+            {
+                var mode = Monitor.MonitorText.Mode(s.Mode);
+                _pill.Set(L.F("写入监控：诊断中（{0}）· 剩余 {1}", mode, Monitor.MonitorText.Remaining(s.Remaining)), L.T("停止"), StatusPill.Running,
+                    L.T("点击停止写入监控，已经记录的数据会保留"));
+                _statusMonitor.Text = L.F("写入监控：诊断中（{0}）· 剩余 {1} · {2}", mode, Monitor.MonitorText.RemainingShort(s.Remaining), Monitor.MonitorText.Lost(s.LostRate));
+                break;
+            }
+
+            case Monitor.MonitorUiState.OtherInstance:
+                _pill.Set(L.T("写入监控：另一个窗口正在监控"), null, StatusPill.Running);
+                _statusMonitor.Text = L.T("写入监控：另一个 DiskThinner 窗口正在监控");
+                break;
+            case Monitor.MonitorUiState.Residual:
+                _pill.Set(L.T("写入监控：上次没有正常结束"), L.T("清理"), StatusPill.Warning,
+                    _elevated ? L.T("点击再清理一次") : L.T("以管理员身份打开 DiskThinner 后会自动清理"));
+                _statusMonitor.Text = _elevated ? L.T("写入监控：上次没有正常结束，残留的会话没有清理掉") : L.T("写入监控：上次没有正常结束，以管理员身份打开后会自动清理");
+                break;
+            default:
+                _pill.Set(L.T("写入监控：关闭"), off ? null : L.T("开启诊断"), StatusPill.Idle,
+                    off ? L.T("设置里关闭了写入监控，点击打开设置") : L.T("开启写入监控后，可以看到是哪个程序在写磁盘"));
+                _statusMonitor.Text = host.LastEndReason switch
+                {
+                    DiskThinner.Monitor.Etw.StopReason.External => L.T("写入监控被外部停止"),
+                    DiskThinner.Monitor.Etw.StopReason.Error => L.T("写入监控因错误停止"),
+                    DiskThinner.Monitor.Etw.StopReason.StoreError => L.T("写入监控：写库失败，已停止"),
+                    _ => L.T("写入监控：关闭"),
+                };
+                break;
+        }
+
+        _growthPage.SetLive(s, host.LiveSession);
+    }
+
+    private async void PillClicked()
+    {
+        var host = _monitorHost;
+        if (_settings.Monitor.IsOff && !host.IsRunning)
+        {
+            _nav.Select("settings");
+            _settingsPage.ShowSection(L.T("写入监控"));
+            return;
+        }
+
+        switch (host.State)
+        {
+            case Monitor.MonitorUiState.Running:
+                ConfirmStopMonitor();
+                break;
+            case Monitor.MonitorUiState.Residual when _elevated:
+                await host.CheckAsync();
+                break;
+            case Monitor.MonitorUiState.Residual:
+                if (MessageBox.Show(this, L.T("上次的写入监控没有正常结束，会话可能还在运行。以管理员身份打开 DiskThinner 后会自动清理。\n\n现在以管理员身份重新打开吗？"),
+                        L.T("写入监控"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    RestartElevated();
+                }
+
+                break;
+            default:
+                OpenMonitorDialog();
+                break;
+        }
+    }
+
+    /// <summary>开启写入监控对话框：管理员下直接开始；普通权限下以管理员身份重启，新实例带参数自动开始（第 5.1.5 节）。</summary>
+    private void OpenMonitorDialog(int? hours = null, bool? precise = null, bool fromAutoStart = false)
+    {
+        if (_monitorHost.IsRunning)
+        {
+            return;
+        }
+
+        int chosenHours;
+        bool chosenPrecise;
+        using (var dlg = new MonitorDialog(hours ?? _settings.Monitor.DefaultHours, precise ?? _settings.Monitor.IsPrecise, _elevated,
+                   _monitorHost.State == Monitor.MonitorUiState.OtherInstance, _account.Mismatch ? _account.ProcessUser : null))
+        {
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+            {
+                if (fromAutoStart)
+                {
+                    _statusMonitor.Text = L.T("没有开始写入监控");
+                }
+
+                return;
+            }
+
+            (chosenHours, chosenPrecise) = (dlg.Hours, dlg.Precise);
+        }
+
+        if (!_elevated)
+        {
+            var args = new List<string> { "--start-monitor", chosenHours.ToString(CultureInfo.InvariantCulture), "--monitor-mode", chosenPrecise ? "precise" : "light" };
+            if (_options.MonitorDb is { } db)
+            {
+                args.AddRange(["--monitor-db", db]);
+            }
+
+            RestartElevated(args);
+            return;
+        }
+
+        StartMonitor(TimeSpan.FromHours(chosenHours), chosenPrecise);
+    }
+
+    private void StartMonitor(TimeSpan duration, bool precise)
+    {
+        var mode = precise ? DiskThinner.Monitor.MonitorMode.Precise : DiskThinner.Monitor.MonitorMode.Light;
+        var r = _monitorHost.Start(duration, mode, _settings.Monitor.KeepDays);
+        AppLog.Write(r.Status == DiskThinner.Monitor.Etw.StartStatus.Started
+            ? $"写入监控已开始：{duration.TotalSeconds:F0} 秒，{(precise ? "精确" : "轻量")}"
+            : $"写入监控没有开始：{r.Status} {r.Message}");
+        var message = r.Status switch
+        {
+            DiskThinner.Monitor.Etw.StartStatus.Started => null,
+            DiskThinner.Monitor.Etw.StartStatus.AlreadyRunning => L.T("另一个 DiskThinner 窗口正在监控，结束后再开启。"),
+            DiskThinner.Monitor.Etw.StartStatus.NotElevated => L.T("写入监控需要管理员权限。"),
+            _ => L.F("开始写入监控失败：{0}", r.Message),
+        };
+        if (message is not null && !_options.MonitorForAutomation)
+        {
+            MessageBox.Show(this, message, L.T("写入监控"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        UpdateMonitorUi();
+    }
+
+    /// <summary>停止监控先确认（第 3.3 节 P8）："停止写入监控？已经记录的数据会保留。"</summary>
+    private async void ConfirmStopMonitor()
+    {
+        if (!_monitorHost.IsRunning)
+        {
+            return;
+        }
+
+        var stop = new TaskDialogButton(L.T("停止"));
+        var keep = new TaskDialogButton(L.T("继续监控"));
+        var page = new TaskDialogPage
+        {
+            Caption = L.T("写入监控"),
+            Heading = L.T("停止写入监控？"),
+            Text = L.T("已经记录的数据会保留。"),
+            Buttons = { stop, keep },
+            DefaultButton = keep,
+        };
+        if (TaskDialog.ShowDialog(this, page) != stop)
+        {
+            return;
+        }
+
+        await StopMonitorAsync();
+    }
+
+    private async Task StopMonitorAsync()
+    {
+        _pill.Enabled = false;
+        try
+        {
+            await _monitorHost.StopAsync(DiskThinner.Monitor.Etw.StopReason.User);
+        }
+        finally
+        {
+            _pill.Enabled = true;
+        }
+
+        UpdateMonitorUi();
+    }
+
+    /// <summary>
+    /// 后台读写入监控的汇总（扫描完成和 <see cref="Monitor.MonitorHost.DataChanged"/> 之后）：概览用 [WeekBaseline, 现在]，空间浏览用近 30 天；
+    /// 增长分析页按它自己的范围重新查询。
+    /// </summary>
+    private async Task ReloadWrites()
+    {
+        var version = ++_writesVersion;
+        var host = _monitorHost;
+        var now = DateTime.UtcNow;
+        var weekFrom = _growth?.WeekBaseline?.TakenAtUtc ?? now.AddDays(-7);
+        var enabled = !_settings.Monitor.IsOff;
+        try
+        {
+            var (week, month) = await Task.Run(() => (host.Load(weekFrom, now), host.Load(now.AddDays(-30), now)));
+            if (version != _writesVersion || IsDisposed)
+            {
+                return;
+            }
+
+            (_weekWrites, _monthWrites, _monitorLoadError) = (week, month, null);
+            var covered = Monitor.MonitorText.CoveredHours(week.Sessions, weekFrom, now, host.LiveSession, now);
+            _overview.SetWrites(week, covered, (now - weekFrom).TotalHours, enabled);
+            _explorer.SetWriteIndex(month.Sessions.Count == 0 ? null : month);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version != _writesVersion || IsDisposed)
+            {
+                return;
+            }
+
+            (_weekWrites, _monthWrites, _monitorLoadError) = (null, null, ex.Message);
+            AppLog.Write("写入监控数据读不了：" + ex.Message);
+            _overview.SetWrites(null, 0, 0, enabled: false); // 读不了时不提示"没有开过"
+            _explorer.SetWriteIndex(null);
+        }
+
+        _growthPage.RefreshWrites();
+        _settingsPage.SetMonitorInfo(host.DbPath, host.DbBytes);
+    }
+
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _scanCts?.Cancel();
+        // 关闭窗口（含注销、关机、--exit-after-scan）时停止监控：会话先停，最后一次落盘最多等 3 秒（第 5.1.3 节）
+        _monitorHost.StopForExit();
         base.OnFormClosing(e);
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        _monitorHost.Dispose();
+        base.OnFormClosed(e);
     }
 }

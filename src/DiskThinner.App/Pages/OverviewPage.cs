@@ -70,6 +70,7 @@ internal sealed class OverviewPage : UserControl
         _growth.Set("—", L.T("需要相隔半天以上的两次快照"), null);
         _trend.SetData([], L.T("快照少于两个，还画不出趋势"));
         _fastest.SetPlaceholder(L.T("需要相隔半天以上的两次快照"));
+        _fastest.HintLinkClicked += (_, _) => StartMonitorRequested?.Invoke(this, EventArgs.Empty);
         _suggest.Activated += (_, node) => NavigateRequested?.Invoke(this, node);
         _largest.Activated += (_, node) => NavigateRequested?.Invoke(this, node);
         _fastest.Activated += (_, node) =>
@@ -94,7 +95,33 @@ internal sealed class OverviewPage : UserControl
     }
 
     private readonly TrendChart _trend = new() { AccessibleName = L.T("可用空间趋势") };
-    private readonly ItemList _fastest = new(L.T("增长最快（近 7 天）"), [L.T("目录"), L.T("变化"), L.T("归属")], [86, 150]);
+    private readonly ItemList _fastest = new(L.T("增长最快（近 7 天）"), [L.T("目录"), L.T("变化"), L.T("写入者")], [86, 190]);
+
+    // 增长最快的写入者列用到的数据：快照对比（SetGrowth）和写入监控（SetWrites）分别到达
+    private GrowthModel? _growthModel;
+    private NodeTree? _growthTree;
+    private Classification? _growthC;
+    private OwnerMap? _growthOwners;
+    private DiskThinner.Monitor.WriteIndex? _writes;
+    private double _writesHours;
+    private double _writesRange;
+    private bool _monitorEnabled = true;
+
+    /// <summary>用户点了"开启 4 小时诊断"。</summary>
+    public event EventHandler? StartMonitorRequested;
+
+    /// <summary>
+    /// 近 7 天（<see cref="GrowthModel.WeekBaseline"/> 到现在）的写入监控数据（docs/phase2a-design.md 5.9.5 节）。<paramref name="index"/> 为 null 表示读不了或还没读；
+    /// <paramref name="enabled"/> 为 false（设置为"关闭"）时不显示开启诊断的提示。
+    /// </summary>
+    public void SetWrites(DiskThinner.Monitor.WriteIndex? index, double coveredHours, double rangeHours, bool enabled)
+    {
+        _writes = index;
+        _writesHours = coveredHours;
+        _writesRange = rangeHours;
+        _monitorEnabled = enabled;
+        RenderFastest();
+    }
 
     internal ItemList Fastest => _fastest;
 
@@ -140,14 +167,49 @@ internal sealed class OverviewPage : UserControl
             ? L.F("按此速度约 {0} 天后写满", Math.Max(1, (int)Math.Round(d)))
             : change <= 0 ? L.T("没有在增长") : L.T("按此速度短期内不会写满");
         _growth.Set(BarChart.Signed(change), foot, null);
+        (_growthModel, _growthTree, _growthC, _growthOwners) = (model, tree, c, owners);
+        RenderFastest();
+    }
 
+    /// <summary>
+    /// 增长最快：第三列"写入者"按三种情况显示（第 5.9.5 节）：近 7 天有监控写入时是"写入进程 ← 顶层应用"加"实测"；
+    /// 没有监控写入、归属已知时是归属（范围内没有监控时加"未监控"）；都没有时是"未识别"或"已不存在"。
+    /// </summary>
+    private void RenderFastest()
+    {
+        _fastest.SetHint(_monitorEnabled && _writesHours <= 0
+            ? L.T("近 7 天没有开过写入监控，增长只能按快照对比，看不到是哪个程序写的。")
+            : null, _monitorEnabled && _writesHours <= 0 ? L.T("开启 4 小时诊断") : null);
+        if (_growthModel is not { } model || model.WeekBaseline is null)
+        {
+            return;
+        }
+
+        var (tree, c, owners) = (_growthTree, _growthC, _growthOwners);
         var items = model.WeekHotspots.Take(8).Select(h =>
         {
             var node = tree?.FindPath(h.Path) ?? -1;
-            var owner = node >= 0 ? owners?.OwnerOf(node)?.Display ?? (c?.RuleOf(node) is { } r ? Names.Display(r.Kind) : null) : null;
-            return new ListItem(node, [Redact(h.Path) + (h.IsRemainder ? L.T("（其余部分）") : ""), BarChart.Signed(h.Change), owner ?? ""],
-                L.F("之前 {0}，现在 {1}", ByteSize.Format(h.Previous), ByteSize.Format(h.Current)), RuleView.Unknown, node < 0 ? L.T("已不存在") : L.T("未识别"),
-                h.Change > 0 ? Theme.Up : h.Change < 0 ? Theme.Down : null);
+            var rule = node >= 0 ? c?.RuleOf(node) : null;
+            var owner = node >= 0 ? owners?.OwnerOf(node)?.Display ?? (rule is { } r ? Names.Display(r.Kind) : null) : null;
+            var path = Redact(h.Path) + (h.IsRemainder ? L.T("（其余部分）") : "");
+            var note = L.F("之前 {0}，现在 {1}", ByteSize.Format(h.Previous), ByteSize.Format(h.Current));
+            var color = h.Change > 0 ? Theme.Up : h.Change < 0 ? Theme.Down : (Color?)null;
+            var cell = Monitor.MonitorText.Cell(_writes, _writesHours, _writesRange, h.Path, h.Change, !h.IsDirectory, rule?.Kind == Kind.VmDisk, shortChain: true, remainder: h.IsRemainder);
+            if (cell is { Observed: true })
+            {
+                return new ListItem(node, [path, BarChart.Signed(h.Change), cell.Text], note + "\n" + cell.Note, RuleView.ObservedSource, cell.Tag, color, TagColumn: 2);
+            }
+
+            if (owner is not null)
+            {
+                // 有监控覆盖、只是这里没写入：只写归属，原因放在提示里；范围内没有监控：加"未监控"
+                return cell is null
+                    ? new ListItem(node, [path, BarChart.Signed(h.Change), owner], note, RuleView.NotMonitored, L.T("未监控"), color, TagColumn: 2)
+                    : new ListItem(node, [path, BarChart.Signed(h.Change), owner], note + "\n" + cell.Text, RuleView.NotMonitored, "", color, TagColumn: 2);
+            }
+
+            return new ListItem(node, [path, BarChart.Signed(h.Change), ""], cell is null ? note : note + "\n" + cell.Text, RuleView.Unknown,
+                node < 0 ? L.T("已不存在") : L.T("未识别"), color);
         }).ToList();
         _fastest.SetItems(items);
         _fastest.SetPlaceholder(items.Count == 0 ? L.T("这段时间里没有超过 100 MB 的变化") : null);
@@ -317,7 +379,12 @@ internal sealed class OverviewPage : UserControl
 
     /// <summary>一行数据：点击后跳到 <see cref="Node"/>。</summary>
     /// <param name="LinkLast">最后一列是链接（"查看""查看步骤"），画成链接色。</param>
-    internal sealed record ListItem(int Node, string[] Cells, string? Note, RuleView.TagStyle TagStyle, string Tag, Color? ValueColor = null, bool LinkLast = false);
+    /// <param name="TagColumn">
+    /// 标签画在这一列的文字后面（"uv.exe ← Code.exe 实测"），<see cref="Tag"/> 为空时只有文字；读屏读到的是"文字 标签"。
+    /// 不设时标签画在第一个空单元格里（docs/phase2a-design.md 5.9.4 节）。
+    /// </param>
+    internal sealed record ListItem(int Node, string[] Cells, string? Note, RuleView.TagStyle TagStyle, string Tag, Color? ValueColor = null, bool LinkLast = false,
+        int? TagColumn = null);
 
     /// <summary>原型 .stat 卡片：标题、大数字、说明和可选的进度条。</summary>
     internal sealed class StatCard : Panel
@@ -400,21 +467,30 @@ internal sealed class OverviewPage : UserControl
         private readonly DerivedFonts _fonts = new();
         private readonly int[] _fixedWidths;
         private readonly int _numericColumns;
+        private readonly HashSet<int>? _rightAligned;
+        private readonly int _fillColumn;
         private readonly Label _placeholder;
+        private readonly LinkLabel _hintLink = new() { Dock = DockStyle.Bottom, AutoSize = false, Font = Theme.Small, ForeColor = Theme.Text, LinkColor = Theme.Accent, ActiveLinkColor = Theme.AccentHover, UseMnemonic = false, Visible = false, Padding = new Padding(0, 4, 0, 2) };
         private List<ListItem> _items = [];
 
-        /// <param name="fixedWidths">第 2 列起每列的宽度（96 DPI），第一列占满剩余宽度；不给时按列数取默认值。</param>
+        /// <param name="fixedWidths">除了占满剩余宽度的那一列，其余各列的宽度（96 DPI，按列的顺序）；不给时按列数取默认值。</param>
         /// <param name="numericColumns">第 2 列起有几列是数字（右对齐，第 2 列可以带颜色）。</param>
-        public ItemList(string title, string[] columns, int[]? fixedWidths = null, int numericColumns = 1)
+        /// <param name="rightAligned">右对齐的列号（给了就不按 <paramref name="numericColumns"/> 算）。</param>
+        /// <param name="fillColumn">占满剩余宽度的列（默认第一列）。</param>
+        public ItemList(string title, string[] columns, int[]? fixedWidths = null, int numericColumns = 1, int[]? rightAligned = null, int fillColumn = 0)
         {
             _fixedWidths = fixedWidths ?? (columns.Length == 4 ? [80, 110, 90] : [80, 110]);
             _numericColumns = numericColumns;
+            _rightAligned = rightAligned is null ? null : [.. rightAligned];
+            _fillColumn = Math.Clamp(fillColumn, 0, columns.Length - 1);
             _placeholder = new Label { Dock = DockStyle.Fill, ForeColor = Theme.Muted, Font = Theme.Ui, TextAlign = ContentAlignment.MiddleCenter, Visible = false, UseMnemonic = false, BackColor = Theme.Card };
             BackColor = Theme.Card;
             Padding = new Padding(14, 10, 14, 10);
-            var heading = new Label { Text = title, Dock = DockStyle.Top, Height = 26, Font = Theme.UiBold, ForeColor = Theme.Text, UseMnemonic = false };
+            var heading = new Label { Text = title, Dock = DockStyle.Top, Height = 26, Font = Theme.UiBold, ForeColor = Theme.Text, UseMnemonic = false, AutoEllipsis = true };
             _heading = heading;
             var hint = new Label { Text = L.T("双击或按回车在空间浏览中查看"), Dock = DockStyle.Bottom, Height = 20, Font = Theme.Small, ForeColor = Theme.Subtle, UseMnemonic = false };
+            _hintLink.LinkClicked += (_, _) => HintLinkClicked?.Invoke(this, EventArgs.Empty);
+            _hintLink.Resize += (_, _) => FitHint();
             _view = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -451,12 +527,48 @@ internal sealed class OverviewPage : UserControl
             };
             Controls.Add(_placeholder);
             Controls.Add(_view);
+            Controls.Add(_hintLink); // 在"双击或按回车……"的上面
             Controls.Add(hint);
             Controls.Add(heading);
             AccessibleName = title;
         }
 
         private readonly Label _heading;
+
+        /// <summary>列表下面的提示行（例如"近 7 天没有开过写入监控……开启 4 小时诊断"）；<paramref name="link"/> 是可以点的部分，接在文字后面。</summary>
+        public void SetHint(string? text, string? link = null)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                _hintLink.Visible = false;
+                return;
+            }
+
+            _hintLink.Text = link is null ? text : text + " " + link;
+            _hintLink.LinkArea = link is null ? new LinkArea(0, 0) : new LinkArea(text.Length + 1, link.Length);
+            _hintLink.AccessibleName = _hintLink.Text;
+            _hintLink.Visible = true;
+            FitHint();
+        }
+
+        internal string? HintText => _hintLink.Visible ? _hintLink.Text : null;
+
+        /// <summary>点了提示行里的链接。</summary>
+        public event EventHandler? HintLinkClicked;
+
+        private void FitHint()
+        {
+            if (!_hintLink.Visible || _hintLink.Width <= 0)
+            {
+                return;
+            }
+
+            var h = TextRenderer.MeasureText(_hintLink.Text, _hintLink.Font, new Size(Math.Max(60, _hintLink.Width), 0), TextFormatFlags.WordBreak).Height + _hintLink.Padding.Vertical + 2;
+            if (_hintLink.Height != h)
+            {
+                _hintLink.Height = h;
+            }
+        }
 
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public string Title
@@ -499,11 +611,18 @@ internal sealed class OverviewPage : UserControl
                     row.SubItems.Add(i < it.Cells.Length ? it.Cells[i] : "");
                 }
 
-                // 风险列的文字给读屏软件用（绘制时画成标签）
-                var tagColumn = Array.FindIndex(it.Cells, string.IsNullOrEmpty);
-                if (tagColumn > 0 && tagColumn < row.SubItems.Count)
+                // 标签的文字给读屏软件用（绘制时画成标签）：指定了标签列时是"文字 标签"，否则写进第一个空单元格
+                if (it.TagColumn is { } tc && tc > 0 && tc < row.SubItems.Count)
                 {
-                    row.SubItems[tagColumn].Text = it.Tag;
+                    row.SubItems[tc].Text = (row.SubItems[tc].Text + " " + it.Tag).Trim();
+                }
+                else if (it.TagColumn is null)
+                {
+                    var tagColumn = Array.FindIndex(it.Cells, string.IsNullOrEmpty);
+                    if (tagColumn > 0 && tagColumn < row.SubItems.Count)
+                    {
+                        row.SubItems[tagColumn].Text = it.Tag;
+                    }
                 }
 
                 _view.Items.Add(row);
@@ -524,12 +643,21 @@ internal sealed class OverviewPage : UserControl
             var w = _view.ClientSize.Width;
             var fixedWidths = _fixedWidths;
             var rest = w - fixedWidths.Take(_view.Columns.Count - 1).Sum(x => Ui.Scale(_view, x)) - 2;
-            _view.Columns[0].Width = Math.Max(Ui.Scale(_view, 120), rest);
-            for (var i = 1; i < _view.Columns.Count; i++)
+            var k = 0;
+            for (var i = 0; i < _view.Columns.Count; i++)
             {
-                _view.Columns[i].Width = Ui.Scale(_view, i - 1 < fixedWidths.Length ? fixedWidths[i - 1] : 90);
+                if (i == _fillColumn)
+                {
+                    _view.Columns[i].Width = Math.Max(Ui.Scale(_view, 120), rest);
+                    continue;
+                }
+
+                _view.Columns[i].Width = Ui.Scale(_view, k < fixedWidths.Length ? fixedWidths[k] : 90);
+                k++;
             }
         }
+
+        private bool RightAligned(int column) => _rightAligned is { } set ? set.Contains(column) : column >= 1 && column <= _numericColumns;
 
         private void DrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
         {
@@ -555,11 +683,33 @@ internal sealed class OverviewPage : UserControl
             var pad = Ui.Scale(_view, 6);
             var cell = Rectangle.FromLTRB(e.Bounds.Left + pad, e.Bounds.Top, e.Bounds.Right - pad, e.Bounds.Bottom);
             var text = e.ColumnIndex < item.Cells.Length ? item.Cells[e.ColumnIndex] : "";
-            var isTag = e.ColumnIndex > 0 && string.IsNullOrEmpty(text);
+            var tagHeight = Ui.Scale(_view, 17);
+            if (item.TagColumn is { } tc && tc == e.ColumnIndex)
+            {
+                // 文字在前，标签紧跟在后面；文字太长时用省略号，给标签留出位置
+                var tagWidth = item.Tag.Length == 0 ? 0 : TextRenderer.MeasureText(g, item.Tag, _fonts.Small, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width
+                    + Math.Max(4, tagHeight / 4) * 2 + Ui.Scale(_view, 6);
+                var textRect = cell with { Width = Math.Max(0, cell.Width - tagWidth) };
+                // 量宽度时不能带 EndEllipsis（没有给宽度时会按 0 宽截断，量出来几乎是 0，标签就压在文字上了）
+                var drawn = text.Length == 0 ? 0 : Math.Min(textRect.Width, TextRenderer.MeasureText(g, text, _fonts.Regular, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width);
+                if (text.Length > 0)
+                {
+                    TextRenderer.DrawText(g, text, _fonts.Regular, textRect, Theme.Text, flags);
+                }
+
+                if (item.Tag.Length > 0)
+                {
+                    var x = cell.X + drawn + (drawn > 0 ? Ui.Scale(_view, 6) : 0);
+                    RuleView.DrawTag(g, item.Tag, _fonts.Small, new Point(x, cell.Y + (cell.Height - tagHeight) / 2), tagHeight, item.TagStyle);
+                }
+
+                return;
+            }
+
+            var isTag = item.TagColumn is null && e.ColumnIndex > 0 && string.IsNullOrEmpty(text);
             if (isTag)
             {
-                var h = Ui.Scale(_view, 17);
-                RuleView.DrawTag(g, item.Tag, _fonts.Small, new Point(cell.X, cell.Y + (cell.Height - h) / 2), h, item.TagStyle);
+                RuleView.DrawTag(g, item.Tag, _fonts.Small, new Point(cell.X, cell.Y + (cell.Height - tagHeight) / 2), tagHeight, item.TagStyle);
                 return;
             }
 
@@ -569,9 +719,8 @@ internal sealed class OverviewPage : UserControl
                 return;
             }
 
-            var numeric = e.ColumnIndex >= 1 && e.ColumnIndex <= _numericColumns;
             var color = e.ColumnIndex == 1 && item.ValueColor is { } vc ? vc : Theme.Text;
-            TextRenderer.DrawText(g, text, _fonts.Regular, cell, color, flags | (numeric ? TextFormatFlags.Right : TextFormatFlags.Left));
+            TextRenderer.DrawText(g, text, _fonts.Regular, cell, color, flags | (RightAligned(e.ColumnIndex) ? TextFormatFlags.Right : TextFormatFlags.Left));
         }
 
         protected override void OnPaint(PaintEventArgs e)

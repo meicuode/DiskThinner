@@ -71,6 +71,9 @@ internal static class RuleView
     public static readonly Group[] LegendOrder =
         [Group.System, Group.Program, Group.Cache, Group.Temp, Group.Package, Group.UserData, Group.VmDisk, Group.Unknown];
 
+    /// <summary>未监控（原型 .s-none）：这段时间没有写入监控，看不到是谁写的。</summary>
+    public static readonly TagStyle NotMonitored = new(ColorTranslator.FromHtml("#f3f3f3"), Theme.Subtle);
+
     /// <summary>实测（原型 .s-obs）：本机上看到的事实，例如程序就装在这里、正在运行。</summary>
     public static readonly TagStyle ObservedSource = new(Color.White, Theme.Accent, ColorTranslator.FromHtml("#8db8e3"));
 

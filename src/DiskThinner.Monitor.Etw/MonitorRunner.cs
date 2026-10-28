@@ -36,6 +36,9 @@ public sealed class RunnerOptions
 
     public TimeSpan FlushInterval { get; init; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>停止时按这个天数和 64 MB 的上限删掉最早的会话（D5，设置里的"保留"）。</summary>
+    public int KeepDays { get; init; } = 90;
+
     /// <summary>日志（不记路径）。</summary>
     public Action<string>? Log { get; init; }
 }
@@ -208,13 +211,14 @@ public sealed class MonitorRunner : IDisposable
         }
     }
 
+    /// <summary>每秒的状态刷新（线程池计时器）：异常不能抛到线程池（会让进程退出），整体捕获、记下最后一个（第 5.1.3 节）。</summary>
     private void SafeTick()
     {
         try
         {
             Tick();
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or System.ComponentModel.Win32Exception)
+        catch (Exception ex)
         {
             _lastError = ex.Message;
         }
@@ -301,9 +305,11 @@ public sealed class MonitorRunner : IDisposable
                 Flush(final: false);
             }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        catch (Exception ex)
         {
+            // 定时落盘也在线程池计时器上：同样整体捕获（写库失败本身在 Flush 里按"连续 3 次就停"处理）
             _lastError = ex.Message;
+            _options.Log?.Invoke("monitor timed flush failed: " + ex.GetType().Name);
         }
     }
 
@@ -346,7 +352,7 @@ public sealed class MonitorRunner : IDisposable
 
         try
         {
-            _store!.Prune(DateTime.UtcNow, TimeSpan.FromDays(90), 64L << 20);
+            _store!.Prune(DateTime.UtcNow, TimeSpan.FromDays(Math.Clamp(_options.KeepDays, 1, 3650)), 64L << 20);
         }
         catch (Exception ex) when (ex is Microsoft.Data.Sqlite.SqliteException or IOException)
         {

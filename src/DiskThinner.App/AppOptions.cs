@@ -18,6 +18,12 @@ namespace DiskThinner.App;
 ///   --show-confirm       截图后再截一张"确认清理"对话框（只显示，不执行）
 ///   --view owner         空间浏览的视图（dir / owner / kind，对应按目录、按归属汇总、按类别汇总）
 ///   --no-rules           不加载规则和已装软件（对比内存用）
+/// 写入监控（docs/phase2a-design.md 5.9.8 节）：
+///   --monitor-db m.db    写入监控库的位置
+///   --start-monitor 4    启动后开始写入监控（小时，1 到 24；以管理员身份重启时带上，只在管理员下执行）
+///   --monitor-mode m     light / precise，和 --start-monitor、--monitor-seconds 一起用
+///   --monitor-seconds 20 启动后开始写入监控（秒，10 到 86400，自动化验证用，优先于 --start-monitor）
+///   --show-monitor-dialog 截图后再截一张"开启写入监控"对话框（只显示，不开始）
 /// </summary>
 internal sealed record AppOptions
 {
@@ -58,6 +64,23 @@ internal sealed record AppOptions
     /// <summary>设置文件的位置（默认 %LOCALAPPDATA%\DiskThinner\settings.json；验证时指向别处）。</summary>
     public string? SettingsFile { get; init; }
 
+    /// <summary>写入监控库的位置（默认 %LOCALAPPDATA%\DiskThinner\monitor.db）。</summary>
+    public string? MonitorDb { get; init; }
+
+    /// <summary>启动后自动开始的写入监控时长（null 表示不自动开始）。</summary>
+    public TimeSpan? StartMonitor { get; init; }
+
+    /// <summary>自动开始时的模式（null 时用设置里的）。</summary>
+    public bool? MonitorPrecise { get; init; }
+
+    /// <summary>由 --monitor-seconds 给出（自动化验证），不经过账户不一致的对话框。</summary>
+    public bool MonitorForAutomation { get; init; }
+
+    public bool ShowMonitorDialog { get; init; }
+
+    /// <summary>参数里被忽略的值（超出范围、不认识），启动后记日志。</summary>
+    public IReadOnlyList<string> Ignored { get; init; } = [];
+
     public static AppOptions Parse(string[] args)
     {
         string? Value(string name)
@@ -68,8 +91,48 @@ internal sealed record AppOptions
 
         bool Flag(string name) => args.Any(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
 
+        // 写入监控的时长：超出范围或不是整数时忽略并记下（第 1.3 节第 6 条）
+        var ignored = new List<string>();
+        int? Int(string name, int min, int max)
+        {
+            if (Value(name) is not { } text)
+            {
+                return null;
+            }
+
+            if (int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var v) && v >= min && v <= max)
+            {
+                return v;
+            }
+
+            ignored.Add($"{name} {text}");
+            return null;
+        }
+
+        var seconds = Int("--monitor-seconds", 10, 86_400);
+        var hours = Int("--start-monitor", 1, 24);
+        bool? precise = Value("--monitor-mode")?.ToLowerInvariant() switch
+        {
+            "precise" => true,
+            "light" => false,
+            null => null,
+            var other => Ignore("--monitor-mode " + other),
+        };
+
+        bool? Ignore(string what)
+        {
+            ignored.Add(what);
+            return null;
+        }
+
         return new AppOptions
         {
+            MonitorDb = Value("--monitor-db"),
+            StartMonitor = seconds is { } s ? TimeSpan.FromSeconds(s) : hours is { } h ? TimeSpan.FromHours(h) : null,
+            MonitorPrecise = precise,
+            MonitorForAutomation = seconds is not null,
+            ShowMonitorDialog = Flag("--show-monitor-dialog"),
+            Ignored = ignored,
             Drive = NormalizeDrive(Value("--scan")) ?? ExistingFolder(Value("--scan")),
             ForceWalk = Flag("--walk"),
             SelectPath = Value("--select"),

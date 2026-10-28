@@ -83,6 +83,7 @@ public sealed class EtwSessionTests : IDisposable
         Assert.Null(second);
         Assert.Equal(StartStatus.AlreadyRunning, secondResult.Status);
 
+        var lostBefore = session.EventsLost;
         var first = session.Stop(StopReason.User);
         var again = session.Stop(StopReason.Error);
         Assert.Same(first, again);
@@ -90,6 +91,9 @@ public sealed class EtwSessionTests : IDisposable
         Assert.Equal(StopReason.User, session.StopReason);
         Assert.Equal(1, stopping);
         Assert.False(IsActive(session.Name));
+
+        // 停止之后（会话已经不在了）别的线程再读丢失数：返回最后的值，不抛异常（2a.5 验收时计时器线程在这里抛出 0x80071069，进程退出）
+        Assert.True(session.EventsLost >= lostBefore);
 
         // 互斥量已经释放
         using var l = MonitorLock.TryAcquire(_lock);
@@ -235,6 +239,7 @@ public sealed class EtwSessionTests : IDisposable
             Assert.True(stopped.Wait(TimeSpan.FromSeconds(25)), "10 秒的监控 25 秒内没有停止");
             Assert.True(flusher.Wait(TimeSpan.FromSeconds(10)));
             Assert.True(flushes > 10, $"并发落盘只跑了 {flushes} 次");
+            Assert.True(runner.Failure is null, "停止过程中计时器出错：" + runner.Failure);
             Assert.Same(stopped, secondStop);
             Assert.Equal(StopReason.Timeout, runner.Status.EndReason);
             Assert.Equal(MonitorState.Stopped, runner.Status.State);

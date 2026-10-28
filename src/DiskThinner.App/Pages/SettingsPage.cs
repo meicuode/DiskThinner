@@ -7,8 +7,8 @@ using DiskThinner.Rules;
 namespace DiskThinner.App.Pages;
 
 /// <summary>
-/// 设置（原型 .p-settings）：左边是分类，右边是各组卡片。快照、清理、规则三组可用；
-/// 写入监控（阶段 2）和 AI（阶段 3）显示为后续版本。改动立即保存到 settings.json。
+/// 设置（原型 .p-settings）：左边是分类，右边是各组卡片。写入监控、快照、清理、规则四组可用（写入监控的常驻服务是阶段 2b）；
+/// AI（阶段 3）显示为后续版本。改动立即保存到 settings.json。
 /// </summary>
 internal sealed class SettingsPage : UserControl
 {
@@ -29,6 +29,14 @@ internal sealed class SettingsPage : UserControl
     private readonly Button _remove = Ui.Button(L.T("移除"));
     private readonly Label _rules = Ui.Label("", Theme.Ui);
     private readonly Label _paths = Ui.Label("", Theme.Small, Theme.Muted);
+    private readonly RadioButton _monOff = new() { Text = L.T("关闭"), AutoSize = true, Font = Theme.Ui, Margin = new Padding(0) };
+    private readonly RadioButton _monDiag = new() { Text = L.T("临时诊断（推荐）"), AutoSize = true, Font = Theme.Ui, Margin = new Padding(0, 6, 0, 0) };
+    private readonly SegmentedControl _monMode = new(L.T("记录模式"), L.T("轻量"), L.T("精确"));
+    private readonly ComboBox _monHours = Combo(L.T("写入监控默认时长"), AppSettings.MonitorHourChoices.Select(h => L.F("{0} 小时", h)).ToArray(), width: 120);
+    private readonly ComboBox _monKeep = Combo(L.T("写入监控数据保留时长"), AppSettings.MonitorKeepChoices.Select(d => L.F("{0} 天", d)).ToArray(), width: 120);
+    private readonly Label _monDbSize = Ui.Label("", Theme.Small, Theme.Muted);
+    private string _monitorDbPath = "";
+    private (int Rules, string? Error, long SnapshotBytes) _info;
     private AppSettings _settings = new();
     private bool _binding;
 
@@ -45,11 +53,22 @@ internal sealed class SettingsPage : UserControl
         var nav = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 150, FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.Transparent, Padding = new Padding(0, 4, 12, 0) };
         nav.AccessibleName = L.T("设置分类");
 
+        // 写入监控（docs/phase2a-design.md 3.3 节 P6、5.9.7 节）：三个选项放在同一个容器里，单选按钮才互斥
+        var monOptions = Stack(
+            _monOff, Hint(L.T("不提示开启诊断。看得到哪里变了，看不到是谁写的。")),
+            _monDiag, Hint(L.T("需要时手动开启 1 到 24 小时，到时自动停止。需要管理员权限，不安装后台服务。")),
+            new RadioButton { Text = L.T("常驻服务（后续版本）"), Enabled = false, AutoSize = true, Font = Theme.Ui, Margin = new Padding(0, 6, 0, 0) },
+            Hint(L.T("安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。")));
+        monOptions.AccessibleName = L.T("写入监控");
+        _monMode.Margin = new Padding(0);
+        var monKeepRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
+        _monDbSize.Margin = new Padding(8, 6, 0, 0);
+        monKeepRow.Controls.AddRange([_monKeep, _monDbSize]);
         AddSection(nav, L.T("写入监控"), Card(L.T("写入监控（ETW）"),
-            Row("", Later(L.T("关闭"), L.T("只用扫描和每日快照，看得到哪里变了，看不到是谁写的。不需要管理员权限。"), true)),
-            Row("", Later(L.T("临时诊断"), L.T("需要时手动开启 1 到 24 小时，到时自动停止。不安装后台服务。"), false)),
-            Row("", Later(L.T("常驻服务"), L.T("安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。"), false)),
-            Row("", Hint(L.T("写入监控在后续版本（阶段 2）提供，这一版固定为\u201c关闭\u201d。")))));
+            Row("", monOptions),
+            Row(L.T("记录模式"), Stack(_monMode, Hint(L.T("轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。")))),
+            Row(L.T("默认时长"), _monHours),
+            Row(L.T("保留"), Stack(monKeepRow, Hint(L.T("这么多天内的监控记录全部保留，另有 64 MB 的上限，超出时先删最早的会话。"))))));
 
         var dailyRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
         _daily.Margin = new Padding(0, 4, 8, 0);
@@ -113,6 +132,23 @@ internal sealed class SettingsPage : UserControl
                 ScheduleChanged?.Invoke(this, (true, (string)_dailyTime.SelectedItem!));
             }
         };
+        _monOff.CheckedChanged += (_, _) =>
+        {
+            if (_monOff.Checked)
+            {
+                Change(_settings with { Monitor = _settings.Monitor with { Enabled = MonitorSettings.Off } });
+            }
+        };
+        _monDiag.CheckedChanged += (_, _) =>
+        {
+            if (_monDiag.Checked)
+            {
+                Change(_settings with { Monitor = _settings.Monitor with { Enabled = MonitorSettings.Diagnostic } });
+            }
+        };
+        _monMode.SelectedIndexChanged += (_, _) => Change(_settings with { Monitor = _settings.Monitor with { Mode = _monMode.SelectedIndex == 1 ? MonitorSettings.Precise : MonitorSettings.Light } });
+        _monHours.SelectedIndexChanged += (_, _) => Change(_settings with { Monitor = _settings.Monitor with { DefaultHours = AppSettings.MonitorHourChoices[_monHours.SelectedIndex] } });
+        _monKeep.SelectedIndexChanged += (_, _) => Change(_settings with { Monitor = _settings.Monitor with { KeepDays = AppSettings.MonitorKeepChoices[_monKeep.SelectedIndex] } });
         _auto.CheckedChanged += (_, _) => Change(_settings with { Snapshot = _settings.Snapshot with { AutoAfterScan = _auto.Checked } });
         _minDir.SelectedIndexChanged += (_, _) => Change(_settings with { Snapshot = _settings.Snapshot with { MinDirMb = AppSettings.MinDirChoices[_minDir.SelectedIndex] } });
         _keep.SelectedIndexChanged += (_, _) => Change(_settings with { Snapshot = _settings.Snapshot with { KeepDays = AppSettings.KeepDayChoices[_keep.SelectedIndex] } });
@@ -167,10 +203,38 @@ internal sealed class SettingsPage : UserControl
 
     public void SetInfo(int rules, string? rulesError, long snapshotDbBytes)
     {
+        _info = (rules, rulesError, snapshotDbBytes);
         _rules.Text = rulesError is null ? L.F("{0} 条 · 随程序更新", rules) : L.F("没有加载：{0}", rulesError);
         _dbSize.Text = snapshotDbBytes > 0 ? L.F("当前占用 {0}", ByteSize.Format(snapshotDbBytes)) : "";
         var root = Path.GetDirectoryName(AppSettings.DefaultPath)!;
-        _paths.Text = L.F("设置：{0}\n快照：{1}\n操作记录：{2}\n日志：{3}", PathDisplay.Shorten(AppSettings.DefaultPath), PathDisplay.Shorten(Path.Combine(root, "snapshots.db")), PathDisplay.Shorten(Path.Combine(root, "user.db")), PathDisplay.Shorten(AppLog.Directory));
+        var monitor = _monitorDbPath.Length > 0 ? _monitorDbPath : Path.Combine(root, "monitor.db");
+        _paths.Text = L.F("设置：{0}\n快照：{1}\n写入监控：{2}\n操作记录：{3}\n日志：{4}", PathDisplay.Shorten(AppSettings.DefaultPath), PathDisplay.Shorten(Path.Combine(root, "snapshots.db")),
+            PathDisplay.Shorten(monitor), PathDisplay.Shorten(Path.Combine(root, "user.db")), PathDisplay.Shorten(AppLog.Directory));
+    }
+
+    /// <summary>monitor.db 的位置和占用（"保留"一行的"当前占用"）。</summary>
+    public void SetMonitorInfo(string dbPath, long bytes)
+    {
+        _monitorDbPath = dbPath;
+        _monDbSize.Text = bytes > 0 ? L.F("当前占用 {0}", ByteSize.Format(bytes)) : L.T("还没有记录");
+        SetInfo(_info.Rules, _info.Error, _info.SnapshotBytes);
+    }
+
+    internal string MonitorDbSizeText => _monDbSize.Text;
+
+    internal RadioButton MonitorOff => _monOff;
+
+    internal RadioButton MonitorDiagnostic => _monDiag;
+
+    internal SegmentedControl MonitorMode => _monMode;
+
+    /// <summary>滚动到某一组（例如工具栏的写入监控胶囊在设置为"关闭"时跳到"写入监控"）。</summary>
+    public void ShowSection(string name)
+    {
+        if (_sections.TryGetValue(name, out var card))
+        {
+            _scroll.ScrollControlIntoView(card);
+        }
     }
 
     private void Bind(AppSettings s)
@@ -183,6 +247,11 @@ internal sealed class SettingsPage : UserControl
         _keep.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.KeepDayChoices, s.Snapshot.KeepDays));
         _tempAge.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.TempAgeChoices, s.Cleanup.TempMinAgeDays));
         _locked.SelectedIndex = s.Cleanup.AskWhenLocked ? 1 : 0;
+        _monOff.Checked = s.Monitor.IsOff;
+        _monDiag.Checked = !s.Monitor.IsOff;
+        _monMode.SelectedIndex = s.Monitor.IsPrecise ? 1 : 0;
+        _monHours.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.MonitorHourChoices, s.Monitor.DefaultHours));
+        _monKeep.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.MonitorKeepChoices, s.Monitor.KeepDays));
         _protected.Items.Clear();
         foreach (var p in s.Cleanup.ProtectedPaths)
         {
@@ -361,16 +430,6 @@ internal sealed class SettingsPage : UserControl
         l.MaximumSize = new Size(620, 0);
         l.Margin = new Padding(0, 4, 0, 0);
         return l;
-    }
-
-    /// <summary>后续版本的选项：显示但不能选。</summary>
-    private static Control Later(string title, string detail, bool selected)
-    {
-        var flow = Stack(
-            new RadioButton { Text = title + (selected ? "" : L.T("（后续版本）")), Checked = selected, Enabled = false, AutoSize = true, Font = Theme.Ui, Margin = new Padding(0) },
-            Hint(detail));
-        flow.Margin = new Padding(0, 0, 0, 4);
-        return flow;
     }
 
     private static ComboBox Combo(string name, string[] items, int width = 220)

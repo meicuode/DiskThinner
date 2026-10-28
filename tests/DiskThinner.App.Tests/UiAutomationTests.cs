@@ -70,7 +70,7 @@ public sealed class UiAutomationTests : IDisposable
         {
             "--scan", Path.Combine(_dir, "data"), "--page", page, "--report", report,
             "--settings", Path.Combine(_dir, "settings.json"), "--snapshot-db", Path.Combine(_dir, "snap.db"),
-            "--user-db", Path.Combine(_dir, "user.db"), "--no-auto-snapshot", "--primary-screen",
+            "--user-db", Path.Combine(_dir, "user.db"), "--monitor-db", Path.Combine(_dir, "monitor.db"), "--no-auto-snapshot", "--primary-screen",
         })
         {
             psi.ArgumentList.Add(a);

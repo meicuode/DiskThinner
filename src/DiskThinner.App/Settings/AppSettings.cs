@@ -35,6 +35,33 @@ internal sealed record CleanupSettings
     public List<string> ProtectedPaths { get; init; } = [];
 }
 
+/// <summary>写入监控的设置（docs/phase2a-design.md 5.9.7 节）。旧的 settings.json 没有这一组时用默认值。</summary>
+internal sealed record MonitorSettings
+{
+    public const string Off = "off";
+    public const string Diagnostic = "diagnostic";
+    public const string Light = "light";
+    public const string Precise = "precise";
+
+    /// <summary>"off"：不提示开启诊断，也不出现入口；"diagnostic"：需要时手动开启（D12）。</summary>
+    public string Enabled { get; init; } = Diagnostic;
+
+    /// <summary>对话框里默认的记录模式（D2：2a.1 实测后定为精确）。</summary>
+    public string Mode { get; init; } = Precise;
+
+    /// <summary>对话框里默认的时长（小时）。</summary>
+    public int DefaultHours { get; init; } = 4;
+
+    /// <summary>monitor.db 里的会话保留多少天（D5，另有 64 MB 的上限）。</summary>
+    public int KeepDays { get; init; } = 90;
+
+    [JsonIgnore]
+    public bool IsOff => Enabled == Off;
+
+    [JsonIgnore]
+    public bool IsPrecise => Mode == Precise;
+}
+
 /// <summary>
 /// %LOCALAPPDATA%\DiskThinner\settings.json。读不了或格式不对时用默认值，坏文件改名留着（不删除）。
 /// </summary>
@@ -44,12 +71,16 @@ internal sealed record AppSettings
     public static readonly int[] MinDirChoices = [20, 50, 100, 200];
     public static readonly int[] KeepDayChoices = [90, 180, 365];
     public static readonly int[] TempAgeChoices = [1, 7];
+    public static readonly int[] MonitorHourChoices = [1, 4, 8, 24];
+    public static readonly int[] MonitorKeepChoices = [30, 90, 180];
 
     public int Version { get; init; } = CurrentVersion;
 
     public SnapshotSettings Snapshot { get; init; } = new();
 
     public CleanupSettings Cleanup { get; init; } = new();
+
+    public MonitorSettings Monitor { get; init; } = new();
 
     public static string DefaultPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DiskThinner", "settings.json");
 
@@ -66,21 +97,37 @@ internal sealed record AppSettings
         !string.IsNullOrWhiteSpace(path) && Path.IsPathFullyQualified(path) && !path.StartsWith(@"\\", StringComparison.Ordinal)
         && path.IndexOfAny(['*', '?', '{', '}']) < 0 && path.TrimEnd('\\').Length > 2;
 
-    /// <summary>把超出范围的值收回到界面能选的值。</summary>
-    public AppSettings Normalized() => this with
+    /// <summary>
+    /// 把超出范围的值收回到界面能选的值。源生成的 JSON 读取对 init 属性的处理：文件里没有的一组读出来是 null、没有的数字是 0，
+    /// 不会用属性的初始值，所以这里按默认值补上（旧的 settings.json 没有"monitor"这一组）。
+    /// </summary>
+    public AppSettings Normalized()
     {
-        Snapshot = Snapshot with
+        var snapshot = Snapshot ?? new SnapshotSettings();
+        var cleanup = Cleanup ?? new CleanupSettings();
+        var monitor = Monitor ?? new MonitorSettings();
+        return this with
         {
-            MinDirMb = Nearest(MinDirChoices, Snapshot.MinDirMb),
-            KeepDays = Nearest(KeepDayChoices, Snapshot.KeepDays),
-            DailyTime = TimeOnly.TryParse(Snapshot.DailyTime, out var t) ? t.ToString("HH:mm") : "12:00",
-        },
-        Cleanup = Cleanup with
-        {
-            TempMinAgeDays = Nearest(TempAgeChoices, Cleanup.TempMinAgeDays),
-            ProtectedPaths = Cleanup.ProtectedPaths.Where(IsValidProtectedPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
-        },
-    };
+            Snapshot = snapshot with
+            {
+                MinDirMb = Nearest(MinDirChoices, snapshot.MinDirMb),
+                KeepDays = Nearest(KeepDayChoices, snapshot.KeepDays),
+                DailyTime = TimeOnly.TryParse(snapshot.DailyTime, out var t) ? t.ToString("HH:mm") : "12:00",
+            },
+            Cleanup = cleanup with
+            {
+                TempMinAgeDays = Nearest(TempAgeChoices, cleanup.TempMinAgeDays),
+                ProtectedPaths = (cleanup.ProtectedPaths ?? []).Where(IsValidProtectedPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            },
+            Monitor = monitor with
+            {
+                Enabled = monitor.Enabled is MonitorSettings.Off ? MonitorSettings.Off : MonitorSettings.Diagnostic,
+                Mode = monitor.Mode is MonitorSettings.Light ? MonitorSettings.Light : MonitorSettings.Precise,
+                DefaultHours = monitor.DefaultHours <= 0 ? 4 : Nearest(MonitorHourChoices, monitor.DefaultHours),
+                KeepDays = monitor.KeepDays <= 0 ? 90 : Nearest(MonitorKeepChoices, monitor.KeepDays),
+            },
+        };
+    }
 
     private static int Nearest(int[] choices, int value) => choices.MinBy(c => Math.Abs(c - value));
 

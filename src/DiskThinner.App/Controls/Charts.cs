@@ -230,3 +230,101 @@ internal sealed class TrendChart : Control
         base.Dispose(disposing);
     }
 }
+
+/// <summary>
+/// 写入监控覆盖时段（原型 .timeline，docs/phase2a-design.md 5.9.4 节）：TitleBar 色的底条上用 Accent 色画出有监控的时段，
+/// 进行中的时段右端加一个深色标记；下面是日期刻度。读屏软件读 AccessibleDescription 里列出的时段。
+/// </summary>
+internal sealed class CoverageTimeline : Control
+{
+    private static readonly Color RunningEdge = ColorTranslator.FromHtml("#063d73");
+    private readonly DerivedFonts _fonts = new();
+    private DateTime _from;
+    private DateTime _to;
+    private IReadOnlyList<(DateTime StartUtc, DateTime EndUtc, bool Running)> _spans = [];
+
+    public CoverageTimeline()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = Theme.Card;
+        AccessibleRole = AccessibleRole.Graphic;
+        AccessibleName = L.T("写入监控覆盖时段");
+    }
+
+    internal IReadOnlyList<(DateTime StartUtc, DateTime EndUtc, bool Running)> Spans => _spans;
+
+    public void SetData(DateTime fromUtc, DateTime toUtc, IReadOnlyList<(DateTime StartUtc, DateTime EndUtc, bool Running)> spans)
+    {
+        _from = fromUtc;
+        _to = toUtc > fromUtc ? toUtc : fromUtc.AddHours(1);
+        _spans = spans;
+        AccessibleDescription = spans.Count == 0
+            ? L.T("这段时间里没有写入监控记录")
+            : L.F("写入监控覆盖：{0}", string.Join(L.T("，"), spans.Select(s => L.F("{0} 到 {1}{2}",
+                s.StartUtc.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture),
+                s.EndUtc.ToLocalTime().ToString(s.StartUtc.ToLocalTime().Date == s.EndUtc.ToLocalTime().Date ? "HH:mm" : "MM-dd HH:mm", CultureInfo.InvariantCulture),
+                s.Running ? L.T("（进行中）") : ""))));
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        var g = e.Graphics;
+        _fonts.Update(Font);
+        var textH = TextRenderer.MeasureText("0", _fonts.Small).Height;
+        var bar = new Rectangle(2, 2, Math.Max(10, Width - 4), Math.Max(6, Height - textH - 8));
+        using (var back = new SolidBrush(Theme.TitleBar))
+        {
+            g.FillRectangle(back, bar);
+        }
+
+        var span = Math.Max(1, (_to - _from).TotalSeconds);
+        int X(DateTime t) => bar.Left + (int)Math.Round(bar.Width * Math.Clamp((t - _from).TotalSeconds / span, 0, 1));
+        using (var fill = new SolidBrush(Theme.Accent))
+        using (var edge = new SolidBrush(RunningEdge))
+        {
+            foreach (var (start, end, running) in _spans)
+            {
+                var left = X(start);
+                var right = Math.Max(left + Math.Max(2, Ui.Scale(this, 2)), X(end));
+                g.FillRectangle(fill, left, bar.Top, right - left, bar.Height);
+                if (running)
+                {
+                    var w = Math.Max(2, Ui.Scale(this, 3));
+                    g.FillRectangle(edge, right - w, bar.Top - 1, w, bar.Height + 2);
+                }
+            }
+        }
+
+        // 日期刻度：首、尾和中间两个，跨度不到两天时带时刻；和已经画的重叠或者文字相同就不画（跨度很短时只剩首尾）
+        var format = (_to - _from).TotalDays < 2 ? "MM-dd HH:mm" : "MM-dd";
+        var flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
+        var gap = TextRenderer.MeasureText(" ", _fonts.Small).Width * 2;
+        var drawn = new List<(int Left, int Width, string Text)>();
+        foreach (var i in new[] { 0, 3, 1, 2 })
+        {
+            var t = _from + TimeSpan.FromSeconds(span * i / 3);
+            var text = t.ToLocalTime().ToString(format, CultureInfo.InvariantCulture);
+            var w = TextRenderer.MeasureText(text, _fonts.Small, Size.Empty, flags).Width;
+            var x = Math.Clamp(X(t) - w / 2, 0, Math.Max(0, Width - w));
+            if (drawn.Any(d => d.Text == text || (x < d.Left + d.Width + gap && d.Left < x + w + gap)))
+            {
+                continue;
+            }
+
+            drawn.Add((x, w, text));
+            TextRenderer.DrawText(g, text, _fonts.Small, new Rectangle(x, bar.Bottom + 4, w + 2, textH), Theme.Subtle, flags);
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _fonts.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+}

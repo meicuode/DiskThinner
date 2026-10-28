@@ -20,9 +20,21 @@
     <value> · 其次 {0} {1}</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
+  <data name=" · 剩余 {0}" xml:space="preserve">
+    <value> · 剩余 {0}</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name=" · 已降为轻量" xml:space="preserve">
+    <value> · 已降为轻量</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
   <data name=" · 找不到 {0}" xml:space="preserve">
     <value> · 找不到 {0}</value>
     <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name=" · 轻量模式的 {0} 小时没有写入量" xml:space="preserve">
+    <value> · 轻量模式的 {0} 小时没有写入量</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="$MFT 的属性列表是非常驻的，暂不支持，请使用遍历扫描" xml:space="preserve">
     <value>$MFT 的属性列表是非常驻的，暂不支持，请使用遍历扫描</value>
@@ -216,6 +228,14 @@
     <value>{0:yyyy-MM-dd HH:mm:ss}　{1}　{2}&#xA;&#xA;{3}&#xA;{4}&#xA;&#xA;依据：{5}&#xA;{6}{7}{8}</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
   </data>
+  <data name="{0} / {1} 分钟" xml:space="preserve">
+    <value>{0} / {1} 分钟</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="{0} / {1} 小时" xml:space="preserve">
+    <value>{0} / {1} 小时</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="{0} MB 的目录" xml:space="preserve">
     <value>{0} MB 的目录</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
@@ -248,6 +268,10 @@
     <value>{0} · 可释放 {1}</value>
     <comment>DiskThinner.App/Explorer/GroupListView.cs</comment>
   </data>
+  <data name="{0} – 进行中" xml:space="preserve">
+    <value>{0} – 进行中</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
   <data name="{0} 与其他位置用硬链接共享，删掉这里不释放" xml:space="preserve">
     <value>{0} 与其他位置用硬链接共享，删掉这里不释放</value>
     <comment>DiskThinner.Cleanup/PlanBuilder.cs</comment>
@@ -276,9 +300,17 @@
     <value>{0} 位于 {1}{2}</value>
     <comment>DiskThinner.Rules/Owners.cs</comment>
   </data>
+  <data name="{0} 分钟" xml:space="preserve">
+    <value>{0} 分钟</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs, DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
   <data name="{0} 分钟前" xml:space="preserve">
     <value>{0} 分钟前</value>
     <comment>DiskThinner.App/Formatting/TimeText.cs</comment>
+  </data>
+  <data name="{0} 到 {1}{2}" xml:space="preserve">
+    <value>{0} 到 {1}{2}</value>
+    <comment>DiskThinner.App/Controls/Charts.cs</comment>
   </data>
   <data name="{0} 处" xml:space="preserve">
     <value>{0} 处</value>
@@ -295,6 +327,14 @@
   <data name="{0} 天前" xml:space="preserve">
     <value>{0} 天前</value>
     <comment>DiskThinner.App/Formatting/TimeText.cs</comment>
+  </data>
+  <data name="{0} 小时" xml:space="preserve">
+    <value>{0} 小时</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs, DiskThinner.App/Monitor/MonitorText.cs, DiskThinner.App/Pages/GrowthPage.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
+  <data name="{0} 小时 {1} 分" xml:space="preserve">
+    <value>{0} 小时 {1} 分</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="{0} 小时前" xml:space="preserve">
     <value>{0} 小时前</value>
@@ -356,6 +396,14 @@
     <value>{0} 的目录名是{1} {2} 的开头</value>
     <comment>DiskThinner.Rules/Owners.cs</comment>
   </data>
+  <data name="{0} 秒" xml:space="preserve">
+    <value>{0} 秒</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="{0} 等 {1} 个进程" xml:space="preserve">
+    <value>{0} 等 {1} 个进程</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="{0} 项" xml:space="preserve">
     <value>{0} 项</value>
     <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs</comment>
@@ -388,9 +436,25 @@
     <value>{0}里有文件被这些程序占用：&#xA;&#xA;{1}&#xA;&#xA;要请它们正常关闭后再试一次吗？不会强制结束，程序可能会提示保存。选“否”则跳过这些文件。</value>
     <comment>DiskThinner.App/MainForm.cs</comment>
   </data>
+  <data name="{0}里没有程序在这里写入" xml:space="preserve">
+    <value>{0}里没有程序在这里写入</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="{0}里没有程序在这里新建或删除文件（轻量模式看不到写入量）" xml:space="preserve">
+    <value>{0}里没有程序在这里新建或删除文件（轻量模式看不到写入量）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="{0}里没有能对上这里的写入（另有 {1} 的写入对不上目录，是监控开始前已打开的文件）" xml:space="preserve">
+    <value>{0}里没有能对上这里的写入（另有 {1} 的写入对不上目录，是监控开始前已打开的文件）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="{0}里，写入记录在上级目录 {1}" xml:space="preserve">
+    <value>{0}里，写入记录在上级目录 {1}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="{0}（{1}）" xml:space="preserve">
     <value>{0}（{1}）</value>
-    <comment>DiskThinner.App/Explorer/DetailPanel.cs, DiskThinner.Cleanup/CleanupPlan.cs, DiskThinner.Rules/Owners.cs</comment>
+    <comment>DiskThinner.App/Explorer/DetailPanel.cs, DiskThinner.App/Pages/GrowthPage.cs, DiskThinner.Cleanup/CleanupPlan.cs, DiskThinner.Rules/Owners.cs</comment>
   </data>
   <data name="{0}（其余部分）" xml:space="preserve">
     <value>{0}（其余部分）</value>
@@ -428,6 +492,14 @@
     <value>{0}：{1}（{2}）</value>
     <comment>DiskThinner.Cleanup/Deleter.cs</comment>
   </data>
+  <data name="{0}：新建 {1} 个、删除 {2} 个文件（轻量模式没有写入量）" xml:space="preserve">
+    <value>{0}：新建 {1} 个、删除 {2} 个文件（轻量模式没有写入量）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="{0}：新建 {1} 个文件，估算增长 {2}，写入 {3}" xml:space="preserve">
+    <value>{0}：新建 {1} 个文件，估算增长 {2}，写入 {3}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="{0}：运行 {1}（{2}）" xml:space="preserve">
     <value>{0}：运行 {1}（{2}）</value>
     <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs</comment>
@@ -438,11 +510,19 @@
   </data>
   <data name="、" xml:space="preserve">
     <value>、</value>
-    <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs, DiskThinner.App/Explorer/GroupListView.cs, DiskThinner.Cleanup/CleanupExecutor.cs, DiskThinner.Cleanup/PlanBuilder.cs, DiskThinner.Rules/Owners.cs</comment>
+    <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs, DiskThinner.App/Explorer/GroupListView.cs, DiskThinner.App/Monitor/MonitorText.cs, DiskThinner.App/Pages/GrowthPage.cs, DiskThinner.Cleanup/CleanupExecutor.cs, DiskThinner.Cleanup/PlanBuilder.cs, DiskThinner.Rules/Owners.cs</comment>
   </data>
   <data name="上次扫描：{0:HH:mm}（{1}，{2:F1} 秒）" xml:space="preserve">
     <value>上次扫描：{0:HH:mm}（{1}，{2:F1} 秒）</value>
     <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
+  </data>
+  <data name="上次的写入监控没有正常结束，会话可能还在运行。以管理员身份打开 DiskThinner 后会自动清理。&#xA;&#xA;现在以管理员身份重新打开吗？" xml:space="preserve">
+    <value>上次的写入监控没有正常结束，会话可能还在运行。以管理员身份打开 DiskThinner 后会自动清理。&#xA;&#xA;现在以管理员身份重新打开吗？</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="上级应用" xml:space="preserve">
+    <value>上级应用</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="不会执行" xml:space="preserve">
     <value>不会执行</value>
@@ -455,6 +535,10 @@
   <data name="不在允许清理的目录里" xml:space="preserve">
     <value>不在允许清理的目录里</value>
     <comment>DiskThinner.Cleanup/Verifier.cs</comment>
+  </data>
+  <data name="不提示开启诊断。看得到哪里变了，看不到是谁写的。" xml:space="preserve">
+    <value>不提示开启诊断。看得到哪里变了，看不到是谁写的。</value>
+    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
   <data name="不是 NTFS 卷，或无法读取卷参数（错误 {0}）" xml:space="preserve">
     <value>不是 NTFS 卷，或无法读取卷参数（错误 {0}）</value>
@@ -475,6 +559,10 @@
   <data name="丢历史或登录态" xml:space="preserve">
     <value>丢历史或登录态</value>
     <comment>DiskThinner.Rules/Names.cs</comment>
+  </data>
+  <data name="丢失 {0}" xml:space="preserve">
+    <value>丢失 {0}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="丢用户数据" xml:space="preserve">
     <value>丢用户数据</value>
@@ -508,13 +596,21 @@
     <value>临时文件最小年龄</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
-  <data name="临时诊断" xml:space="preserve">
-    <value>临时诊断</value>
+  <data name="临时诊断（推荐）" xml:space="preserve">
+    <value>临时诊断（推荐）</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
+  <data name="为了在程序被强制结束时也能停下来，会临时添加一个计划任务，监控结束后删除。" xml:space="preserve">
+    <value>为了在程序被强制结束时也能停下来，会临时添加一个计划任务，监控结束后删除。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
   </data>
   <data name="主导航" xml:space="preserve">
     <value>主导航</value>
     <comment>DiskThinner.App/Controls/NavBar.cs</comment>
+  </data>
+  <data name="主要目录" xml:space="preserve">
+    <value>主要目录</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="之前 {0}，现在 {1}" xml:space="preserve">
     <value>之前 {0}，现在 {1}</value>
@@ -527,6 +623,10 @@
   <data name="云文件占位符（如 OneDrive 按需下载），内容不在本地，不占空间。" xml:space="preserve">
     <value>云文件占位符（如 OneDrive 按需下载），内容不在本地，不占空间。</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
+  <data name="产品 · 公司" xml:space="preserve">
+    <value>产品 · 公司</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="产品名 {0}" xml:space="preserve">
     <value>产品名 {0}</value>
@@ -556,9 +656,21 @@
     <value>以下内容删除后无法恢复</value>
     <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs</comment>
   </data>
+  <data name="以管理员身份打开 DiskThinner 后会自动清理" xml:space="preserve">
+    <value>以管理员身份打开 DiskThinner 后会自动清理</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
   <data name="以管理员身份重启" xml:space="preserve">
     <value>以管理员身份重启</value>
     <comment>DiskThinner.App/Explorer/ExplorerPage.cs</comment>
+  </data>
+  <data name="以管理员身份重启并开始" xml:space="preserve">
+    <value>以管理员身份重启并开始</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
+  <data name="以管理员身份重新打开 DiskThinner，然后开始写入监控" xml:space="preserve">
+    <value>以管理员身份重新打开 DiskThinner，然后开始写入监控</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
   </data>
   <data name="会自动重建 · 默认直接删除" xml:space="preserve">
     <value>会自动重建 · 默认直接删除</value>
@@ -583,6 +695,10 @@
   <data name="你添加的保护目录" xml:space="preserve">
     <value>你添加的保护目录</value>
     <comment>DiskThinner.App/Settings/AppSettings.cs</comment>
+  </data>
+  <data name="你用 {0} 账户提权，监控数据会保存在 {0} 的数据目录下，用自己的账户打开 DiskThinner 时看不到。" xml:space="preserve">
+    <value>你用 {0} 账户提权，监控数据会保存在 {0} 的数据目录下，用自己的账户打开 DiskThinner 时看不到。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
   </data>
   <data name="你的项目" xml:space="preserve">
     <value>你的项目</value>
@@ -646,7 +762,15 @@
   </data>
   <data name="停止" xml:space="preserve">
     <value>停止</value>
-    <comment>DiskThinner.App/Dialogs/CleanupProgressDialog.cs</comment>
+    <comment>DiskThinner.App/Dialogs/CleanupProgressDialog.cs, DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="停止写入监控？" xml:space="preserve">
+    <value>停止写入监控？</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="停止监控" xml:space="preserve">
+    <value>停止监控</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="先显示确认框，确认后才会删除" xml:space="preserve">
     <value>先显示确认框，确认后才会删除</value>
@@ -708,6 +832,10 @@
     <value>其他用户的目录</value>
     <comment>DiskThinner.Cleanup/PlanBuilder.cs</comment>
   </data>
+  <data name="其他进程" xml:space="preserve">
+    <value>其他进程</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="内置保护名单" xml:space="preserve">
     <value>内置保护名单</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
@@ -720,21 +848,53 @@
     <value>内置规则</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
+  <data name="写入了 {0}{1}" xml:space="preserve">
+    <value>写入了 {0}{1}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="写入监控" xml:space="preserve">
     <value>写入监控</value>
-    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+    <comment>DiskThinner.App/MainForm.cs, DiskThinner.App/Monitor/MonitorHost.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
-  <data name="写入监控在后续版本加入：现在能看到哪里变了，看不到是哪个程序写的" xml:space="preserve">
-    <value>写入监控在后续版本加入：现在能看到哪里变了，看不到是哪个程序写的</value>
+  <data name="写入监控不可用" xml:space="preserve">
+    <value>写入监控不可用</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
-  <data name="写入监控在后续版本（阶段 2）提供，这一版固定为“关闭”。" xml:space="preserve">
-    <value>写入监控在后续版本（阶段 2）提供，这一版固定为“关闭”。</value>
+  <data name="写入监控不可用。" xml:space="preserve">
+    <value>写入监控不可用。</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入监控因错误停止" xml:space="preserve">
+    <value>写入监控因错误停止</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控已在设置里关闭" xml:space="preserve">
+    <value>写入监控已在设置里关闭</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入监控已在设置里关闭。快照对比只知道哪里变了、变了多少，不知道是谁写的。" xml:space="preserve">
+    <value>写入监控已在设置里关闭。快照对比只知道哪里变了、变了多少，不知道是谁写的。</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入监控数据保留时长" xml:space="preserve">
+    <value>写入监控数据保留时长</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
+  <data name="写入监控数据读不了：{0}" xml:space="preserve">
+    <value>写入监控数据读不了：{0}</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入监控正在进行。改成“关闭”会停止这次监控，已经记录的数据会保留。&#xA;&#xA;要停止吗？" xml:space="preserve">
+    <value>写入监控正在进行。改成“关闭”会停止这次监控，已经记录的数据会保留。&#xA;&#xA;要停止吗？</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
   </data>
   <data name="写入监控的数据来自更新的版本（格式 {0}），请升级 DiskThinner" xml:space="preserve">
     <value>写入监控的数据来自更新的版本（格式 {0}），请升级 DiskThinner</value>
     <comment>DiskThinner.Monitor/MonitorStore.cs</comment>
+  </data>
+  <data name="写入监控被外部停止" xml:space="preserve">
+    <value>写入监控被外部停止</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
   </data>
   <data name="写入监控覆盖" xml:space="preserve">
     <value>写入监控覆盖</value>
@@ -742,19 +902,95 @@
   </data>
   <data name="写入监控覆盖时段" xml:space="preserve">
     <value>写入监控覆盖时段</value>
+    <comment>DiskThinner.App/Controls/Charts.cs, DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入监控覆盖时段（{0}）" xml:space="preserve">
+    <value>写入监控覆盖时段（{0}）</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
-  <data name="写入监控（ETW 诊断）还没有开启，这一版也还没有这个功能。快照对比只知道哪里变了、变了多少，不知道是谁写的；开启后这里会显示有监控记录的时段。" xml:space="preserve">
-    <value>写入监控（ETW 诊断）还没有开启，这一版也还没有这个功能。快照对比只知道哪里变了、变了多少，不知道是谁写的；开启后这里会显示有监控记录的时段。</value>
-    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  <data name="写入监控覆盖：{0}" xml:space="preserve">
+    <value>写入监控覆盖：{0}</value>
+    <comment>DiskThinner.App/Controls/Charts.cs</comment>
+  </data>
+  <data name="写入监控需要管理员权限。" xml:space="preserve">
+    <value>写入监控需要管理员权限。</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控默认时长" xml:space="preserve">
+    <value>写入监控默认时长</value>
+    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
   <data name="写入监控（ETW）" xml:space="preserve">
     <value>写入监控（ETW）</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
+  <data name="写入监控：上次没有正常结束" xml:space="preserve">
+    <value>写入监控：上次没有正常结束</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：上次没有正常结束，以管理员身份打开后会自动清理" xml:space="preserve">
+    <value>写入监控：上次没有正常结束，以管理员身份打开后会自动清理</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：上次没有正常结束，残留的会话没有清理掉" xml:space="preserve">
+    <value>写入监控：上次没有正常结束，残留的会话没有清理掉</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：关闭" xml:space="preserve">
+    <value>写入监控：关闭</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：写库失败，已停止" xml:space="preserve">
+    <value>写入监控：写库失败，已停止</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：另一个 DiskThinner 窗口正在监控" xml:space="preserve">
+    <value>写入监控：另一个 DiskThinner 窗口正在监控</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：另一个窗口正在监控" xml:space="preserve">
+    <value>写入监控：另一个窗口正在监控</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：诊断中（{0}）· 剩余 {1}" xml:space="preserve">
+    <value>写入监控：诊断中（{0}）· 剩余 {1}</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：诊断中（{0}）· 剩余 {1} · {2}" xml:space="preserve">
+    <value>写入监控：诊断中（{0}）· 剩余 {1} · {2}</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入监控：需要管理员权限，没有开始" xml:space="preserve">
+    <value>写入监控：需要管理员权限，没有开始</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="写入者" xml:space="preserve">
+    <value>写入者</value>
+    <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
+  </data>
+  <data name="写入记录在上级目录 {0}" xml:space="preserve">
+    <value>写入记录在上级目录 {0}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="写入进程" xml:space="preserve">
     <value>写入进程</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入进程排行" xml:space="preserve">
+    <value>写入进程排行</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入进程排行 · 仅统计有监控的 {0}" xml:space="preserve">
+    <value>写入进程排行 · 仅统计有监控的 {0}</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写入量" xml:space="preserve">
+    <value>写入量</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="写库失败，已停止" xml:space="preserve">
+    <value>写库失败，已停止</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="净增长" xml:space="preserve">
     <value>净增长</value>
@@ -836,6 +1072,10 @@
     <value>删除是永久的，不经过回收站（C 盘的回收站不释放空间）。每一项都会写入操作记录。{0}</value>
     <comment>DiskThinner.App/Pages/CleanupPage.cs</comment>
   </data>
+  <data name="到时停止" xml:space="preserve">
+    <value>到时停止</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="加入清理计划{0}" xml:space="preserve">
     <value>加入清理计划{0}</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
@@ -904,6 +1144,10 @@
     <value>取不到程序路径</value>
     <comment>DiskThinner.App/Commands/SnapshotCommand.cs</comment>
   </data>
+  <data name="取消" xml:space="preserve">
+    <value>取消</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
   <data name="取消了" xml:space="preserve">
     <value>取消了</value>
     <comment>DiskThinner.Cleanup/CleanupExecutor.cs</comment>
@@ -926,6 +1170,14 @@
   </data>
   <data name="变化最大的目录" xml:space="preserve">
     <value>变化最大的目录</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="另一个 DiskThinner 窗口正在监控，结束后再开启。" xml:space="preserve">
+    <value>另一个 DiskThinner 窗口正在监控，结束后再开启。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs, DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="另有 {0} 次" xml:space="preserve">
+    <value>另有 {0} 次</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="另有 {0} 项是手动清理，不会执行。" xml:space="preserve">
@@ -963,10 +1215,6 @@
   <data name="只有一个快照，还不能对比。下次扫描（距离上次超过 6 小时会自动保存）或者每日快照之后就能看到变化。" xml:space="preserve">
     <value>只有一个快照，还不能对比。下次扫描（距离上次超过 6 小时会自动保存）或者每日快照之后就能看到变化。</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
-  </data>
-  <data name="只用扫描和每日快照，看得到哪里变了，看不到是谁写的。不需要管理员权限。" xml:space="preserve">
-    <value>只用扫描和每日快照，看得到哪里变了，看不到是谁写的。不需要管理员权限。</value>
-    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
   <data name="只看可清理" xml:space="preserve">
     <value>只看可清理</value>
@@ -1044,6 +1292,10 @@
     <value>回收站</value>
     <comment>DiskThinner.Rules/Names.cs</comment>
   </data>
+  <data name="因错误停止" xml:space="preserve">
+    <value>因错误停止</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="在“{0}”里，执行时跳过" xml:space="preserve">
     <value>在“{0}”里，执行时跳过</value>
     <comment>DiskThinner.Cleanup/PlanBuilder.cs</comment>
@@ -1051,6 +1303,10 @@
   <data name="在保护名单里：{0}。DiskThinner 不会删除这里的任何东西。" xml:space="preserve">
     <value>在保护名单里：{0}。DiskThinner 不会删除这里的任何东西。</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
+  <data name="在所在目录" xml:space="preserve">
+    <value>在所在目录</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="在方块图中只显示这个目录" xml:space="preserve">
     <value>在方块图中只显示这个目录</value>
@@ -1075,6 +1331,10 @@
   <data name="在资源管理器中显示，自己清理" xml:space="preserve">
     <value>在资源管理器中显示，自己清理</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
+  <data name="在这里" xml:space="preserve">
+    <value>在这里</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="增加 {0} · 减少 {1}（按快照记录的目录汇总）" xml:space="preserve">
     <value>增加 {0} · 减少 {1}（按快照记录的目录汇总）</value>
@@ -1127,6 +1387,10 @@
   <data name="复制路径" xml:space="preserve">
     <value>复制路径</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs, DiskThinner.App/Explorer/ExplorerPage.cs</comment>
+  </data>
+  <data name="多个目录" xml:space="preserve">
+    <value>多个目录</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="多个程序" xml:space="preserve">
     <value>多个程序</value>
@@ -1184,12 +1448,20 @@
     <value>定时</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
+  <data name="实测" xml:space="preserve">
+    <value>实测</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="实际释放：{0}&#xA;" xml:space="preserve">
     <value>实际释放：{0}&#xA;</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
   </data>
-  <data name="对比两个快照，找出哪些目录在变大" xml:space="preserve">
-    <value>对比两个快照，找出哪些目录在变大</value>
+  <data name="对不上目录（监控前已打开的文件）" xml:space="preserve">
+    <value>对不上目录（监控前已打开的文件）</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="对比两个快照，结合写入监控数据，找出谁在让磁盘变大" xml:space="preserve">
+    <value>对比两个快照，结合写入监控数据，找出谁在让磁盘变大</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="对象" xml:space="preserve">
@@ -1276,6 +1548,10 @@
     <value>已经不在了</value>
     <comment>DiskThinner.Cleanup/Verifier.cs</comment>
   </data>
+  <data name="已经记录的数据会保留。" xml:space="preserve">
+    <value>已经记录的数据会保留。</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
   <data name="已装软件" xml:space="preserve">
     <value>已装软件</value>
     <comment>DiskThinner.Inventory/InstalledApp.cs, DiskThinner.Rules/Owners.cs</comment>
@@ -1288,8 +1564,8 @@
     <value>已选 {0} 项 · {1}　预计释放 {2}</value>
     <comment>DiskThinner.App/Pages/CleanupPage.cs</comment>
   </data>
-  <data name="常驻服务" xml:space="preserve">
-    <value>常驻服务</value>
+  <data name="常驻服务（后续版本）" xml:space="preserve">
+    <value>常驻服务（后续版本）</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
   <data name="应用数据" xml:space="preserve">
@@ -1300,17 +1576,37 @@
     <value>建议先处理</value>
     <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
   </data>
+  <data name="开启 4 小时诊断" xml:space="preserve">
+    <value>开启 4 小时诊断</value>
+    <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
+  </data>
+  <data name="开启写入监控后，可以看到是哪个程序在写磁盘" xml:space="preserve">
+    <value>开启写入监控后，可以看到是哪个程序在写磁盘</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="开启写入监控（临时诊断）" xml:space="preserve">
+    <value>开启写入监控（临时诊断）</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
   <data name="开启每日快照" xml:space="preserve">
     <value>开启每日快照</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
-  <data name="开启诊断（后续版本）" xml:space="preserve">
-    <value>开启诊断（后续版本）</value>
-    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  <data name="开启诊断" xml:space="preserve">
+    <value>开启诊断</value>
+    <comment>DiskThinner.App/MainForm.cs, DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="开始写入监控失败：{0}" xml:space="preserve">
+    <value>开始写入监控失败：{0}</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
   </data>
   <data name="开始清理" xml:space="preserve">
     <value>开始清理</value>
     <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs</comment>
+  </data>
+  <data name="开始监控" xml:space="preserve">
+    <value>开始监控</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
   </data>
   <data name="归属" xml:space="preserve">
     <value>归属</value>
@@ -1395,6 +1691,10 @@
   <data name="我添加的保护目录" xml:space="preserve">
     <value>我添加的保护目录</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
+  <data name="手动停止" xml:space="preserve">
+    <value>手动停止</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="手动清理" xml:space="preserve">
     <value>手动清理</value>
@@ -1524,6 +1824,10 @@
     <value>按规则处理的是整个 {0}。</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
+  <data name="按选择的时长和模式开始写入监控" xml:space="preserve">
+    <value>按选择的时长和模式开始写入监控</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
   <data name="按风险分组，每组有默认的处理方式，可以逐项修改" xml:space="preserve">
     <value>按风险分组，每组有默认的处理方式，可以逐项修改</value>
     <comment>DiskThinner.App/Pages/CleanupPage.cs</comment>
@@ -1568,6 +1872,10 @@
     <value>数据位置</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
+  <data name="数据只保存在本机，按目录和程序汇总，不记录文件名和文件内容，不联网，不修改任何文件。" xml:space="preserve">
+    <value>数据只保存在本机，按目录和程序汇总，不记录文件名和文件内容，不联网，不修改任何文件。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
   <data name="数据库 / 缓存 / 模型" xml:space="preserve">
     <value>数据库 / 缓存 / 模型</value>
     <comment>DiskThinner.App/Explorer/FileKinds.cs</comment>
@@ -1599,6 +1907,22 @@
   <data name="文档 / 媒体" xml:space="preserve">
     <value>文档 / 媒体</value>
     <comment>DiskThinner.App/Explorer/FileKinds.cs</comment>
+  </data>
+  <data name="新建 {0} 个文件" xml:space="preserve">
+    <value>新建 {0} 个文件</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="新建了 {0} 个文件" xml:space="preserve">
+    <value>新建了 {0} 个文件</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="新建了 {0} 个文件，估算增长 {1}{2}" xml:space="preserve">
+    <value>新建了 {0} 个文件，估算增长 {1}{2}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="新建文件" xml:space="preserve">
+    <value>新建文件</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="方向键在方块之间移动，Enter 进入目录，Backspace 返回上一级" xml:space="preserve">
     <value>方向键在方块之间移动，Enter 进入目录，Backspace 返回上一级</value>
@@ -1643,6 +1967,10 @@
   <data name="日志" xml:space="preserve">
     <value>日志</value>
     <comment>DiskThinner.Rules/Names.cs</comment>
+  </data>
+  <data name="时长" xml:space="preserve">
+    <value>时长</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
   </data>
   <data name="时间" xml:space="preserve">
     <value>时间</value>
@@ -1708,6 +2036,10 @@
     <value>最近一次</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
   </data>
+  <data name="最近一次诊断（{0}，{1}）中，{2} {3}{4}；进程链：{5}" xml:space="preserve">
+    <value>最近一次诊断（{0}，{1}）中，{2} {3}{4}；进程链：{5}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="最近快照：{0}" xml:space="preserve">
     <value>最近快照：{0}</value>
     <comment>DiskThinner.App/MainForm.cs</comment>
@@ -1720,6 +2052,14 @@
     <value>有文件被占用时，问我要不要请占用它的程序正常关闭（不会强制结束）</value>
     <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs</comment>
   </data>
+  <data name="服务 {0}" xml:space="preserve">
+    <value>服务 {0}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="服务 {0} 等 {1} 个" xml:space="preserve">
+    <value>服务 {0} 等 {1} 个</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="未开启" xml:space="preserve">
     <value>未开启</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
@@ -1730,7 +2070,7 @@
   </data>
   <data name="未监控" xml:space="preserve">
     <value>未监控</value>
-    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs, DiskThinner.App/Pages/OverviewPage.cs</comment>
   </data>
   <data name="未知" xml:space="preserve">
     <value>未知</value>
@@ -1739,6 +2079,14 @@
   <data name="未知的动作类型" xml:space="preserve">
     <value>未知的动作类型</value>
     <comment>DiskThinner.Rules/RuleDb.cs</comment>
+  </data>
+  <data name="未知进程" xml:space="preserve">
+    <value>未知进程</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="未知进程（进程号 {0}）" xml:space="preserve">
+    <value>未知进程（进程号 {0}）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="未设置根节点" xml:space="preserve">
     <value>未设置根节点</value>
@@ -1795,6 +2143,10 @@
   <data name="模型文件" xml:space="preserve">
     <value>模型文件</value>
     <comment>DiskThinner.Rules/Names.cs</comment>
+  </data>
+  <data name="模式" xml:space="preserve">
+    <value>模式</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
   </data>
   <data name="正在停止…" xml:space="preserve">
     <value>正在停止…</value>
@@ -1884,6 +2236,10 @@
     <value>没有在增长</value>
     <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
   </data>
+  <data name="没有开始写入监控" xml:space="preserve">
+    <value>没有开始写入监控</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
   <data name="没有扫描结果。" xml:space="preserve">
     <value>没有扫描结果。</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs, DiskThinner.App/Pages/OverviewPage.cs</comment>
@@ -1903,6 +2259,10 @@
   <data name="没有编号为 {0} 的快照" xml:space="preserve">
     <value>没有编号为 {0} 的快照</value>
     <comment>DiskThinner.Storage/SnapshotStore.cs</comment>
+  </data>
+  <data name="没有能对上这里的写入" xml:space="preserve">
+    <value>没有能对上这里的写入</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="没有规则认识、也推断不出归属的位置。打开所在位置看看内容；AI 分析会在后续版本加入。" xml:space="preserve">
     <value>没有规则认识、也推断不出归属的位置。打开所在位置看看内容；AI 分析会在后续版本加入。</value>
@@ -1936,6 +2296,10 @@
     <value>注意</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
+  <data name="注意事项" xml:space="preserve">
+    <value>注意事项</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
   <data name="浏览器 Cookie" xml:space="preserve">
     <value>浏览器 Cookie</value>
     <comment>DiskThinner.Rules/ProtectionList.cs</comment>
@@ -1958,7 +2322,7 @@
   </data>
   <data name="清理" xml:space="preserve">
     <value>清理</value>
-    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+    <comment>DiskThinner.App/MainForm.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
   <data name="清理 conda 的包缓存和索引缓存" xml:space="preserve">
     <value>清理 conda 的包缓存和索引缓存</value>
@@ -2020,6 +2384,14 @@
     <value>清空计划</value>
     <comment>DiskThinner.App/Pages/CleanupPage.cs</comment>
   </data>
+  <data name="点击停止写入监控，已经记录的数据会保留" xml:space="preserve">
+    <value>点击停止写入监控，已经记录的数据会保留</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="点击再清理一次" xml:space="preserve">
+    <value>点击再清理一次</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
   <data name="用户与应用数据" xml:space="preserve">
     <value>用户与应用数据</value>
     <comment>DiskThinner.App/Rules/RuleView.cs</comment>
@@ -2047,6 +2419,46 @@
   <data name="用资源管理器打开，DiskThinner 不会删除任何东西" xml:space="preserve">
     <value>用资源管理器打开，DiskThinner 不会删除任何东西</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
+  <data name="监控 {0}内" xml:space="preserve">
+    <value>监控 {0}内</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="监控时段写入最多：{0} {1}" xml:space="preserve">
+    <value>监控时段写入最多：{0} {1}</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="监控时长" xml:space="preserve">
+    <value>监控时长</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
+  <data name="监控期间会记录哪个程序在本机磁盘上新建、删除、重命名了文件（精确模式还记录写了多少），结束后在“增长分析”和“空间浏览”里查看。" xml:space="preserve">
+    <value>监控期间会记录哪个程序在本机磁盘上新建、删除、重命名了文件（精确模式还记录写了多少），结束后在“增长分析”和“空间浏览”里查看。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
+  <data name="监控期间请保持 DiskThinner 打开（可以最小化）；到时间或关闭窗口都会停止。" xml:space="preserve">
+    <value>监控期间请保持 DiskThinner 打开（可以最小化）；到时间或关闭窗口都会停止。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
+  <data name="监控期间这个目录还没有单独记录（刚出现、或者写入量太小），写入记在上级目录里" xml:space="preserve">
+    <value>监控期间这个目录还没有单独记录（刚出现、或者写入量太小），写入记在上级目录里</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="监控的 {0} 小时里没有写入" xml:space="preserve">
+    <value>监控的 {0} 小时里没有写入</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="监控的 {0} 小时里没有新建或删除" xml:space="preserve">
+    <value>监控的 {0} 小时里没有新建或删除</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="监控的 {0} 小时里没有记录到写入" xml:space="preserve">
+    <value>监控的 {0} 小时里没有记录到写入</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="监控的 {0} 小时里没有记录到能对上这里的写入；另有 {1} 的写入对不上目录（监控开始前已打开的文件）" xml:space="preserve">
+    <value>监控的 {0} 小时里没有记录到能对上这里的写入；另有 {1} 的写入对不上目录（监控开始前已打开的文件）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="目录" xml:space="preserve">
     <value>目录</value>
@@ -2104,9 +2516,17 @@
     <value>程序</value>
     <comment>DiskThinner.App/Explorer/FileKinds.cs, DiskThinner.App/Rules/RuleView.cs, DiskThinner.Rules/Names.cs, DiskThinner.Rules/Owners.cs</comment>
   </data>
+  <data name="程序意外退出" xml:space="preserve">
+    <value>程序意外退出</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="程序文件，请通过卸载程序删除" xml:space="preserve">
     <value>程序文件，请通过卸载程序删除</value>
     <comment>DiskThinner.Rules/ProtectionList.cs</comment>
+  </data>
+  <data name="程序退出时停止" xml:space="preserve">
+    <value>程序退出时停止</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="程序里没有内置规则库" xml:space="preserve">
     <value>程序里没有内置规则库</value>
@@ -2144,6 +2564,10 @@
     <value>类别 / 风险</value>
     <comment>DiskThinner.App/Explorer/GroupListView.cs, DiskThinner.App/Explorer/TreeListView.cs</comment>
   </data>
+  <data name="精确" xml:space="preserve">
+    <value>精确</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs, DiskThinner.App/Monitor/MonitorText.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
   <data name="系统" xml:space="preserve">
     <value>系统</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs, DiskThinner.App/Rules/RuleView.cs, DiskThinner.Rules/Names.cs</comment>
@@ -2172,6 +2596,10 @@
     <value>系统还原点，在“系统保护”里调整</value>
     <comment>DiskThinner.Rules/ProtectionList.cs</comment>
   </data>
+  <data name="系统（缓存回写或内核）" xml:space="preserve">
+    <value>系统（缓存回写或内核）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="累计释放" xml:space="preserve">
     <value>累计释放</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
@@ -2196,6 +2624,10 @@
     <value>结果</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
   </data>
+  <data name="继续监控" xml:space="preserve">
+    <value>继续监控</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
   <data name="缓存" xml:space="preserve">
     <value>缓存</value>
     <comment>DiskThinner.App/Rules/RuleView.cs, DiskThinner.Rules/Names.cs</comment>
@@ -2212,6 +2644,10 @@
     <value>草稿，未审阅</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
+  <data name="蓝色时段有写入进程记录。其余时段只有快照对比，只知道哪里变了，不知道是谁写的。" xml:space="preserve">
+    <value>蓝色时段有写入进程记录。其余时段只有快照对比，只知道哪里变了，不知道是谁写的。</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
   <data name="虚拟磁盘" xml:space="preserve">
     <value>虚拟磁盘</value>
     <comment>DiskThinner.App/Rules/RuleView.cs, DiskThinner.Rules/Names.cs</comment>
@@ -2219,6 +2655,10 @@
   <data name="被占用的文件" xml:space="preserve">
     <value>被占用的文件</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
+  <data name="被外部停止" xml:space="preserve">
+    <value>被外部停止</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="被拦截" xml:space="preserve">
     <value>被拦截</value>
@@ -2280,6 +2720,10 @@
     <value>警告</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
+  <data name="记录模式" xml:space="preserve">
+    <value>记录模式</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
   <data name="设置" xml:space="preserve">
     <value>设置</value>
     <comment>DiskThinner.App/MainForm.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
@@ -2296,8 +2740,12 @@
     <value>设置环境变量 {0}，把它放到其他盘，以后不再占 C 盘。{1}</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
-  <data name="设置：{0}&#xA;快照：{1}&#xA;操作记录：{2}&#xA;日志：{3}" xml:space="preserve">
-    <value>设置：{0}&#xA;快照：{1}&#xA;操作记录：{2}&#xA;日志：{3}</value>
+  <data name="设置里关闭了写入监控，点击打开设置" xml:space="preserve">
+    <value>设置里关闭了写入监控，点击打开设置</value>
+    <comment>DiskThinner.App/MainForm.cs</comment>
+  </data>
+  <data name="设置：{0}&#xA;快照：{1}&#xA;写入监控：{2}&#xA;操作记录：{3}&#xA;日志：{4}" xml:space="preserve">
+    <value>设置：{0}&#xA;快照：{1}&#xA;写入监控：{2}&#xA;操作记录：{3}&#xA;日志：{4}</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
   <data name="证书私钥" xml:space="preserve">
@@ -2307,6 +2755,14 @@
   <data name="证据" xml:space="preserve">
     <value>证据</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
+  <data name="诊断 · {0}模式" xml:space="preserve">
+    <value>诊断 · {0}模式</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="诊断中，剩余 {0}" xml:space="preserve">
+    <value>诊断中，剩余 {0}</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="询问时，同意了才请程序正常关闭，不会强制结束。确认清理时还可以再改。" xml:space="preserve">
     <value>询问时，同意了才请程序正常关闭，不会强制结束。确认清理时还可以再改。</value>
@@ -2408,6 +2864,22 @@
     <value>转到 {0}</value>
     <comment>DiskThinner.App/Explorer/Breadcrumb.cs</comment>
   </data>
+  <data name="轻量" xml:space="preserve">
+    <value>轻量</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs, DiskThinner.App/Monitor/MonitorText.cs, DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
+  <data name="轻量只记录新建、删除、重命名。精确额外记录每次写入，能估算每个程序让目录涨了多少，编译、npm install 时开销更大。" xml:space="preserve">
+    <value>轻量只记录新建、删除、重命名。精确额外记录每次写入，能估算每个程序让目录涨了多少，编译、npm install 时开销更大。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
+  <data name="轻量模式只记录新建、删除、重命名，看不到写入量" xml:space="preserve">
+    <value>轻量模式只记录新建、删除、重命名，看不到写入量</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。" xml:space="preserve">
+    <value>轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。</value>
+    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
   <data name="运行 {0}{1}" xml:space="preserve">
     <value>运行 {0}{1}</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
@@ -2432,12 +2904,24 @@
     <value>运行官方清理命令（{0}）</value>
     <comment>DiskThinner.App/Dialogs/ConfirmCleanupDialog.cs</comment>
   </data>
+  <data name="近 30 天 {0} 次诊断共 {1} 小时，{2} 次在这里有写入，主要来自 {3}" xml:space="preserve">
+    <value>近 30 天 {0} 次诊断共 {1} 小时，{2} 次在这里有写入，主要来自 {3}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="近 30 天 {0} 次诊断（共 {1} 小时）" xml:space="preserve">
+    <value>近 30 天 {0} 次诊断（共 {1} 小时）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
   <data name="近 7 天" xml:space="preserve">
     <value>近 7 天</value>
     <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
   </data>
   <data name="近 7 天净增长" xml:space="preserve">
     <value>近 7 天净增长</value>
+    <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
+  </data>
+  <data name="近 7 天没有开过写入监控，增长只能按快照对比，看不到是哪个程序写的。" xml:space="preserve">
+    <value>近 7 天没有开过写入监控，增长只能按快照对比，看不到是哪个程序写的。</value>
     <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
   </data>
   <data name="近 {0} 天" xml:space="preserve">
@@ -2472,6 +2956,10 @@
     <value>还没有清理过</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
   </data>
+  <data name="还没有记录" xml:space="preserve">
+    <value>还没有记录</value>
+    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
   <data name="这一项已删除 {0:N0} 个文件 · {1}" xml:space="preserve">
     <value>这一项已删除 {0:N0} 个文件 · {1}</value>
     <comment>DiskThinner.App/Dialogs/CleanupProgressDialog.cs</comment>
@@ -2500,6 +2988,10 @@
     <value>这么多天内的快照全部保留，更早的每周只留一个。</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
+  <data name="这么多天内的监控记录全部保留，另有 64 MB 的上限，超出时先删最早的会话。" xml:space="preserve">
+    <value>这么多天内的监控记录全部保留，另有 64 MB 的上限，超出时先删最早的会话。</value>
+    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
   <data name="这是 junction 或符号链接，指向别的位置，没有展开计算，大小为 0。" xml:space="preserve">
     <value>这是 junction 或符号链接，指向别的位置，没有展开计算，大小为 0。</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
@@ -2512,9 +3004,25 @@
     <value>这次是普通权限的遍历扫描，识别不了硬链接：和别处共享的文件也算进了预计释放，实际释放可能更少。以管理员身份扫描更准确。</value>
     <comment>DiskThinner.Cleanup/PlanBuilder.cs</comment>
   </data>
+  <data name="这段时间没有监控，可以开启诊断" xml:space="preserve">
+    <value>这段时间没有监控，可以开启诊断</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="这段时间里没有写入监控记录" xml:space="preserve">
+    <value>这段时间里没有写入监控记录</value>
+    <comment>DiskThinner.App/Controls/Charts.cs, DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="这段时间里没有写入监控记录。快照对比只知道哪里变了、变了多少，不知道是谁写的；开启诊断后，这里会显示有写入进程记录的时段。" xml:space="preserve">
+    <value>这段时间里没有写入监控记录。快照对比只知道哪里变了、变了多少，不知道是谁写的；开启诊断后，这里会显示有写入进程记录的时段。</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
   <data name="这段时间里没有超过 100 MB 的变化" xml:space="preserve">
     <value>这段时间里没有超过 100 MB 的变化</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs, DiskThinner.App/Pages/OverviewPage.cs</comment>
+  </data>
+  <data name="进程" xml:space="preserve">
+    <value>进程</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
   </data>
   <data name="退出码 {0}" xml:space="preserve">
     <value>退出码 {0}</value>
@@ -2628,13 +3136,21 @@
     <value>零散的小位置（各不到 {0}）</value>
     <comment>DiskThinner.App/Explorer/GroupListView.cs</comment>
   </data>
-  <data name="需要时手动开启 1 到 24 小时，到时自动停止。不安装后台服务。" xml:space="preserve">
-    <value>需要时手动开启 1 到 24 小时，到时自动停止。不安装后台服务。</value>
+  <data name="需要时手动开启 1 到 24 小时，到时自动停止。需要管理员权限，不安装后台服务。" xml:space="preserve">
+    <value>需要时手动开启 1 到 24 小时，到时自动停止。需要管理员权限，不安装后台服务。</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
   </data>
   <data name="需要相隔半天以上的两次快照" xml:space="preserve">
     <value>需要相隔半天以上的两次快照</value>
     <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
+  </data>
+  <data name="需要管理员权限。现在是普通权限：点下面的按钮后 DiskThinner 会以管理员身份重新打开、重新扫描，然后开始监控。" xml:space="preserve">
+    <value>需要管理员权限。现在是普通权限：点下面的按钮后 DiskThinner 会以管理员身份重新打开、重新扫描，然后开始监控。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
+  </data>
+  <data name="需要管理员权限（当前已是管理员）。" xml:space="preserve">
+    <value>需要管理员权限（当前已是管理员）。</value>
+    <comment>DiskThinner.App/Dialogs/MonitorDialog.cs</comment>
   </data>
   <data name="需重新下载" xml:space="preserve">
     <value>需重新下载</value>
@@ -2652,6 +3168,10 @@
     <value>默认不勾选，确认时逐项勾选</value>
     <comment>DiskThinner.Cleanup/CleanupPlan.cs</comment>
   </data>
+  <data name="默认时长" xml:space="preserve">
+    <value>默认时长</value>
+    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
   <data name="默认运行官方清理命令" xml:space="preserve">
     <value>默认运行官方清理命令</value>
     <comment>DiskThinner.Cleanup/CleanupPlan.cs</comment>
@@ -2662,7 +3182,7 @@
   </data>
   <data name="（{0}）" xml:space="preserve">
     <value>（{0}）</value>
-    <comment>DiskThinner.App/Explorer/ExplorerPage.cs, DiskThinner.Cleanup/CleanupExecutor.cs, DiskThinner.Rules/Owners.cs</comment>
+    <comment>DiskThinner.App/Explorer/ExplorerPage.cs, DiskThinner.App/Monitor/MonitorText.cs, DiskThinner.Cleanup/CleanupExecutor.cs, DiskThinner.Rules/Owners.cs</comment>
   </data>
   <data name="（其余部分）" xml:space="preserve">
     <value>（其余部分）</value>
@@ -2676,13 +3196,13 @@
     <value>（另有 {0} 与别处用硬链接共享，删了也不释放）</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
-  <data name="（后续版本）" xml:space="preserve">
-    <value>（后续版本）</value>
-    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
-  </data>
   <data name="（含子项）" xml:space="preserve">
     <value>（含子项）</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
+  </data>
+  <data name="（所在目录）" xml:space="preserve">
+    <value>（所在目录）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
   <data name="（按簇分配，实际占用更大）" xml:space="preserve">
     <value>（按簇分配，实际占用更大）</value>
@@ -2699,6 +3219,14 @@
   <data name="（管理员权限，MFT 扫描）" xml:space="preserve">
     <value>（管理员权限，MFT 扫描）</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="（虚拟磁盘，看不到内部是谁写的）" xml:space="preserve">
+    <value>（虚拟磁盘，看不到内部是谁写的）</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="（进行中）" xml:space="preserve">
+    <value>（进行中）</value>
+    <comment>DiskThinner.App/Controls/Charts.cs</comment>
   </data>
   <data name="，" xml:space="preserve">
     <value>，</value>
@@ -2720,6 +3248,10 @@
     <value>，部分完成 {0} 项</value>
     <comment>DiskThinner.App/MainForm.cs</comment>
   </data>
+  <data name="，部分数据不全" xml:space="preserve">
+    <value>，部分数据不全</value>
+    <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
   <data name="，释放 {0}" xml:space="preserve">
     <value>，释放 {0}</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
@@ -2735,5 +3267,13 @@
   <data name="；当前扫描里已经没有这个位置" xml:space="preserve">
     <value>；当前扫描里已经没有这个位置</value>
     <comment>DiskThinner.App/Pages/GrowthPage.cs</comment>
+  </data>
+  <data name="；数字前的 ≈ 表示按抽样估算或有丢失" xml:space="preserve">
+    <value>；数字前的 ≈ 表示按抽样估算或有丢失</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
+  </data>
+  <data name="；进程链：{0}" xml:space="preserve">
+    <value>；进程链：{0}</value>
+    <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
 </root>

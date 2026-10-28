@@ -105,8 +105,33 @@ public sealed unsafe class DiagnosticSession : IDisposable
     public TimeSpan Remaining => _deadline.Remaining;
     public MonitorMode Mode { get; private set; }
 
-    /// <summary>内核侧丢的事件数（EventsLost，实时会话的实时值）。</summary>
-    public long EventsLost => _session.EventsLost;
+    /// <summary>
+    /// 内核侧丢的事件数（EventsLost，实时会话的实时值）。开始停止之后（会话已经不在了，再查会抛 0x80071069）和查询失败时
+    /// 返回最后一次查到的值，不抛异常：别的线程上的计时器可能正好在停止过程中来读。
+    /// </summary>
+    public long EventsLost
+    {
+        get
+        {
+            if (Volatile.Read(ref _stopping) != 0)
+            {
+                return Interlocked.Read(ref _lostSnapshot);
+            }
+
+            try
+            {
+                var lost = _session.EventsLost;
+                Interlocked.Exchange(ref _lostSnapshot, lost);
+                return lost;
+            }
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or ObjectDisposedException or InvalidOperationException)
+            {
+                return Interlocked.Read(ref _lostSnapshot);
+            }
+        }
+    }
+
+    private long _lostSnapshot;
 
     public long ParseMismatch { get; private set; }
     public StopReason? StopReason { get; private set; }
@@ -330,7 +355,7 @@ public sealed unsafe class DiagnosticSession : IDisposable
     {
         try
         {
-            var lost = _session.EventsLost;
+            var lost = EventsLost;
             if (lost != _lastLost)
             {
                 LostDelta?.Invoke(lost - _lastLost);

@@ -55,14 +55,22 @@ internal static class ShellActions
         }
     }
 
-    /// <summary>以管理员身份重新启动自己并退出当前进程。用户取消 UAC 时返回 false。</summary>
-    public static bool RestartElevated(string? drive, IWin32Window? owner)
+    /// <summary>
+    /// 以管理员身份重新启动自己并退出当前进程。用户取消 UAC 时返回 false。
+    /// <paramref name="extraArgs"/> 追加在后面（例如写入监控的 --start-monitor 4 --monitor-mode precise），逐个传参。
+    /// </summary>
+    public static bool RestartElevated(string? drive, IWin32Window? owner, IEnumerable<string>? extraArgs = null)
     {
         var psi = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true, Verb = "runas" };
         if (!string.IsNullOrEmpty(drive))
         {
             psi.ArgumentList.Add("--scan");
             psi.ArgumentList.Add(drive);
+        }
+
+        foreach (var a in extraArgs ?? [])
+        {
+            psi.ArgumentList.Add(a);
         }
 
         try

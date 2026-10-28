@@ -428,7 +428,19 @@ internal sealed class ExplorerPage : UserControl
         }
 
         _crumb.Show(tree, node);
-        _detail.ShowNode(tree, node, _result?.Stats, _classification, _owners);
+        _detail.ShowNode(tree, node, _result?.Stats, _classification, _owners, _writes);
+    }
+
+    private DiskThinner.Monitor.WriteIndex? _writes;
+
+    /// <summary>近 30 天的写入监控汇总（详情里的 ETW 证据，docs/phase2a-design.md 5.9.6 节）；换了之后重新显示当前节点。</summary>
+    public void SetWriteIndex(DiskThinner.Monitor.WriteIndex? writes)
+    {
+        _writes = writes;
+        if (_result is { } r && _detail.ShownGroup is null && _detail.ShownNode >= 0)
+        {
+            _detail.ShowNode(r.Tree, _detail.ShownNode, r.Stats, _classification, _owners, _writes);
+        }
     }
 
     private void UpdateMapScope()

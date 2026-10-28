@@ -9,14 +9,17 @@
 #   -Part accept：2a.4 的验收（8.2 节 accept 的第 1–5、7 步）：monitor 子命令的到时停止、强制结束后的清理、兜底任务（-SkipWatchdog 跳过）、
 #     负载下的精确和轻量模式，再以 DT_ETW_TESTS=1 跑 EtwSessionTests（-Part etw 只跑这些测试）。运行前先用普通权限构建：
 #     dotnet build src/DiskThinner.App -c Release; dotnet build tests/DiskThinner.Monitor.Tests -c Release
+#   -Part ui：2a.5 的界面验收（8.2 节 accept 第 6 步）：调用 phase2a-ui.ps1，截有监控数据的各页面，验证到时停止和关窗口停止。
 param(
     [Parameter(Mandatory)] [string] $OutDir,
-    [ValidateSet('bench', 'bench2', 'accept', 'etw')] [string] $Part = 'bench',
+    # 可以用逗号连着写几个部分（例如 etw,ui），只弹一次 UAC
+    [ValidatePattern('^(bench|bench2|accept|etw|ui)(,(bench|bench2|accept|etw|ui))*$')] [string] $Part = 'bench',
     [int] $IdleSeconds = 180,
     [switch] $SkipWatchdog
 )
 
 $ErrorActionPreference = 'Stop'
+$parts = $Part -split ','
 [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $bench = Join-Path $root 'spikes\EtwBench\bin\Release\net10.0-windows\EtwBench.exe'
@@ -52,7 +55,7 @@ function Bench([string] $name, [string[]] $arguments, [string] $exe = $bench) {
 
 function DiskThinnerSessions { @(logman query -ets | Select-String -Pattern 'DiskThinner' | ForEach-Object { ($_.Line -split '\s+')[0] }) }
 
-if ($Part -eq 'bench') {
+if ($parts -contains 'bench') {
     Add-Content $log "sessions_before=$((DiskThinnerSessions) -join ',')"
 
     # W1 空闲（不开会话时没有要测的，只测两种模式）
@@ -117,7 +120,7 @@ if ($Part -eq 'bench') {
     Add-Content $log "leftover_dirs=$left"
 }
 
-if ($Part -eq 'bench2') {
+if ($parts -contains 'bench2') {
     # 第二轮（5.2 节"离阈值不到 20% 时最多再跑 2 次"）：编译耗时按交替的顺序再测，抵消缓存和先后顺序的影响；
     # V6 用空闲时的事件（有突发）加更慢的回调制造丢失；V9 用修正后的判断再测一次
     Step 'w3-restore' { & $dotnet restore $project -nologo -v q | Out-Null }
@@ -162,12 +165,22 @@ function RunEtwTests {
     if ($summary -notmatch 'Skipped:\s+0,') { throw "有测试被跳过：$summary" }
 }
 
-if ($Part -eq 'etw') {
+if ($parts -contains 'etw') {
     Step 'etw-tests' { RunEtwTests }
     Add-Content $log "sessions_after=$((DiskThinnerSessions) -join ',')"
 }
 
-if ($Part -eq 'accept') {
+# 第 6 步（2a.5）：有监控数据时的界面截图、--monitor-seconds 到时停止、关窗口时停止（tools/verify/phase2a-ui.ps1）
+if ($parts -contains 'ui') {
+    Step 'ui' {
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'phase2a-ui.ps1') -OutDir (Join-Path $OutDir 'ui-admin')
+        Add-Content $log "ui exit=$LASTEXITCODE"
+        if ($LASTEXITCODE -ne 0) { throw "phase2a-ui.ps1 退出码 $LASTEXITCODE" }
+    }
+    Add-Content $log "sessions_after=$((DiskThinnerSessions) -join ',')"
+}
+
+if ($parts -contains 'accept') {
     $exe = Join-Path $root 'src\DiskThinner.App\bin\Release\net10.0-windows\DiskThinner.exe'
     $loadRelease = Join-Path $root 'tests\DiskThinner.WriteLoad\bin\Release\net10.0-windows\DiskThinner.WriteLoad.exe'
     $schtasks = Join-Path $env:SystemRoot 'System32\schtasks.exe'

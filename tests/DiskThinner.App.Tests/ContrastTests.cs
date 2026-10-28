@@ -71,6 +71,13 @@ public class ContrastTests
         Add("标签 TagText / TagBack", Theme.TagText, Theme.TagBack);
         Add("未开启监控标签 Subtle / #f3f3f3", Theme.Subtle, Hex("#f3f3f3"));
         Add("详情面板 未识别 / Card", Hex("#5b2a86"), Theme.Card);
+        Add("写入监控胶囊 Text / NavHover（悬停）", Theme.Text, Theme.NavHover);
+        Add("写入监控胶囊 Accent / NavHover（悬停）", Theme.Accent, Theme.NavHover);
+        Add("写入监控胶囊 Subtle / NavHover（悬停）", Theme.Subtle, Theme.NavHover);
+        Add("覆盖时段 丢失率偏高 WarnText / Card", Theme.WarnText, Theme.Card);
+        Add("开启写入监控对话框 账户提示 WarnText / WarnBack", Theme.WarnText, Theme.WarnBack);
+        Add("开启写入监控对话框 注意事项 Text / Background", Theme.Text, Theme.Background);
+        Add("未监控标签", RuleView.NotMonitored.Fore, RuleView.NotMonitored.Back);
         Add("详情面板 警告框文字", Hex("#6b1419"), Hex("#fde7e9"));
         foreach (var risk in Enum.GetValues<Risk>())
         {
@@ -105,6 +112,11 @@ public class ContrastTests
         Add("展开三角 #666666 / RowSelected", Hex("#666666"), Theme.RowSelected);
         Add("方块图选中框 #111111 / Unknown 类别色", Hex("#111111"), RuleView.ColorOf(RuleView.Group.Unknown));
         Add("方块图选中框 #111111 / 虚拟磁盘类别色", Hex("#111111"), RuleView.ColorOf(RuleView.Group.VmDisk));
+        Add("写入监控胶囊圆点 关闭 / Background", Controls.StatusPill.Idle, Theme.Background);
+        Add("写入监控胶囊圆点 诊断中 / Background", Controls.StatusPill.Running, Theme.Background);
+        Add("写入监控胶囊圆点 残留 / Background", Controls.StatusPill.Warning, Theme.Background);
+        Add("写入监控胶囊圆点 关闭 / NavHover", Controls.StatusPill.Idle, Theme.NavHover);
+        Add("覆盖时段 Accent / TitleBar 底条", Theme.Accent, Theme.TitleBar);
         return data;
     }
 

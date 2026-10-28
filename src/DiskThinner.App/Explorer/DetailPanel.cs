@@ -62,16 +62,21 @@ internal sealed class DetailPanel : Panel
 
     private static IEnumerable<Control> Descendants(Control c) => c.Controls.Cast<Control>().SelectMany(x => Descendants(x).Prepend(x));
 
-    public void ShowNode(NodeTree? tree, int node, ScanStats? stats, Classification? classification = null, OwnerMap? owners = null)
+    /// <param name="writes">近 30 天的写入监控汇总（docs/phase2a-design.md 5.9.6 节）；为 null 时不显示 ETW 证据。</param>
+    public void ShowNode(NodeTree? tree, int node, ScanStats? stats, Classification? classification = null, OwnerMap? owners = null,
+        DiskThinner.Monitor.WriteIndex? writes = null)
     {
         _tree = tree;
         _node = node;
         _stats = stats;
         _classification = classification;
         _owners = classification is null ? null : owners ?? OwnerMap.RulesOnly(classification);
+        _writes = writes;
         _group = null;
         Rebuild();
     }
+
+    private DiskThinner.Monitor.WriteIndex? _writes;
 
     /// <summary>显示汇总视图里的一组（应用或类别）。</summary>
     public void ShowGroup(NodeTree tree, SpaceGroup group, Classification? classification, OwnerMap? owners)
@@ -299,12 +304,21 @@ internal sealed class DetailPanel : Panel
             _content.Controls.Add(Wrap(Ui.Label(hint, Theme.Small, Theme.Muted), new Padding(0, 10, 0, 0)));
         }
 
-        // ---- 证据：归属的依据（本机上看到的程序、已装软件、目录名）+ 规则的依据 ----
+        // ---- 证据：归属的依据（本机上看到的程序、已装软件、目录名）+ 规则的依据 + 写入监控（ETW） ----
         var ownerEvidence = OwnerEvidenceFor(resolved);
         var showRuleEvidence = rule is { Evidence.Count: > 0 } && c!.IsRoot(n);
-        if (ownerEvidence.Count > 0 || showRuleEvidence)
+        var etw = Monitor.MonitorEvidence.For(_writes, path, isDir);
+        if (ownerEvidence.Count > 0 || showRuleEvidence || etw.Count > 0)
         {
             _content.Controls.Add(SectionTitle(L.T("证据")));
+            foreach (var line in etw)
+            {
+                var label = Ui.Label(line, Theme.Small, Theme.Text);
+                label.MaximumSize = new Size(width - TagWidth("ETW"), 0);
+                label.Margin = new Padding(0, 2, 0, 0);
+                _content.Controls.Add(TaggedItem("ETW", RuleView.ObservedSource, label, width));
+            }
+
             AddOwnerEvidence(ownerEvidence, width);
             if (showRuleEvidence)
             {
