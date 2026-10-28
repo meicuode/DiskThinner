@@ -231,6 +231,23 @@ public class AggregatorTests
     }
 
     [Fact]
+    public void RenamedDirectoryOntoExistingNode_KeepsFileStates()
+    {
+        // 目标目录已经有节点（锚点：上次快照里有、之后被删掉，又有别的目录改名成它）：旧节点并进去，计数和文件状态都跟过去
+        _a.Directories.GetOrAdd($@"{Root}\move\done");
+        var stageKey = Create($@"{Root}\move\stage", options: 0x1);
+        var f = Create($@"{Root}\move\stage\m.bin");
+        Write(f, 0, 4096);
+        PathEvent(MonitorEventKind.RenamePath, $@"{Root}\move\done", stageKey);
+        Assert.Equal(4096, At($@"{Root}\move\done").Growth);
+
+        Write(f, 4096, 4096);
+        Assert.Equal(8192, At($@"{Root}\move\done").Growth);
+        PathEvent(MonitorEventKind.DeletePath, $@"{Root}\move\done\m.bin", f);
+        Assert.Equal(0, At($@"{Root}\move\done").Growth);
+    }
+
+    [Fact]
     public void RenamedDirectoryKeepsFileStates()
     {
         var stageKey = Create($@"{Root}\move\stage", options: 0x1); // 目录本身的新建（FILE_DIRECTORY_FILE）

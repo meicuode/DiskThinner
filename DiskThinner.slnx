@@ -11,6 +11,7 @@
     <Project Path="src/DiskThinner.Core/DiskThinner.Core.csproj" />
     <Project Path="src/DiskThinner.Inventory/DiskThinner.Inventory.csproj" />
     <Project Path="src/DiskThinner.Monitor/DiskThinner.Monitor.csproj" />
+    <Project Path="src/DiskThinner.Monitor.Etw/DiskThinner.Monitor.Etw.csproj" />
     <Project Path="src/DiskThinner.Rules/DiskThinner.Rules.csproj" />
     <Project Path="src/DiskThinner.Scanner/DiskThinner.Scanner.csproj" />
     <Project Path="src/DiskThinner.Storage/DiskThinner.Storage.csproj" />

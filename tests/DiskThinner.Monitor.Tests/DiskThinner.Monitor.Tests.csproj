@@ -13,5 +13,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DiskThinner.Monitor\DiskThinner.Monitor.csproj" />
+    <!-- EtwSessionTests（提权）和 PackagingTests（不带 RID 的输出目录里没有 TraceEvent 的原生 DLL）用 -->
+    <ProjectReference Include="..\..\src\DiskThinner.Monitor.Etw\DiskThinner.Monitor.Etw.csproj" />
+    <!-- 只为保证先构建测试负载（EtwSessionTests 从它自己的输出目录启动），不引用它的程序集 -->
+    <ProjectReference Include="..\DiskThinner.WriteLoad\DiskThinner.WriteLoad.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

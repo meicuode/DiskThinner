@@ -1,6 +1,7 @@
 # 发布包冒烟测试。GitHub Actions 在全新的 windows-2022 / windows-2025 上跑，也可以在本机或虚拟机上跑。
 # 解压 zip，逐个启动：扫描一个测试文件夹；管理员下再用 MFT 扫描整个系统盘、生成清理计划、截确认框（只显示，不执行）；
-# 跑 snapshot 子命令。只读：不执行任何清理；快照、操作记录、设置都写到 -OutDir 下。
+# 跑 snapshot 子命令；管理员下跑 15 秒的 monitor 子命令（写入监控，核对解析器）。
+# 只读：不执行任何清理；快照、写入监控库、操作记录、设置都写到 -OutDir 下。
 # 结果写到 -OutDir\smoke.txt；在 GitHub Actions 里同时输出 ::notice / ::error 注解。有失败时退出码为 1。
 # 用法：pwsh -File tools\verify\smoke.ps1 -PackageDir <放 zip 的目录> -OutDir <输出目录> [-Variant all|selfcontained|framework]
 param(
@@ -128,6 +129,35 @@ function Run-Snapshot([string] $case, [string] $exe, [string] $drive) {
     Notice $case "快照库 $('{0:N0}' -f ((Get-Item $db).Length / 1KB)) KB"
 }
 
+# 写入监控（阶段 2a）：管理员下开 15 秒的精确模式会话并核对解析器。库和报告都写在 -OutDir 下，不碰默认的 monitor.db
+function Run-Monitor([string] $case, [string] $exe) {
+    if (-not $elevated) {
+        Say "SKIP $case：不是管理员，跳过写入监控"
+        return
+    }
+
+    $dir = Join-Path $OutDir $case
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    $report = Join-Path $dir 'report.txt'
+    $p = Start-Process -FilePath $exe -PassThru -ArgumentList @('monitor', '--seconds', '15', '--mode', 'precise', '--verify-parser',
+        '--db', (Q (Join-Path $dir 'monitor.db')), '--report', (Q $report))
+    $null = $p.Handle
+    if (-not $p.WaitForExit(120 * 1000)) {
+        Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+        Fail $case '超过 120 秒没有退出'
+        return
+    }
+
+    if (-not (Test-Path $report)) { Fail $case "没有生成报告（退出码 $($p.ExitCode)，见 $env:LOCALAPPDATA\DiskThinner\logs\monitor.log）"; return }
+    $r = Read-Report $report
+    $left = @(logman query -ets | Select-String -Pattern 'DiskThinner-Diag-')
+    if ($p.ExitCode -ne 0) { Fail $case "退出码 $($p.ExitCode)：$($r['error'])"; return }
+    if ([long]$r['received'] -le 0) { Fail $case '没有收到事件'; return }
+    if ($r['parse_mismatch'] -ne '0') { Fail $case "解析器和 TDH 对不上 $($r['parse_mismatch']) 处（$($r['events_by_id'])）"; return }
+    if ($r['session_stopped'] -ne 'true' -or $left.Count -gt 0) { Fail $case '结束后会话还在'; return }
+    Notice $case "收到 $($r['received']) 个事件，丢失 $($r['lost'])，CPU $($r['cpu_percent'])%，结束原因 $($r['end_reason'])；$($r['events_by_id'])"
+}
+
 foreach ($kind in 'selfcontained', 'framework') {
     if (-not $packages.ContainsKey($kind)) { continue }
     $exe = $packages[$kind]
@@ -139,6 +169,14 @@ foreach ($kind in 'selfcontained', 'framework') {
     }
 
     Run-Snapshot "$kind-snapshot-folder" $exe $data
+
+    # 包里不带 TraceEvent 的原生 DLL（docs/phase2a-design.md 5.11 节，D10）
+    $pkg = Split-Path $exe
+    $extra = @(@('x86', 'arm64', 'amd64') | Where-Object { Test-Path (Join-Path $pkg $_) })
+    $extra += @(Get-ChildItem $pkg -File -Recurse -Include 'Dia2Lib.dll', 'TraceReloggerLib.dll', 'KernelTraceControl.dll', 'msdia140.dll' | ForEach-Object Name)
+    if ($extra.Count -gt 0) { Fail "$kind-package" "包里有不该带的：$($extra -join ', ')" }
+
+    Run-Monitor "$kind-monitor" $exe
 
     if ($kind -eq 'selfcontained') {
         if (-not $elevated) {

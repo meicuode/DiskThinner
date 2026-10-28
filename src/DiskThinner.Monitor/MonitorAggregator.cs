@@ -251,7 +251,16 @@ public sealed class MonitorAggregator
         if (oldDirNode > 0)
         {
             // 目录改名：节点原地改名，下面的文件状态跟着走；名字表里还是旧路径的项按前缀换成新路径
-            Directories.Move(oldDirNode, newPath);
+            var merged = Directories.Move(oldDirNode, newPath);
+            if (merged != oldDirNode)
+            {
+                // 新路径已经有节点（例如锚点），旧节点并了进去：直接在这个目录下的文件状态换成新编号（并目录很少见，逐项扫一遍）
+                foreach (var key in _files.Keys.Where(k => k.Dir == oldDirNode).ToList())
+                {
+                    _files.Remove(key, out var moved);
+                    _files[(merged, key.Name)] = moved;
+                }
+            }
             if (_movedDirs.Count >= 1000)
             {
                 _movedDirs.RemoveAt(0);

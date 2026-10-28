@@ -88,3 +88,32 @@ W2 按 WriteLoad 默认参数逐项比对（新建、删除、重命名个数，
 ## 存储（2a.3）
 
 `monitor.db`（D4）：会话、按小时的统计、目录（按段存）、映像、进程链、`write_stat`（会话 × 小时 × 目录 × 进程链）。设计 5.8 节的最坏情况合成数据（24 小时，每小时一半的行在 500 个锚点上、一半在新目录上，500 种进程链、300 个映像，计数取上限附近的值）：每小时 1,000 行时一天 2.6 MB（目标 ≤ 4 MB），每小时 2,000 行时 4.5 MB（目标 ≤ 8 MB）。保留按开始时间删整个会话，按实际占用的页（不是文件大小）判断，超出上限时只删需要删的那几个。
+
+## ETW 会话和 monitor 子命令（2a.4，2026-10-27）
+
+新增 `DiskThinner.Monitor.Etw`（DiagnosticSession、MonitorRunner、MonitorCleanup）和 `DiskThinner.exe monitor` 子命令。`tools/verify/phase2a-elevated.ps1 -Part accept`（以管理员运行）的结果如下：
+
+| 步骤 | 结果 |
+|---|---|
+| 2 到时 | `monitor --seconds 30` 退出码 0，`end_reason=timeout`、`session_stopped=true`；正常结束后兜底任务已删 |
+| 3 强制结束 | `Stop-Process -Force` 后会话仍在；`monitor --cleanup` 返回 `residual_stopped=1`、`orphans_marked=1`、`task_deleted=1`，之后会话和任务都不在了 |
+| 4 兜底任务（D7、V20） | 60 秒的会话开始 10 秒后被强制结束；兜底任务以 SYSTEM 身份运行 logman，在强制结束后 120 秒停掉会话，也就是计划结束后约 1 分钟。会话已经停了但任务还在时，`--cleanup` 会补删任务（`residual_found=0`、`task_deleted=1`）。V20 单独测：`DeleteExpiredTaskAfter=PT0S` 的任务在过期后 54 秒内被系统删除 |
+| 5 负载 | 精确和轻量两种模式都加 `--verify-parser`，结果 `parse_mismatch=0`、`lost=0`；CPU 0.26% / 0.24%，工作集约 63–66 MB |
+| 7 | 每一步之后都没有 `DiskThinner-Diag-` 会话；默认的 monitor.db 没有被碰（前后都是"不存在"） |
+
+`EtwSessionTests`（`DT_ETW_TESTS=1`、管理员）8 个全部通过。覆盖的内容：开始和停止，停止只执行一次；到时停止发生在计时器线程上，之后能再开始；`logman stop` 后结束原因是 external；残留清理不碰名字不符合的会话；到时停止和并发落盘不交错；用 WriteLoad 小参数和默认参数各跑一次精确模式，逐项比对通过（第 1.3 节第 7 条）；默认参数再跑一次轻量模式，只比对计数。
+
+第一次运行时发现了三个问题，都已修好：
+
+- `--verify-parser` 的差分核对在 TDH 解码出的整数类型和我们的不一致时会抛异常（哨兵偏移会被当成有符号数），导致泵线程以 error 退出。现在改为按位比较，核对里的异常只记一次不一致；报告里加了 `parse_mismatch_first`，会话因为异常停止时 monitor 子命令返回 1。
+- 轻量模式不开文件名关键字，看不到关闭时删除（V12）的删除，这和设计一致。测试改为只在精确模式下比对 `temp\` 的删除数。
+- 目录改名到一个已经有节点的路径（比如锚点）时，文件状态还挂在旧编号上，之后的写入不再累计估算增长。现在并节点时把文件状态一起换到新编号，补了单元测试。
+
+发布包（`build-release.ps1 -Version 0.2.0-dev.4`）：
+
+- 两个包里都没有 `x86\`、`arm64\`、`amd64\`、Dia2Lib.dll、TraceReloggerLib.dll（V7、D10）。脚本发现有这些文件时不打包。不带 RID 的输出目录由 `PackagingTests` 核对。
+- 依赖运行库的版本：24 个文件，共 6.8 MB，zip 2.8 MB。比 0.1.0 多了 Monitor、Monitor.Etw、TraceEvent、FastSerialization、NETCore.Client 和两个 Extensions 抽象库，约 3.9 MB。
+- 自包含单文件版：3 个文件，exe 109.3 MB，zip 45.8 MB。
+- 两个包的文件清单写在 `files-<包>.txt`。
+
+`smoke.ps1`（本机管理员，两个包）0 项失败。单文件版的 `monitor --seconds 15 --mode precise --verify-parser` 收到 48,471 个事件，丢失 0，`parse_mismatch=0`，结束后没有残留会话（V8：单文件版里 TraceEvent 正常工作）。Release 构建没有 NU 警告（V11）。

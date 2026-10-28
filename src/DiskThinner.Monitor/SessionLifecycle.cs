@@ -115,13 +115,14 @@ public static class SessionLiveness
 
     /// <summary>
     /// 分清"有实例在监控 / 残留会话 / 没结束的会话记录"。<paramref name="activeNames"/> 是活动会话里符合名字的，列不出来时为 null。
-    /// 自己正在监控的那一行（<paramref name="selfSession"/>）永远不算孤儿。
+    /// 自己正在监控的那一行（<paramref name="selfSession"/>）永远不算孤儿。<paramref name="namePattern"/> 默认是 <see cref="NamePattern"/>，提权测试注入自己的前缀。
     /// </summary>
     public static LivenessResult Classify(bool selfMonitoring, bool lockExistsElsewhere, IReadOnlyCollection<string>? activeNames,
-        IReadOnlyList<OpenSessionRow> openRows, string? selfSession = null)
+        IReadOnlyList<OpenSessionRow> openRows, string? selfSession = null, Regex? namePattern = null)
     {
         var live = selfMonitoring || lockExistsElsewhere;
-        var ours = activeNames?.Where(n => NamePattern.IsMatch(n)).ToList();
+        var pattern = namePattern ?? NamePattern;
+        var ours = activeNames?.Where(n => pattern.IsMatch(n)).ToList();
         if (!live)
         {
             return new LivenessResult(false, ours ?? [], [.. openRows.Where(r => r.SessionName != selfSession)]);

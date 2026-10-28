@@ -100,6 +100,10 @@
     <value>DiskThinner 以 {0} 的身份运行，而登录的是 {1}。为避免清到别人的目录，这次不清理用户目录、不运行官方命令，只清理系统位置。</value>
     <comment>DiskThinner.Cleanup/AccountInfo.cs</comment>
   </data>
+  <data name="DiskThinner 被强制结束时停止它开的写入监控会话。监控结束后自动删除。" xml:space="preserve">
+    <value>DiskThinner 被强制结束时停止它开的写入监控会话。监控结束后自动删除。</value>
+    <comment>DiskThinner.Monitor/WindowsSystem.cs</comment>
+  </data>
   <data name="DiskThinner 遇到了一个没有预料到的问题，这次操作没有完成。程序可以继续使用；如果反复出现，请重启程序。&#xA;&#xA;{0}: {1}{2}" xml:space="preserve">
     <value>DiskThinner 遇到了一个没有预料到的问题，这次操作没有完成。程序可以继续使用；如果反复出现，请重启程序。&#xA;&#xA;{0}: {1}{2}</value>
     <comment>DiskThinner.App/Program.cs</comment>

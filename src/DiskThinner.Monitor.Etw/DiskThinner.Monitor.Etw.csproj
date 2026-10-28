@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 写入监控的事件源：用 TraceEvent 开关 ETW 实时会话，把原始事件交给 DiskThinner.Monitor（docs/phase2a-design.md 4.1 节，D11）。
+       TraceEvent 用到反射，不能 AOT；2b 的常驻服务改为直接调用 ETW API，换掉这个项目，Monitor 原样复用。 -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Monitor\DiskThinner.Monitor.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Monitor.Tests" />
+  </ItemGroup>
+</Project>

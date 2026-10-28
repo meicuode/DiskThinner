@@ -1,0 +1,18 @@
+<Project>
+  <!-- TraceEvent 4.0.0 的 props（build/ 和 buildTransitive/ 下都有，通过项目引用间接拿到这个包的 App 和测试项目也会导入）
+       把 amd64\、x86\、arm64\ 下的 KernelTraceControl.dll、msdia140.dll 作为 None 项复制到输出目录，
+       Dia2Lib.dll、TraceReloggerLib.dll 也作为 None 项复制到输出根目录。2a.1 实测（V7）只用实时会话和清单式提供程序时一个都不需要，
+       发布包里全部去掉（docs/phase2a-design.md 5.11 节，D10）。 -->
+  <Target Name="DropTraceEventNatives" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_DtDropNative Include="@(None)" Condition="$([System.String]::Copy('%(None.Link)').StartsWith('x86\')) Or $([System.String]::Copy('%(None.Link)').StartsWith('arm64\')) Or $([System.String]::Copy('%(None.Link)').StartsWith('amd64\')) Or '%(None.Link)' == 'Dia2Lib.dll' Or '%(None.Link)' == 'TraceReloggerLib.dll'" />
+      <None Remove="@(_DtDropNative)" />
+    </ItemGroup>
+  </Target>
+  <!-- 同名的两个程序集也在 lib 下（作为运行时引用复制），一起去掉 -->
+  <Target Name="DropTraceEventInteropAssemblies" AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'Dia2Lib.dll' Or '%(Filename)%(Extension)' == 'TraceReloggerLib.dll'" />
+    </ItemGroup>
+  </Target>
+</Project>

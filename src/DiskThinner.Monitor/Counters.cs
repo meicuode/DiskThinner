@@ -94,4 +94,5 @@ public enum SessionFlags
     RenameIncomplete = 64,
     NameMapEvicted = 128,
     AnchorsFolded = 256,
+    WatchdogFailed = 512,
 }

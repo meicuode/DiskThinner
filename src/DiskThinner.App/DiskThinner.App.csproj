@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
@@ -14,6 +14,7 @@
     <ProjectReference Include="..\DiskThinner.Inventory\DiskThinner.Inventory.csproj" />
     <ProjectReference Include="..\DiskThinner.Storage\DiskThinner.Storage.csproj" />
     <ProjectReference Include="..\DiskThinner.Cleanup\DiskThinner.Cleanup.csproj" />
+    <ProjectReference Include="..\DiskThinner.Monitor.Etw\DiskThinner.Monitor.Etw.csproj" />
     <!-- 只为了在构建主程序前先构建 dtrule，用它把 rules/*.yaml 编译成 rules.db；不引用它的程序集。
          dtrule 是构建工具，不进发布包：publish -r win-x64 / 自包含时这些属性不传给它，它总是输出到下面 DtRuleDll 的固定位置
          （否则会输出到 ...\win-x64\ 下，干净的机器上找不到 dtrule.dll）。 -->

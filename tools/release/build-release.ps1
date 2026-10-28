@@ -51,6 +51,11 @@ $zips = @(
     @{ Dir = $sc; Zip = Join-Path $out "DiskThinner-$version-win-x64-selfcontained.zip" }
 )
 foreach ($z in $zips) {
+    # TraceEvent 的原生 DLL 和互操作程序集一个都不要（2a.1 的 V7，D10）；有就不打包
+    $base = (Resolve-Path $z.Dir).Path.TrimEnd('\') + '\'
+    $bad = @(Get-ChildItem $z.Dir -File -Recurse | Where-Object {
+            $_.FullName.Substring($base.Length) -match '^(x86|arm64|amd64)\\' -or $_.Name -in 'Dia2Lib.dll', 'TraceReloggerLib.dll', 'KernelTraceControl.dll', 'msdia140.dll' })
+    if ($bad.Count -gt 0) { throw "$(Split-Path $z.Dir -Leaf) 里有不该带的文件：$(($bad | ForEach-Object Name) -join ', ')" }
     Compress-Archive -Path (Join-Path $z.Dir '*') -DestinationPath $z.Zip -CompressionLevel Optimal
 }
 
@@ -59,7 +64,11 @@ Set-Content (Join-Path $out 'SHA256SUMS.txt') $sums -Encoding ascii
 
 foreach ($z in $zips) {
     $exe = Get-Item (Join-Path $z.Dir 'DiskThinner.exe')
-    $files = @(Get-ChildItem $z.Dir -File).Count
-    "{0}: zip {1:N1} MB, exe {2:N1} MB, {3} 个文件" -f (Split-Path $z.Zip -Leaf), ((Get-Item $z.Zip).Length / 1MB), ($exe.Length / 1MB), $files
+    $all = @(Get-ChildItem $z.Dir -File -Recurse)
+    # 文件清单（相对路径和大小），和加 TraceEvent 之前的对比写进阶段报告（docs/phase2a-design.md 1.3 节第 15 条）
+    $base = (Resolve-Path $z.Dir).Path.TrimEnd('\') + '\'
+    $list = $all | ForEach-Object { "{0}`t{1}" -f $_.FullName.Substring($base.Length), $_.Length } | Sort-Object
+    Set-Content (Join-Path $out "files-$(Split-Path $z.Dir -Leaf).txt") $list -Encoding utf8
+    "{0}: zip {1:N1} MB, exe {2:N1} MB, {3} 个文件, 共 {4:N1} MB" -f (Split-Path $z.Zip -Leaf), ((Get-Item $z.Zip).Length / 1MB), ($exe.Length / 1MB), $all.Count, (($all | Measure-Object Length -Sum).Sum / 1MB)
 }
 $sums
