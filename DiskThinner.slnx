@@ -7,6 +7,7 @@
     <Project Path="spikes/UiBench/UiBench.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/DiskThinner.Agent/DiskThinner.Agent.csproj" />
     <Project Path="src/DiskThinner.App/DiskThinner.App.csproj" />
     <Project Path="src/DiskThinner.Cleanup/DiskThinner.Cleanup.csproj" />
     <Project Path="src/DiskThinner.Core/DiskThinner.Core.csproj" />
@@ -17,6 +18,7 @@
     <Project Path="src/DiskThinner.Storage/DiskThinner.Storage.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DiskThinner.Agent.Tests/DiskThinner.Agent.Tests.csproj" />
     <Project Path="tests/DiskThinner.App.Tests/DiskThinner.App.Tests.csproj" />
     <Project Path="tests/DiskThinner.Cleanup.Tests/DiskThinner.Cleanup.Tests.csproj" />
     <Project Path="tests/DiskThinner.LockHolder/DiskThinner.LockHolder.csproj" />

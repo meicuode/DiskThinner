@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 常驻监控服务（阶段 2b，docs/phase2b-design.md 5.2 节）：以 SYSTEM 身份运行的 Windows 服务，持续记录写入监控的数据，
+       通过设了访问权限的命名管道给界面查询。Native AOT 发布（dotnet publish -r win-x64），只依赖系统 DLL 和同目录的 e_sqlite3.dll。
+       只在本机：不引用任何网络相关的 API（评审检查：没有 HttpClient、Socket、Dns 之类）；只写数据目录和日志目录。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>DiskThinner.Agent</AssemblyName>
+    <RootNamespace>DiskThinner.Agent</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- 体积（依赖运行库版发布包含服务 ≤ 10 MB，第 1.2 节）：按大小优化、不带堆栈的方法名（日志只记异常类型）、框架异常消息用资源键。
+         实测 exe 5.18 MB → 4.04 MB。不能用 InvariantGlobalization：Core 的 L 要建 zh-Hans 区域，固定区域性下会抛异常（2b.3 实测）。 -->
+    <OptimizationPreference>Size</OptimizationPreference>
+    <StackTraceSupport>false</StackTraceSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Monitor\DiskThinner.Monitor.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.Agent.Tests" />
+  </ItemGroup>
+</Project>

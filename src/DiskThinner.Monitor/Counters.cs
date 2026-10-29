@@ -78,6 +78,24 @@ public sealed class MonitorStats
         ReorderOverflow += o.ReorderOverflow;
         LateEvents += o.LateEvents;
     }
+
+    /// <summary>这次减去 <paramref name="o"/> 的差（服务按天轮换时，新会话行的统计从轮换那一刻算起）。</summary>
+    public MonitorStats Minus(MonitorStats o) => new()
+    {
+        Received = Received - o.Received,
+        Lost = Lost - o.Lost,
+        SampledOut = SampledOut - o.SampledOut,
+        ParseErrors = ParseErrors - o.ParseErrors,
+        Filtered = Filtered - o.Filtered,
+        UnresolvedWrites = UnresolvedWrites - o.UnresolvedWrites,
+        UnresolvedBytes = UnresolvedBytes - o.UnresolvedBytes,
+        BadOffsets = BadOffsets - o.BadOffsets,
+        DuplicateWrites = DuplicateWrites - o.DuplicateWrites,
+        NameMapEvicted = NameMapEvicted - o.NameMapEvicted,
+        FileStateEvicted = FileStateEvicted - o.FileStateEvicted,
+        ReorderOverflow = ReorderOverflow - o.ReorderOverflow,
+        LateEvents = LateEvents - o.LateEvents,
+    };
 }
 
 /// <summary>会话的标记（monitor.db 的 session.flags，按位）。</summary>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 服务本身（内部类型由 InternalsVisibleTo 开放）；提权测试启动的是 DT_AGENT_EXE 指定的 AOT 发布版，没有指定时用这个项目的输出 -->
+    <ProjectReference Include="..\..\src\DiskThinner.Agent\DiskThinner.Agent.csproj" />
+  </ItemGroup>
+</Project>

@@ -58,3 +58,56 @@ W8：启动到主窗口出现的时间（`phase2a-perf.ps1`），0.2.0-dev.5（�
   - 自包含的版本 zip 44.7 MB，去掉前是 45.8 MB。
 - 本机管理员的冒烟测试 0 项失败。两种包的 monitor 项丢失都是 0，核对数分别是 491 和 369。
 - "监控中（精确）+ MFT 扫描整个系统盘"的峰值内存 300 MB（2a 是 345 MB）。
+
+## 2b.3：常驻监控服务（2026-10-29）
+
+### 改动
+
+- Monitor 项目：
+  - `Etw/Recorder.cs`：从 `MonitorRunner` 拆出和会话无关的部分（解析 → 重排 → 汇总 → 定时落盘、降级、统计），诊断和服务共用。`MonitorRunner` 只剩诊断会话的开始、截止时间和停止，对外接口不变。
+  - 按天轮换（只有服务打开）：本地日期变了之后，第一次定时落盘（整点后至少 60 秒）时在 UTC 整点结束当前行，结束原因 `rotate`；整点之后的数据都记到新行。汇总器接着用，跨天的估算增长不断。
+  - `Agent/Protocol.cs`：管道协议，一行一个 JSON（源生成），带请求校验。`Agent/AgentQuery.cs`：调用者过滤（E4）、查询的合并和超限折叠。`Agent/DataDirectoryAcl.cs`：数据目录权限的检查和设置。
+  - `MonitorStore.LoadMerged`：在 SQL 里按（目录, 进程链）合计，不把逐小时的行读进内存。另加 `FirstSessionStartUtc`、`MonitorStats.Minus`、`MonitorAggregator.ClearFlags`。
+- 新项目 `src/DiskThinner.Agent`（Native AOT）：
+  - `ServiceControl`：直接调用 SCM 的 API（E1）；
+  - `AgentHost`：启动顺序、请求处理；
+  - `AgentRecorder`：ETW 会话，被外部停止后重开，写库失败时重试；
+  - `PipeServer`：管道服务端；
+  - `AgentConfig`、`AgentLog`、`AgentSettings`：配置、日志、命令行参数。
+- 测试：
+  - Monitor.Tests 加 `RecorderTests`（跨 0 点轮换、换汇总器时计数不丢）和 `AgentProtocolTests`（协议、调用者过滤、查询合并、`LoadMerged`），共 26 个；
+  - 新的 Agent.Tests：配置、日志、参数的单元测试 13 个，外加提权的 `AgentServiceTests`（`DT_AGENT_TESTS=1`）；
+  - `tools/verify/phase2b-elevated.ps1 -Part agent` 运行提权测试。
+
+和设计不同的几处：
+
+- **查询的行**：按（目录, 进程链）跨会话合计。每行的会话号取最近的会话，小时取最早的小时，界面按会话找"最近一次写入"的功能照样能用。
+- **管道权限**：INTERACTIVE 只给读写数据的权限。`PipeAccessRights.Write` 里含"新建管道实例"，给了它，普通用户就能抢先建同名实例冒充服务。第一个实例带 `FILE_FLAG_FIRST_PIPE_INSTANCE`，名字已经被占时服务以退出码 13 退出。因此客户端要用只请求 ReadData | WriteData 的构造函数连接，2b.4 的 `AgentClient` 照这个写，并核对服务端进程号。
+- **控制命令**：`control stop/start` 只停止或开始记录，服务进程留着；停止服务本身由界面通过 SCM 做（2b.4）。`configure` 改了模式时，结束当前行（结束原因 `config`），用新模式重开会话。
+- **轮换的统计**：旧行的会话统计（收到数等）算到轮换的那一刻，也就是整点后 1 分多钟。按小时的覆盖和写入行按整点分开。
+- **汇总器重建（设计里没有）**：轮换时如果目录表超过 100,000 项、或进程链超过 5,000 条，就换一个新的汇总器，免得长期运行的服务把表涨到上限。整点之后还没落盘的计数，按（目录路径, 进程链）合并进下一次落盘。
+- **体积**：AOT 发布用 `OptimizationPreference=Size`、`StackTraceSupport=false`、`UseSystemResourceKeys=true`，exe 从 5.18 MB 降到 4.04 MB。依赖运行库版的包加上 `Agent\`（exe 和 e_sqlite3.dll）约 9.6 MB，在 10 MB 以内。
+  - `InvariantGlobalization` 不能用：Core 的 `L` 要建 zh-Hans 区域，在固定区域性下会抛 `TypeInitializationException`。异常出在泵线程上，会话随后以 error 结束、1 分钟后重开。第一次提权测试就是这样查出来的。
+
+### W 清单（续）
+
+| 项 | 结果 | 结论 |
+|---|---|---|
+| W4 服务 | AOT 下 `StartServiceCtrlDispatcherW` + `RegisterServiceCtrlHandlerExW` 能跑。`sc start` 到 RUNNING 0.78–0.87 秒，`sc stop` 到 STOPPED 0.31–0.33 秒（含最后一次落盘）。PRESHUTDOWN 的 15 秒要在安装时用 `ChangeServiceConfig2W` 设（2b.4）。关机时落盘的实机检查放到 2b.4 装上真实服务之后 | 通过（关机部分待做） |
+| W5 调用者身份 | 选 `ImpersonateNamedPipeClient`（.NET 的 `RunAsClient`）取线程令牌，客户端用 Identification 级别连接。结果：<br>· 去掉 Administrators 的受限令牌发控制命令，返回 `denied`；<br>· 匿名级别连接发控制命令，返回 `denied`；<br>· 受限令牌查询，看得到调用者自己个人目录下的行 | 通过 |
+| W6 失败重启 | 测试服务设 `restart/2000/restart/5000`、`failureflag 1`：<br>· `taskkill /F` 后 2 秒重启。新进程先把被结束的那一行标成 `crashed`（结束时间是最后一次落盘），停掉残留会话，再开新会话；<br>· 占住管道名让服务以 13 退出，5 秒后重启成功，说明非崩溃的错误退出也算失败；<br>· 数据目录的权限不对时服务以 10 退出，不写日志 | 通过 |
+
+`AgentServiceTests` 的其他结果：
+
+- 外部 `logman stop` 后按测试设置的 5 秒重开，那一行标 `external`；
+- 测试过程中留下的会话行依次是 external、crashed、service-stop、error、service-stop，都有结束原因；
+- 服务刚启动时工作集 19–21 MB；
+- 日志里没有负载目录的路径；
+- 测试结束后没有留下测试服务和会话。
+
+### 验证
+
+- 全量测试通过：Agent 13（另有 1 个提权测试跳过）、App 150、Cleanup 35、Monitor 147（另有 8 个跳过）、Rules 105、Scanner 35（另有 8 个跳过）、Storage 22。i18n 818 条，一致。
+- Agent 的 AOT 发布没有警告。
+- 提权：2a 的 `EtwSessionTests` 8/8 通过，这是 `Recorder` 拆分后的回归；`AgentServiceTests` 1/1 通过，用的是 AOT 发布版。
+- 还没做的验证：空闲 30 分钟的开销和长时间运行的内存（2b.4 装上真实服务后做）；真实安装路径下的权限设置（2b.4）。

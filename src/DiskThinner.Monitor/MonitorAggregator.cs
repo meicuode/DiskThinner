@@ -515,6 +515,9 @@ public sealed class MonitorAggregator
 
     public void MarkDowngraded() => Flags |= SessionFlags.Downgraded;
 
+    /// <summary>清掉会话标记（服务开新的会话行时：标记按行记，不跟着汇总器一直留着）。</summary>
+    public void ClearFlags() => Flags = SessionFlags.None;
+
     private void EvictFileStates()
     {
         // 淘汰最久没写的 10%（满 300,000 项才会走到这里，很少发生）

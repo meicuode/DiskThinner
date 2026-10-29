@@ -503,6 +503,64 @@ public sealed class MonitorStore
         return new WriteIndex(sessions, rows, hours);
     }
 
+    /// <summary>
+    /// 常驻服务的查询（docs/phase2b-design.md 5.5 节）：[fromUtc, toUtc) 内的行按（目录, 进程链）合计，跨会话、跨小时。
+    /// 每行的会话号取最近的一个会话、小时取最早的一个小时，Sampled 取或。会话和按小时的覆盖照原样给出。30 天的数据也只有几万行，在 SQL 里合计，不把逐小时的行读进内存。
+    /// </summary>
+    public WriteIndex LoadMerged(DateTime fromUtc, DateTime toUtc)
+    {
+        var sessions = Sessions(fromUtc, toUtc);
+        using var conn = Connect();
+        var dirPaths = LoadDirPaths(conn);
+        var images = LoadImages(conn);
+        var chains = LoadChains(conn, images);
+        var fromHour = Hour(fromUtc);
+        var toHour = Hour(toUtc - TimeSpan.FromTicks(1));
+        var rows = new List<IndexRow>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT max(session_id), min(hour), dir_id, chain_id, sum(created_files), sum(created_dirs), sum(deleted), sum(renamed), " +
+                              "sum(write_bytes), sum(write_ops), sum(growth_bytes), max(estimated) FROM write_stat WHERE hour BETWEEN $a AND $b GROUP BY dir_id, chain_id";
+            cmd.Parameters.AddWithValue("$a", fromHour);
+            cmd.Parameters.AddWithValue("$b", toHour);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var dirId = r.GetInt64(2);
+                rows.Add(new IndexRow(r.GetInt64(0), FromHour(r.GetInt64(1)), dirId == 0 ? null : dirPaths.GetValueOrDefault(dirId),
+                    chains.GetValueOrDefault(r.GetInt64(3)) ?? StoredChain.Other,
+                    new Counters
+                    {
+                        Creates = r.GetInt64(4), CreatedDirs = r.GetInt64(5), Deletes = r.GetInt64(6), Renames = r.GetInt64(7),
+                        WriteBytes = r.GetInt64(8), WriteOps = r.GetInt64(9), Growth = r.GetInt64(10), Sampled = r.GetInt64(11) != 0,
+                    }));
+            }
+        }
+
+        var hours = new List<HourCoverage>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT session_id, hour, mode, received, lost, sampled_out, unresolved_bytes, write_bytes, flags FROM session_hour WHERE hour BETWEEN $a AND $b";
+            cmd.Parameters.AddWithValue("$a", fromHour);
+            cmd.Parameters.AddWithValue("$b", toHour);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                hours.Add(new HourCoverage(r.GetInt64(0), FromHour(r.GetInt64(1)), r.GetString(2) == "light" ? MonitorMode.Light : MonitorMode.Precise,
+                    r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6), r.GetInt64(7), r.GetInt32(8)));
+            }
+        }
+
+        return new WriteIndex(sessions, rows, hours);
+    }
+
+    /// <summary>最早的会话的开始时间（服务状态里的"从哪天开始记录"）；没有会话时为 null。</summary>
+    public DateTime? FirstSessionStartUtc()
+    {
+        using var conn = Connect();
+        return Scalar(conn, "SELECT min(started_at) FROM session") is long ms ? FromMs(ms) : null;
+    }
+
     private static Dictionary<long, string> LoadDirPaths(SqliteConnection conn)
     {
         var nodes = new Dictionary<long, (long Parent, string Name)>();
