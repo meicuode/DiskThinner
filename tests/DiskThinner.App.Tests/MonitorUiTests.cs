@@ -34,7 +34,20 @@ public sealed class MonitorUiTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        Directory.Delete(_dir, recursive: true);
+
+        // 页面的后台查询可能还没把库文件关掉：重试几次；还删不掉就留着（临时目录，和 UiAutomationTests 一样）
+        for (var i = 0; i < 10; i++)
+        {
+            try
+            {
+                Directory.Delete(_dir, recursive: true);
+                return;
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(200);
+            }
+        }
     }
 
     private static Counters C(long growth = 0, long bytes = 0, long creates = 0, long deletes = 0, bool sampled = false) =>
@@ -254,9 +267,10 @@ public sealed class MonitorUiTests : IDisposable
         Assert.Equal("700.0 MB", writer.Cells[4]);
         Assert.Equal(tree.FindPath($@"C:\{Local}\uv\cache"), writer.Node);
 
-        // 设置为"关闭"时不显示"开启诊断"
+        // 设置为"关闭"时不显示"开启诊断"（换了数据来源会在后台重新查询，等它结束，库文件才不再被占用）
         page.SetMonitor((f, t) => Load(db, f, t), enabled: false);
         Assert.False(page.DiagnoseButton.Visible);
+        Wait(page);
     });
 
     [Fact]
