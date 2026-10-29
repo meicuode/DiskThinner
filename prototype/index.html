@@ -59,6 +59,7 @@ svg.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;st
 #v-quarantine:checked ~ .shell .p-quarantine,
 #v-settings:checked ~ .shell .p-settings{display:block}
 #v-dlg-etw:checked ~ .shell .p-dlg-etw,
+#v-dlg-agent:checked ~ .shell .p-dlg-agent,
 #v-dlg-send:checked ~ .shell .p-dlg-send,
 #v-dlg-clean:checked ~ .shell .p-dlg-clean{display:grid}
 #v-overview:checked ~ .shell .nav label[for="v-overview"],
@@ -69,6 +70,7 @@ svg.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;st
 #v-quarantine:checked ~ .shell .nav label[for="v-quarantine"],
 #v-settings:checked ~ .shell .nav label[for="v-settings"],
 #v-dlg-etw:checked ~ .shell .nav label[for="v-dlg-etw"],
+#v-dlg-agent:checked ~ .shell .nav label[for="v-dlg-agent"],
 #v-dlg-send:checked ~ .shell .nav label[for="v-dlg-send"],
 #v-dlg-clean:checked ~ .shell .nav label[for="v-dlg-clean"]{background:#dfe9f6;color:var(--accent);font-weight:600;box-shadow:inset 3px 0 0 var(--accent)}
 #v-overview:focus-visible ~ .shell .nav label[for="v-overview"],
@@ -79,6 +81,7 @@ svg.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;st
 #v-quarantine:focus-visible ~ .shell .nav label[for="v-quarantine"],
 #v-settings:focus-visible ~ .shell .nav label[for="v-settings"],
 #v-dlg-etw:focus-visible ~ .shell .nav label[for="v-dlg-etw"],
+#v-dlg-agent:focus-visible ~ .shell .nav label[for="v-dlg-agent"],
 #v-dlg-send:focus-visible ~ .shell .nav label[for="v-dlg-send"],
 #v-dlg-clean:focus-visible ~ .shell .nav label[for="v-dlg-clean"]{outline:2px solid var(--accent);outline-offset:-2px}
 
@@ -263,6 +266,7 @@ table{border-collapse:collapse;width:100%}
 .opt input{margin-top:3px}
 .opt .t{font-weight:600}
 .opt .d{font-size:12px;color:var(--muted);margin-top:2px}
+.svc{margin:-2px 0 10px 28px;padding:6px 12px;border-left:3px solid var(--accent-weak);background:#fafafa}
 pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;overflow:auto;margin:0;line-height:1.5}
 
 /* ---------- 对话框 ---------- */
@@ -293,6 +297,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
   <input type="radio" name="view" id="v-quarantine" class="view-radio" aria-label="操作记录">
   <input type="radio" name="view" id="v-settings" class="view-radio" aria-label="设置">
   <input type="radio" name="view" id="v-dlg-etw" class="view-radio" aria-label="对话框：开启写入监控">
+  <input type="radio" name="view" id="v-dlg-agent" class="view-radio" aria-label="对话框：安装常驻监控服务">
   <input type="radio" name="view" id="v-dlg-send" class="view-radio" aria-label="对话框：AI 发送内容预览">
   <input type="radio" name="view" id="v-dlg-clean" class="view-radio" aria-label="对话框：确认清理">
 
@@ -365,6 +370,9 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
         <div class="group proto">原型：对话框</div>
         <label for="v-dlg-etw">
           <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>开启写入监控
+        </label>
+        <label for="v-dlg-agent">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>安装常驻服务
         </label>
         <label for="v-dlg-send">
           <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>AI 发送预览
@@ -492,6 +500,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <li>卡片底部的提示：从没开过监控时写"写入监控未开启，增长只能按快照对比，看不到是哪个程序写的。开启 4 小时诊断"；开过时写覆盖了多少小时。设置里选"关闭"时不显示这条提示。</li>
               <li>工具栏的写入监控胶囊有四种状态："写入监控：关闭 · 开启诊断"；"写入监控：诊断中（精确）· 剩余 3 小时 12 分 · 停止"（圆点绿色）；"写入监控：另一个窗口正在监控"（普通权限下检测到别的窗口在监控）；"写入监控：上次没有正常结束 · 清理"（只有残留会话时）。</li>
               <li>状态栏同理："写入监控：关闭"；监控时"写入监控：诊断中（精确）· 剩余 3:12 · 丢失 0.0%"。</li>
+              <li>装了常驻服务（阶段 2b）时胶囊还有两种状态："写入监控：常驻（精确）· 已记录 6 天"（圆点绿色，点击打开设置的写入监控一组）；"写入监控：常驻服务没有运行 · 启动"（圆点黄色，普通权限下点击提示以管理员身份重启）。状态栏："写入监控：常驻（精确）· 丢失 0.0%"。</li>
             </ul>
           </details>
         </section>
@@ -603,7 +612,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
 
               <div class="sec-t">证据</div>
               <ul class="evi">
-                <li><span class="tag s-obs">ETW</span>最近一次诊断（10-19 08:00–10:00，精确）中，uv.exe 在这里新建了 8,921 个文件，估算增长 1.20 GB；进程链：uv.exe ← pwsh.exe ← Code.exe</li>
+                <li><span class="tag s-obs">ETW</span>近 30 天常驻监控（共 26 天）中，uv.exe 在这里新建了 8,921 个文件，估算增长 1.20 GB；进程链：uv.exe ← pwsh.exe ← Code.exe</li>
                 <li><span class="tag s-obs">程序</span>uv.exe 位于 <span class="path">%USERPROFILE%\.local\bin</span>，产品名 uv</li>
                 <li><span class="tag s-infer">已装软件</span>匹配到 winget 包 astral-sh.uv</li>
                 <li><span class="tag s-rule">规则</span>dev.uv.cache（官方文档：缓存目录与 UV_CACHE_DIR）</li>
@@ -624,6 +633,9 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                 <summary>原型说明：空间浏览</summary>
                 <ul>
                   <li>布局参考 WizTree：上方树形列表，下方方块图，右侧详情。三者联动选中。</li>
+                  <li>ETW 证据按数据来源有两种写法：只有临时诊断时"最近一次诊断（10-19 08:00–10:00，精确）中，……"；有常驻服务的数据时"近 30 天常驻监控（共 26 天）中，……"。</li>
+                  <li>规则和推断都不认识的目录（阶段 2b）：近 30 天常驻监控覆盖不少于 7 天、主要写入者占估算增长 80% 以上时，归属写"实测：uv.exe（Code.exe）"加 <span class="tag s-obs">实测</span> 标签，提示"规则和推断都不认识这里；近 30 天常驻监控里 92% 的增长来自这个进程"。不改变类别、风险和清理计划；规则写明的归属和推断都不被覆盖。</li>
+                  <li>其他用户个人目录下的写入，普通用户的界面看不到（管理员能看到）。</li>
                   <li>树形列表用虚拟模式 ListView 模拟树，支持百万级条目；方块图用 GDI 自绘。</li>
                   <li>"按归属汇总"把同一个应用分散在多处的目录合并统计（比如 VS Code 的缓存、扩展、工作区存储）。</li>
                   <li>"可释放"要扣掉硬链接共享的部分，和"大小"不一定相等。</li>
@@ -741,6 +753,8 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <li>"写入量"是程序写了多少字节（覆盖写、临时文件都算）；"估算增长"是新文件最终变大了多少，用来和快照的变化量对照。目录表和空间浏览用估算增长，排行用写入量。</li>
               <li>监控开始前就打开的文件（数据库、虚拟磁盘）的写入对不上目录，只记在排行里，主要目录写"对不上目录"；目录表里这时写"没有能对上这里的写入"，提示里给出对不上的总量。</li>
               <li>正在监控时，覆盖时段表的最后一行是"10-19 08:00 – 进行中 · 诊断 · 精确模式 · 已 2 小时 · 剩余 2 小时 · 丢失 0.0%"，下面的按钮变成"停止监控"。上次没有正常结束的会话标"程序意外退出"。</li>
+              <li>装了常驻服务（阶段 2b）时，服务按天轮换的会话合成一行连续的时段："10-20 – 进行中 · 常驻 · 精确模式 · 丢失 0.0%"；中间断开过（服务停止、关机）就分成几行。"开启诊断"按钮换成说明"常驻服务正在记录"。"写入监控覆盖"卡片的脚注是"常驻服务记录中 · 丢失 0.0%"。</li>
+              <li>写入进程排行里，其他用户个人目录下的写入，普通用户看到的是合成的一行"其他用户的目录（需要管理员）"，只有计数，没有路径。</li>
               <li>"停止监控"先确认："停止写入监控？已经记录的数据会保留。"按钮"停止""继续监控"。</li>
             </ul>
           </details>
@@ -967,11 +981,16 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <div class="card" id="set-monitor">
                 <h2>写入监控（ETW）</h2>
                 <label class="opt"><input type="radio" name="mon" aria-label="关闭"><div><div class="t">关闭</div><div class="d">不提示开启诊断。看得到哪里变了，看不到是谁写的。</div></div></label>
-                <label class="opt on"><input type="radio" name="mon" checked aria-label="临时诊断"><div><div class="t">临时诊断（推荐）</div><div class="d">需要时手动开启 1 到 24 小时，到时自动停止。需要管理员权限，不安装后台服务。</div></div></label>
-                <label class="opt" style="opacity:.6"><input type="radio" name="mon" disabled aria-label="常驻服务（后续版本）"><div><div class="t">常驻服务（后续版本）</div><div class="d">安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。</div></div></label>
-                <div class="form-row"><div class="lbl">记录模式</div><div><div class="seg"><span class="on">轻量</span><span>精确</span></div><div class="hint">轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。</div></div></div>
-                <div class="form-row"><div class="lbl">默认时长</div><div><select class="select" aria-label="写入监控默认时长"><option>1 小时</option><option selected>4 小时</option><option>8 小时</option><option>24 小时</option></select></div></div>
-                <div class="form-row"><div class="lbl">保留</div><div><select class="select" aria-label="写入监控数据保留时长"><option>30 天</option><option selected>90 天</option><option>180 天</option></select> <span class="small muted" style="margin-left:8px">当前占用 1.2 MB</span></div></div>
+                <label class="opt"><input type="radio" name="mon" aria-label="临时诊断"><div><div class="t">临时诊断（推荐）</div><div class="d">需要时手动开启 1 到 24 小时，到时自动停止。需要管理员权限，不安装后台服务。</div></div></label>
+                <label class="opt on"><input type="radio" name="mon" checked aria-label="常驻服务"><div><div class="t">常驻服务</div><div class="d">开机自动记录，不需要打开 DiskThinner。以 SYSTEM 身份运行，只监控、不联网、不删除文件，可以随时卸载。</div></div></label>
+                <div class="svc" role="group" aria-label="常驻监控服务">
+                  <div class="form-row"><div class="lbl">服务</div><div><span class="dot on" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>运行中 · 精确 · 版本 0.3.0 · 从 10-20 开始记录 · 数据 12.4 MB
+                    <div style="margin-top:8px"><button class="btn" type="button">停止服务</button> <button class="btn" type="button">更新服务</button> <button class="btn danger" type="button">卸载…</button></div>
+                    <div class="hint">服务的记录模式和保留天数是所有用户共用的，在下面修改。普通权限下这几个按钮是"以管理员身份重启"。</div></div></div>
+                </div>
+                <div class="form-row"><div class="lbl">记录模式</div><div><div class="seg"><span>轻量</span><span class="on">精确</span></div><div class="hint">轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。选了常驻服务时，这一项和下面的"保留"作用于服务。</div></div></div>
+                <div class="form-row"><div class="lbl">默认时长</div><div><select class="select" aria-label="写入监控默认时长"><option>1 小时</option><option selected>4 小时</option><option>8 小时</option><option>24 小时</option></select><div class="hint">只对临时诊断有效。</div></div></div>
+                <div class="form-row"><div class="lbl">保留</div><div><select class="select" aria-label="写入监控数据保留时长"><option>30 天</option><option selected>90 天</option><option>180 天</option></select> <span class="small muted" style="margin-left:8px">诊断 1.2 MB · 常驻服务 12.4 MB</span><div class="hint">诊断数据另有 64 MB 的上限，常驻服务的数据另有 256 MB 的上限，超出时先删最早的。</div></div></div>
               </div>
 
               <div class="card" id="set-snapshot">
@@ -1016,13 +1035,54 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <details class="proto-note">
                 <summary>原型说明：设置</summary>
                 <ul>
-                  <li>写入监控三档：关闭、临时诊断、常驻服务。默认临时诊断，需要时才开。常驻服务是阶段 2b，这一版置灰。</li>
+                  <li>写入监控三档：关闭、临时诊断、常驻服务。默认临时诊断，需要时才开。</li>
+                  <li>常驻服务（阶段 2b）：没有安装时，选中后下面只有一个按钮"安装…"（普通权限下是"以管理员身份重启并安装"），点了打开"安装常驻监控服务"对话框。已安装时显示状态和按钮，状态有五种："运行中 · 精确 · 版本 0.3.0 · 从 10-20 开始记录 · 数据 12.4 MB"；"已停止"（按钮"启动服务"）；"需要更新（服务 0.2.0，程序 0.3.0）"（按钮"更新服务"）；"最近出错：开不了 ETW 会话（系统里的会话数已满）"（黄色）；"连不上服务"。</li>
+                  <li>"卸载…"先确认："卸载常驻监控服务？"，勾选框"同时删除监控数据（12.4 MB）"默认不勾选，按钮"卸载""取消"。卸载后这一组回到"临时诊断"。</li>
+                  <li>服务在记录时，概览、增长分析的"开启诊断"换成"常驻服务正在记录"；服务没有运行时诊断照常可用。</li>
                   <li>选"关闭"时概览和增长分析不出现"开启诊断"的提示，点工具栏的胶囊跳到这里。</li>
                   <li>记录模式的默认值按实测的开销定（2a.1）：开销达标就默认精确，否则默认轻量。保留天数之外另有 64 MB 的上限，超出时删最早的会话。</li>
                   <li>MCP 只暴露只读工具，删除永远只能在 DiskThinner 界面里由用户确认。</li>
                   <li>社区规则共享、远程规则更新属于第 4 阶段，这里暂不出现。</li>
                 </ul>
               </details>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== 对话框：安装常驻监控服务（阶段 2b） ============================== -->
+        <section class="page p-dlg p-dlg-agent" role="dialog" aria-modal="true" aria-labelledby="h-dlg-agent">
+          <div class="dlg">
+            <div class="dlg-h" id="h-dlg-agent">安装常驻监控服务</div>
+            <div class="dlg-b">
+              <p style="margin:4px 0 12px">服务开机后自动记录哪个程序在本机磁盘上新建、删除、重命名、写入了文件，按目录和程序汇总。只在本机，不联网，不记录文件名和文件内容，不修改、不删除任何文件。</p>
+              <table class="tbl">
+                <tbody>
+                  <tr><td class="muted" style="width:96px">程序</td><td class="path">C:\Program Files\DiskThinner\Agent\</td></tr>
+                  <tr><td class="muted">数据</td><td class="path">C:\ProgramData\DiskThinner\Agent\<span class="small muted">（只有管理员能访问）</span></td></tr>
+                  <tr><td class="muted">开销</td><td>空闲时 CPU 约 0.1%，内存不超过约 100 MB</td></tr>
+                  <tr><td class="muted">身份</td><td>以 SYSTEM 运行；开机自动启动（延迟），出错时自动重启两次</td></tr>
+                </tbody>
+              </table>
+              <div class="form-row mt12"><div class="lbl">模式</div><div><div class="seg"><span>轻量</span><span class="on">精确</span></div><div class="hint">和临时诊断一样：轻量只记录新建、删除、重命名；精确还记录写了多少。</div></div></div>
+              <div class="form-row"><div class="lbl">保留</div><div><select class="select" aria-label="常驻服务数据保留时长"><option>30 天</option><option selected>90 天</option><option>180 天</option></select><div class="hint">另有 256 MB 的上限，超出时先删最早的一天。</div></div></div>
+              <div class="note mt12">
+                <div>· 需要管理员权限。现在是普通权限：点下面的按钮后 DiskThinner 会以管理员身份重新打开，然后安装。</div>
+                <div>· 随时可以在"设置 → 写入监控"里停止或卸载；卸载时可以选择是否删除已经记录的数据。</div>
+                <div>· 其他用户个人目录下的记录，普通用户的界面看不到。</div>
+              </div>
+              <details class="proto-note">
+                <summary>原型说明：安装常驻监控服务</summary>
+                <ul>
+                  <li>管理员下第一条注意事项改成"需要管理员权限（当前已是管理员）"，按钮是"安装并启动"。</li>
+                  <li>安装时显示进度："复制程序 → 准备数据目录 → 注册服务 → 启动 → 等待服务应答"。任何一步失败都撤销已经做的步骤，并说明原因。</li>
+                  <li>数据目录已经存在、而且权限不对（例如有人预先建好了）时，安装会收回所有权、重设权限，结果里写"数据目录的权限已重设"。</li>
+                  <li>服务的程序从 Program Files 运行，复制后核对 SHA-256，不从解压目录运行。</li>
+                </ul>
+              </details>
+            </div>
+            <div class="dlg-f">
+              <label class="btn" for="v-settings">取消</label>
+              <label class="btn primary" for="v-settings">以管理员身份重启并安装</label>
             </div>
           </div>
         </section>

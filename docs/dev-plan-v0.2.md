@@ -430,6 +430,8 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 > - 指标：依赖运行库版发布包 7.3 MB；"监控中 + MFT 扫描"峰值 345 MB。
 > 调整：工程分成 `DiskThinner.Monitor`（纯逻辑，可以 AOT，2b 复用）和 `DiskThinner.Monitor.Etw`（TraceEvent，2b 换掉）。监控数据单独放在 `monitor.db`，默认保留 90 天，上限 64 MB。发布包不带 TraceEvent 的原生 DLL。另加了一个无界面的 `monitor` 子命令，用于诊断和验收。
 > 未达标：冷启动到窗口显示 0.1.0 是 1.35 秒，现在是 1.80 秒（中位数，抖动比差值大），都超过 1 秒的目标，2b 开始前复测。
+> 2026-10-29 发布 v0.2.0：https://github.com/meicuode/DiskThinner/releases/tag/v0.2.0 （Release 工作流的检查、打包和 windows-2022 / 2025 冒烟测试全部通过）。
+> 2026-10-29 2b 设计见 `docs/phase2b-design.md`，决策点 E1–E15 按推荐采用，E16 不建测试账户。
 - 2b 常驻服务（8 到 12 人日）：AOT 服务、直接调用 ETW API、USN 轻量模式、命名管道和访问权限、安装卸载升级、崩溃自动重启。
 
 ### 阶段 3：AI 辅助（v0.4，8 到 12 人日）

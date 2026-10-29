@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/spikes/">
+    <Project Path="spikes/AotProbe/AotProbe.csproj" />
     <Project Path="spikes/EtwBench/EtwBench.csproj" />
     <Project Path="spikes/RuleCoverage/RuleCoverage.csproj" />
     <Project Path="spikes/ScanBench/ScanBench.csproj" />

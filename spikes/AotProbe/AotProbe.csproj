@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 阶段 2b.0 的可行性验证：DiskThinner.Monitor（含 Microsoft.Data.Sqlite）能不能 Native AOT 发布、有没有 AOT 警告、体积多大；
+       带访问权限的命名管道在 AOT 下能不能用。不进入产品。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiskThinner.Monitor\DiskThinner.Monitor.csproj" />
+  </ItemGroup>
+</Project>
