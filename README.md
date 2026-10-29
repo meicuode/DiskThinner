@@ -110,7 +110,7 @@ MFT 扫描和删除类验收需要管理员，用 `tools/verify/` 下的脚本�
 GitHub Actions：
 
 - `ci.yml`：推送到 main 和 PR 时跑规则校验、构建、测试；推送到 main 时再打包并冒烟测试。
-- `package.yml`（被另外两个调用）：打两个 zip（打包时检查没有带 TraceEvent 的原生 DLL，并写出文件清单），在全新的 windows-2022 和 windows-2025 上解压运行 `tools/verify/smoke.ps1`：扫描测试文件夹、以管理员身份用 MFT 扫描整个系统盘并生成清理计划（只读，不执行清理）、跑 snapshot 子命令、跑 15 秒的精确模式 `monitor --verify-parser`（要求收到事件、解析器和系统解码一致、不留会话）。自包含版在装 .NET 之前测，依赖运行库的版本装好 .NET 10 之后测。截图和报告作为构建产物保存。
+- `package.yml`（被另外两个调用）：打两个 zip（打包时检查没有带 TraceEvent 和它的原生 DLL，并写出文件清单），在全新的 windows-2022 和 windows-2025 上解压运行 `tools/verify/smoke.ps1`：扫描测试文件夹、以管理员身份用 MFT 扫描整个系统盘并生成清理计划（只读，不执行清理）、跑 snapshot 子命令、跑 15 秒的精确模式 `monitor --verify-parser`（要求收到事件、解析器和系统解码一致、不留会话）。自包含版在装 .NET 之前测，依赖运行库的版本装好 .NET 10 之后测。截图和报告作为构建产物保存。
 - `release.yml`：推送 `v主.次.修订` 形式的标签（如 `v0.2.0`，或 `v0.2.0-beta.1` 发布为预发布）时，跑同样的检查和冒烟测试，都通过后才创建 GitHub Release 并上传 zip 和 `SHA256SUMS.txt`。版本号以标签为准；发布说明取 `docs/release-notes-<版本>.md`，没有就用通用说明。
 
 发布新版本：

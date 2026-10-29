@@ -10,7 +10,7 @@
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
     <!-- 只在 tools/i18n（界面文字的改写和 resx 生成）里使用，不进产品 -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
-    <!-- 写入监控（阶段 2a）：只在 DiskThinner.Monitor.Etw 和 spikes/EtwBench 里使用，2b 的常驻服务改为直接调用 ETW API -->
+    <!-- 写入监控（阶段 2a）：2b 起产品直接调用 ETW API，只有 spikes/EtwBench（开销实测、和自己写的消费者逐个比对）还用它，不进发布包 -->
     <PackageVersion Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="4.0.0" />
   </ItemGroup>
   <ItemGroup>

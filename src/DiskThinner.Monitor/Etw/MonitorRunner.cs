@@ -88,6 +88,9 @@ public sealed class MonitorRunner : IDisposable
     /// <summary>第一处解析不一致（--verify-parser）。</summary>
     public string? MismatchDetail => _session?.MismatchDetail;
 
+    /// <summary>核对过至少一个字段的事件数（--verify-parser）。为 0 时核对是空的（TDH 没读到清单）。</summary>
+    public long ParseVerified => _session?.ParseVerified ?? 0;
+
     /// <summary>会话因为异常停止时的异常。</summary>
     public Exception? Failure => _session?.PumpError ?? _session?.TimerError;
 

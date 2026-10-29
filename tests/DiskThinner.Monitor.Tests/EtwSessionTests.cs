@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DiskThinner.Monitor.Etw;
-using Microsoft.Diagnostics.Tracing.Session;
 
 namespace DiskThinner.Monitor.Tests;
 
@@ -157,8 +156,7 @@ public sealed class EtwSessionTests : IDisposable
             // 模拟强制结束：会话建好、启用了提供程序，但进程"没来得及"停它；库里的会话行没有结束时间
             foreach (var name in new[] { residual, other })
             {
-                using var s = new TraceEventSession(name) { StopOnDispose = false, BufferSizeMB = 1 };
-                s.EnableProvider(Providers.KernelProcess, Microsoft.Diagnostics.Tracing.TraceEventLevel.Verbose, Providers.ProcessKeyword);
+                NativeSession.StartUnconsumed(name, Providers.KernelProcess, Providers.ProcessKeyword);
             }
 
             Assert.True(IsActive(residual));
@@ -185,14 +183,7 @@ public sealed class EtwSessionTests : IDisposable
         {
             foreach (var name in new[] { residual, other })
             {
-                try
-                {
-                    using var s = new TraceEventSession(name, TraceEventSessionOptions.Attach);
-                    s.Stop(noThrow: true);
-                }
-                catch (Exception ex) when (ex is FileNotFoundException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException)
-                {
-                }
+                NativeSession.StopByName(name); // 测试自己开的会话；已经停了时返回 false
             }
         }
     }
@@ -307,6 +298,7 @@ public sealed class EtwSessionTests : IDisposable
             Assert.True(runner.Stop(StopReason.User).Wait(TimeSpan.FromSeconds(15)));
             Assert.True(runner.Failure is null, "会话因为异常停止：" + runner.Failure);
             Assert.True(runner.ParseMismatch == 0, $"解析不一致 {runner.ParseMismatch} 处，第一处 {runner.MismatchDetail}");
+            Assert.True(runner.ParseVerified > 0, "TDH 一个字段也没核对上：核对是空的");
             Assert.True(runner.EventsById.Count > 0);
 
             using var json = JsonDocument.Parse(File.ReadAllText(report));
@@ -401,22 +393,22 @@ public sealed class EtwSessionTests : IDisposable
     }
 }
 
-/// <summary>不带 RID 的构建输出（这个测试项目的输出目录）里没有 TraceEvent 的原生 DLL 和互操作程序集：证明 Directory.Build.targets 生效（第 5.11 节，D10）。</summary>
+/// <summary>2b 起直接调用 ETW API：输出目录里不再有 TraceEvent 和它带的原生 DLL（docs/phase2b-design.md 5.7 节，E6）。</summary>
 public sealed class PackagingTests
 {
     [Fact]
-    public void OutputDirectory_HasTraceEventWithoutNatives()
+    public void OutputDirectory_HasNoTraceEvent()
     {
         var dir = AppContext.BaseDirectory;
-        Assert.True(File.Exists(Path.Combine(dir, "Microsoft.Diagnostics.Tracing.TraceEvent.dll")), "输出目录里没有 TraceEvent：测试项目没有引用 Monitor.Etw");
+        foreach (var file in new[] { "Microsoft.Diagnostics.Tracing.TraceEvent.dll", "Microsoft.Diagnostics.FastSerialization.dll", "Dia2Lib.dll", "TraceReloggerLib.dll",
+                     "KernelTraceControl.dll", "msdia140.dll" })
+        {
+            Assert.Empty(Directory.GetFiles(dir, file, SearchOption.AllDirectories));
+        }
+
         foreach (var sub in new[] { "x86", "arm64", "amd64" })
         {
             Assert.False(Directory.Exists(Path.Combine(dir, sub)), $"输出目录里有 {sub}\\");
-        }
-
-        foreach (var file in new[] { "Dia2Lib.dll", "TraceReloggerLib.dll", "KernelTraceControl.dll", "msdia140.dll" })
-        {
-            Assert.Empty(Directory.GetFiles(dir, file, SearchOption.AllDirectories));
         }
     }
 

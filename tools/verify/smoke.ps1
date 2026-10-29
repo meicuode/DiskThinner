@@ -153,9 +153,10 @@ function Run-Monitor([string] $case, [string] $exe) {
     $left = @(logman query -ets | Select-String -Pattern 'DiskThinner-Diag-')
     if ($p.ExitCode -ne 0) { Fail $case "退出码 $($p.ExitCode)：$($r['error'])"; return }
     if ([long]$r['received'] -le 0) { Fail $case '没有收到事件'; return }
-    if ($r['parse_mismatch'] -ne '0') { Fail $case "解析器和 TDH 对不上 $($r['parse_mismatch']) 处（$($r['events_by_id'])）"; return }
+    if ($r['parse_mismatch'] -ne '0') { Fail $case "解析器和 TDH 对不上 $($r['parse_mismatch']) 处，第一处 $($r['parse_mismatch_first'])（$($r['events_by_id'])）"; return }
+    if ([long]$r['parse_verified'] -le 0) { Fail $case 'TDH 一个字段也没核对上（核对是空的）'; return }
     if ($r['session_stopped'] -ne 'true' -or $left.Count -gt 0) { Fail $case '结束后会话还在'; return }
-    Notice $case "收到 $($r['received']) 个事件，丢失 $($r['lost'])，CPU $($r['cpu_percent'])%，结束原因 $($r['end_reason'])；$($r['events_by_id'])"
+    Notice $case "收到 $($r['received']) 个事件，丢失 $($r['lost'])，核对 $($r['parse_verified']) 个，CPU $($r['cpu_percent'])%，结束原因 $($r['end_reason'])；$($r['events_by_id'])"
 }
 
 foreach ($kind in 'selfcontained', 'framework') {
@@ -170,10 +171,10 @@ foreach ($kind in 'selfcontained', 'framework') {
 
     Run-Snapshot "$kind-snapshot-folder" $exe $data
 
-    # 包里不带 TraceEvent 的原生 DLL（docs/phase2a-design.md 5.11 节，D10）
+    # 2b 起直接调用 ETW API：包里不带 TraceEvent 和它的原生 DLL（docs/phase2b-design.md 5.7 节，E6）
     $pkg = Split-Path $exe
     $extra = @(@('x86', 'arm64', 'amd64') | Where-Object { Test-Path (Join-Path $pkg $_) })
-    $extra += @(Get-ChildItem $pkg -File -Recurse -Include 'Dia2Lib.dll', 'TraceReloggerLib.dll', 'KernelTraceControl.dll', 'msdia140.dll' | ForEach-Object Name)
+    $extra += @(Get-ChildItem $pkg -File -Recurse -Include 'Microsoft.Diagnostics.Tracing.TraceEvent.dll', 'Microsoft.Diagnostics.FastSerialization.dll', 'Dia2Lib.dll', 'TraceReloggerLib.dll', 'KernelTraceControl.dll', 'msdia140.dll' | ForEach-Object Name)
     if ($extra.Count -gt 0) { Fail "$kind-package" "包里有不该带的：$($extra -join ', ')" }
 
     Run-Monitor "$kind-monitor" $exe

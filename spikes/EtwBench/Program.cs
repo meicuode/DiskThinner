@@ -3,6 +3,7 @@
 //                [--seconds 180] [--writeload <exe>] [--project <csproj>] [--buffer-mb N] [--raw <文件>] [--raw-max 200000] [--slow-us 0]
 //   EtwBench list-sessions --out <文件>          （V21，普通权限下运行）
 //   EtwBench orphan --session <名字> --out <标记文件> --seconds 600   （V9：开会话后等着被强制结束）
+//   EtwBench compare --writeload <exe> --out <报告.txt> [--buffer-mb 32]   （2b.1 的 W1/W2/W7：TraceEvent 和 NativeSession 同时开着比对）
 // 报告是 key=value 文本。原始事件（--raw）含本机路径，只留在 artifacts\ 下，不提交。
 using System.Diagnostics;
 using System.Globalization;
@@ -32,6 +33,7 @@ internal static partial class Program
                 "orphan" => Orphan(o),
                 "dump" => Dump(o),
                 "replay" => Replay.Run(o),
+                "compare" => Compare.Run(o),
                 _ => Usage(),
             };
         }

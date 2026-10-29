@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- 写入监控（阶段 2a）的纯逻辑：载荷解析、进程归属、估算增长、按小时汇总和合并、抽样、存储和查询。
-       不引用 TraceEvent 和 WinForms，按 Native AOT 要求编写，2b 的常驻服务直接复用（docs/phase2a-design.md 4.1 节）。
-       Windows API 都在接口后面，测试用假的实现。 -->
+  <!-- 写入监控：载荷解析、进程归属、估算增长、按小时汇总和合并、抽样、存储和查询（阶段 2a），
+       以及直接调用 ETW API 的会话 Etw/（阶段 2b，docs/phase2b-design.md 5.1 节）。
+       不引用 TraceEvent 和 WinForms，按 Native AOT 要求编写，界面和 2b 的常驻服务共用。纯逻辑里的 Windows API 都在接口后面，测试用假的实现。
+       只在本机：不引用任何网络相关的 API。 -->
   <PropertyGroup>
     <IsAotCompatible>true</IsAotCompatible>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

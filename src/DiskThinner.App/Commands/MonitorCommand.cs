@@ -143,6 +143,7 @@ internal static class MonitorCommand
         report.Set("sample_factor", s.SampleFactor.ToString(CultureInfo.InvariantCulture));
         report.Set("parse_mismatch", runner.ParseMismatch.ToString(CultureInfo.InvariantCulture));
         report.Set("parse_mismatch_first", runner.MismatchDetail ?? "");
+        report.Set("parse_verified", runner.ParseVerified.ToString(CultureInfo.InvariantCulture));
         report.Set("cpu_percent", s.CpuPercent.ToString("0.###", CultureInfo.InvariantCulture));
         report.Set("working_set_bytes", s.WorkingSetBytes.ToString(CultureInfo.InvariantCulture));
         report.Set("events_by_id", string.Join(';', runner.EventsById.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => $"{kv.Key}:{kv.Value}")));

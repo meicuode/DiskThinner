@@ -51,10 +51,10 @@ $zips = @(
     @{ Dir = $sc; Zip = Join-Path $out "DiskThinner-$version-win-x64-selfcontained.zip" }
 )
 foreach ($z in $zips) {
-    # TraceEvent 的原生 DLL 和互操作程序集一个都不要（2a.1 的 V7，D10）；有就不打包
+    # 2b 起产品直接调用 ETW API：TraceEvent、它的原生 DLL 和互操作程序集一个都不要（docs/phase2b-design.md 5.7 节）；有就不打包
     $base = (Resolve-Path $z.Dir).Path.TrimEnd('\') + '\'
     $bad = @(Get-ChildItem $z.Dir -File -Recurse | Where-Object {
-            $_.FullName.Substring($base.Length) -match '^(x86|arm64|amd64)\\' -or $_.Name -in 'Dia2Lib.dll', 'TraceReloggerLib.dll', 'KernelTraceControl.dll', 'msdia140.dll' })
+            $_.FullName.Substring($base.Length) -match '^(x86|arm64|amd64)\\' -or $_.Name -in 'Microsoft.Diagnostics.Tracing.TraceEvent.dll', 'Microsoft.Diagnostics.FastSerialization.dll', 'Dia2Lib.dll', 'TraceReloggerLib.dll', 'KernelTraceControl.dll', 'msdia140.dll' })
     if ($bad.Count -gt 0) { throw "$(Split-Path $z.Dir -Leaf) 里有不该带的文件：$(($bad | ForEach-Object Name) -join ', ')" }
     Compress-Archive -Path (Join-Path $z.Dir '*') -DestinationPath $z.Zip -CompressionLevel Optimal
 }

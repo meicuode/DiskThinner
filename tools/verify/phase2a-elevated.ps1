@@ -11,15 +11,19 @@
 #     dotnet build src/DiskThinner.App -c Release; dotnet build tests/DiskThinner.Monitor.Tests -c Release
 #   -Part perf：1.3 节第 20 条的性能对照（-Before / -After 两个发布目录）。
 #   -Part ui：2a.5 的界面验收（8.2 节 accept 第 6 步）：调用 phase2a-ui.ps1，截有监控数据的各页面，验证到时停止和关窗口停止。
+#   -Part compare：2b.1 的双会话比对（docs/phase2b-design.md 2.2 节 W1、W2、W7）：EtwBench compare 同时开 TraceEvent 和 NativeSession
+#     跑一次 WriteLoad；给了 -AotProbe 时再跑 AotProbe.exe --etw（NativeSession 在 AOT 下）。
 param(
     [Parameter(Mandatory)] [string] $OutDir,
     # 可以用逗号连着写几个部分（例如 etw,ui），只弹一次 UAC
-    [ValidatePattern('^(bench|bench2|accept|etw|ui|perf)(,(bench|bench2|accept|etw|ui|perf))*$')] [string] $Part = 'bench',
+    [ValidatePattern('^(bench|bench2|accept|etw|ui|perf|compare)(,(bench|bench2|accept|etw|ui|perf|compare))*$')] [string] $Part = 'bench',
     [int] $IdleSeconds = 180,
     [switch] $SkipWatchdog,
     # -Part perf 用：加 TraceEvent 之前和现在的发布目录（build-release.ps1 的输出）
     [string] $Before,
-    [string] $After
+    [string] $After,
+    # -Part compare 用：AOT 发布的 spikes/AotProbe/AotProbe.exe（给了才跑 --etw）
+    [string] $AotProbe
 )
 
 $ErrorActionPreference = 'Stop'
@@ -167,6 +171,28 @@ function RunEtwTests {
     Add-Content $log "etw-tests exit=$($p.ExitCode) $summary"
     if ($p.ExitCode -ne 0) { throw "dotnet test 退出码 $($p.ExitCode)" }
     if ($summary -notmatch 'Skipped:\s+0,') { throw "有测试被跳过：$summary" }
+}
+
+if ($parts -contains 'compare') {
+    Step 'compare' {
+        $report = Join-Path $OutDir 'compare.txt'
+        Remove-Item $report -ErrorAction SilentlyContinue
+        $p = Start-Process $bench -ArgumentList 'compare', '--writeload', "`"$load`"", '--out', "`"$report`"" -NoNewWindow -PassThru -Wait `
+            -RedirectStandardError (Join-Path $OutDir 'compare.err')
+        Add-Content $log "compare exit=$($p.ExitCode) $((Get-Content $report -ErrorAction SilentlyContinue) -join ' ')"
+        if ($p.ExitCode -ne 0) { throw "EtwBench compare 退出码 $($p.ExitCode)" }
+    }
+    if ($AotProbe) {
+        Step 'aot-etw' {
+            $dir = Join-Path ([IO.Path]::GetTempPath()) ('DiskThinner-2a-aot-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+            $out = & $AotProbe $dir --etw
+            $code = $LASTEXITCODE
+            Add-Content $log "aot-etw exit=$code $($out -join ' ')"
+            Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+            if ($code -ne 0) { throw "AotProbe 退出码 $code" }
+        }
+    }
+    Add-Content $log "sessions_after=$((DiskThinnerSessions) -join ',')"
 }
 
 if ($parts -contains 'etw') {
