@@ -226,6 +226,13 @@ internal sealed class MainForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
+        // 研发方案 1.3 的冷启动目标：记下进程启动到窗口显示的时间，以及这时 TraceEvent 有没有被加载（第 5.9.1 节：不应该）
+        using (var self = Process.GetCurrentProcess())
+        {
+            _shownMs = (DateTime.Now - self.StartTime).TotalMilliseconds;
+        }
+
+        _traceEventAtShown = AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "Microsoft.Diagnostics.Tracing.TraceEvent");
         LoadDrives();
         RefreshSchedule();
         UpdateMonitorUi();
@@ -236,6 +243,8 @@ internal sealed class MainForm : Form
     }
 
     private Task? _monitorInit;
+    private double _shownMs;
+    private bool _traceEventAtShown;
 
     private sealed record DriveItem(string Root, string Text)
     {
@@ -1102,6 +1111,9 @@ internal sealed class MainForm : Form
     {
         var host = _monitorHost;
         var s = host.Status;
+        yield return $"startup_shown_ms={_shownMs:F0}";
+        yield return $"traceevent_loaded_at_shown={_traceEventAtShown}";
+        yield return $"assemblies_at_report={AppDomain.CurrentDomain.GetAssemblies().Length}";
         yield return $"monitor_state={host.State}";
         yield return $"monitor_session={s.SessionName}";
         yield return $"monitor_mode={(s.SessionName is null ? "" : s.Mode.ToString())}";

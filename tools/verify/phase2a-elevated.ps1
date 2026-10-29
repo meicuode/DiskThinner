@@ -9,13 +9,17 @@
 #   -Part accept：2a.4 的验收（8.2 节 accept 的第 1–5、7 步）：monitor 子命令的到时停止、强制结束后的清理、兜底任务（-SkipWatchdog 跳过）、
 #     负载下的精确和轻量模式，再以 DT_ETW_TESTS=1 跑 EtwSessionTests（-Part etw 只跑这些测试）。运行前先用普通权限构建：
 #     dotnet build src/DiskThinner.App -c Release; dotnet build tests/DiskThinner.Monitor.Tests -c Release
+#   -Part perf：1.3 节第 20 条的性能对照（-Before / -After 两个发布目录）。
 #   -Part ui：2a.5 的界面验收（8.2 节 accept 第 6 步）：调用 phase2a-ui.ps1，截有监控数据的各页面，验证到时停止和关窗口停止。
 param(
     [Parameter(Mandatory)] [string] $OutDir,
     # 可以用逗号连着写几个部分（例如 etw,ui），只弹一次 UAC
-    [ValidatePattern('^(bench|bench2|accept|etw|ui)(,(bench|bench2|accept|etw|ui))*$')] [string] $Part = 'bench',
+    [ValidatePattern('^(bench|bench2|accept|etw|ui|perf)(,(bench|bench2|accept|etw|ui|perf))*$')] [string] $Part = 'bench',
     [int] $IdleSeconds = 180,
-    [switch] $SkipWatchdog
+    [switch] $SkipWatchdog,
+    # -Part perf 用：加 TraceEvent 之前和现在的发布目录（build-release.ps1 的输出）
+    [string] $Before,
+    [string] $After
 )
 
 $ErrorActionPreference = 'Stop'
@@ -168,6 +172,14 @@ function RunEtwTests {
 if ($parts -contains 'etw') {
     Step 'etw-tests' { RunEtwTests }
     Add-Content $log "sessions_after=$((DiskThinnerSessions) -join ',')"
+}
+
+# 1.3 节第 20 条：冷启动时间、发布包大小、"监控中（精确）+ MFT 扫描"的峰值内存（tools/verify/phase2a-perf.ps1，需要 -Before / -After 两个发布目录）
+if ($parts -contains 'perf') {
+    Step 'perf' {
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'phase2a-perf.ps1') -Before $Before -After $After -OutDir (Join-Path $OutDir 'perf')
+        Add-Content $log "perf exit=$LASTEXITCODE"
+    }
 }
 
 # 第 6 步（2a.5）：有监控数据时的界面截图、--monitor-seconds 到时停止、关窗口时停止（tools/verify/phase2a-ui.ps1）

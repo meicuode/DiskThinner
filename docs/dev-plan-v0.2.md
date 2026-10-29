@@ -422,6 +422,14 @@ CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABO
 ### 阶段 2：写入监控（v0.2 / v0.3）
 
 - 2a 诊断模式（6 到 8 人日）：先实测开销；开启写入监控对话框；ETW 会话与汇总；增长分析页的覆盖时间轴、写入进程列和写入进程排行；空间浏览的 ETW 证据。
+
+> 2026-10-29 2a 已完成。设计见 `docs/phase2a-design.md`（决策点 D1–D15 按推荐采用），验收结果见 `docs/phase2a-report.md`。
+> - 实测：精确模式空闲时 CPU 0.07%、工作集增加 22 MB、不丢事件，默认模式定为精确。
+> - 负载核对：WriteLoad 默认参数下，新建、删除、重命名个数、写入量、估算增长逐项对上。
+> - 停止和清理：到时、用户停止、关窗口、被外部停止、强制结束后清理、兜底计划任务都实测过。
+> - 指标：依赖运行库版发布包 7.3 MB；"监控中 + MFT 扫描"峰值 345 MB。
+> 调整：工程分成 `DiskThinner.Monitor`（纯逻辑，可以 AOT，2b 复用）和 `DiskThinner.Monitor.Etw`（TraceEvent，2b 换掉）。监控数据单独放在 `monitor.db`，默认保留 90 天，上限 64 MB。发布包不带 TraceEvent 的原生 DLL。另加了一个无界面的 `monitor` 子命令，用于诊断和验收。
+> 未达标：冷启动到窗口显示 0.1.0 是 1.35 秒，现在是 1.80 秒（中位数，抖动比差值大），都超过 1 秒的目标，2b 开始前复测。
 - 2b 常驻服务（8 到 12 人日）：AOT 服务、直接调用 ETW API、USN 轻量模式、命名管道和访问权限、安装卸载升级、崩溃自动重启。
 
 ### 阶段 3：AI 辅助（v0.4，8 到 12 人日）
