@@ -39,7 +39,12 @@ jobs:
           $code = $LASTEXITCODE
           $warnings = @(Select-String -Path agent-aot.log -Pattern 'warning IL\d{4}' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
           $warnings | ForEach-Object { Write-Host "::error title=AOT 警告::$_" }
-          if ($code -ne 0) { Get-Content agent-aot.log -Tail 30; throw '服务的 AOT 发布失败' }
+          if ($code -ne 0) {
+            # 不登录看不到日志：出错的行和最后几行写成注解
+            @(Select-String -Path agent-aot.log -Pattern ' error |error [A-Z]+\d+' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique -First 10) + @(Get-Content agent-aot.log -Tail 5) |
+              ForEach-Object { Write-Host "::error title=AOT 发布::$_" }
+            throw '服务的 AOT 发布失败'
+          }
           if ($warnings.Count -gt 0) { throw "服务的 AOT 发布有 $($warnings.Count) 个警告" }
           "AOT 发布：DiskThinner.Agent.exe $(
       - name: 测试
