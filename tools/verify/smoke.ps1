@@ -1,6 +1,6 @@
 # 发布包冒烟测试。GitHub Actions 在全新的 windows-2022 / windows-2025 上跑，也可以在本机或虚拟机上跑。
 # 解压 zip，逐个启动：扫描一个测试文件夹；管理员下再用 MFT 扫描整个系统盘、生成清理计划、截确认框（只显示，不执行）；
-# 跑 snapshot 子命令；管理员下跑 15 秒的 monitor 子命令（写入监控，核对解析器）。
+# 跑 snapshot 子命令；管理员下跑 15 秒的 monitor 子命令（写入监控，核对解析器），再用包里的 Agent\ 装一次常驻服务、查到数据、卸载并删除数据。
 # 只读：不执行任何清理；快照、写入监控库、操作记录、设置都写到 -OutDir 下。
 # 结果写到 -OutDir\smoke.txt；在 GitHub Actions 里同时输出 ::notice / ::error 注解。有失败时退出码为 1。
 # 用法：pwsh -File tools\verify\smoke.ps1 -PackageDir <放 zip 的目录> -OutDir <输出目录> [-Variant all|selfcontained|framework]
@@ -159,6 +159,85 @@ function Run-Monitor([string] $case, [string] $exe) {
     Notice $case "收到 $($r['received']) 个事件，丢失 $($r['lost'])，核对 $($r['parse_verified']) 个，CPU $($r['cpu_percent'])%，结束原因 $($r['end_reason'])；$($r['events_by_id'])"
 }
 
+# 常驻服务（阶段 2b，docs/phase2b-design.md 5.8 节）：管理员下用包里的 Agent\ 安装（5 秒落盘）→ 小负载 → 经管道查到 → 卸载并删除数据 →
+# 没有服务、会话、程序目录和数据目录。已经装了常驻服务（或者有它的数据目录）时跳过，不碰已有的安装
+function Run-Agent([string] $case, [string] $exe) {
+    if (-not $elevated) {
+        Say "SKIP $case：不是管理员，跳过常驻服务"
+        return
+    }
+
+    $svc = 'DiskThinnerAgent'
+    $dataDir = Join-Path $env:ProgramData 'DiskThinner\Agent'
+    $progDir = Join-Path $env:ProgramFiles 'DiskThinner\Agent'
+    if ((Get-Service $svc -ErrorAction SilentlyContinue) -or (Test-Path $dataDir)) {
+        Say "SKIP $case：这台机器已经装了常驻服务或者有它的数据，不碰已有的安装"
+        return
+    }
+
+    $pkg = Split-Path $exe
+    foreach ($f in 'DiskThinner.Agent.exe', 'e_sqlite3.dll') {
+        if (-not (Test-Path (Join-Path $pkg "Agent\$f"))) { Fail $case "包里没有 Agent\$f"; return }
+    }
+
+    $dir = Join-Path $OutDir $case
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    function AgentCmd([string[]] $a, [string] $name) {
+        $report = Join-Path $dir "$name.txt"
+        Remove-Item $report -ErrorAction SilentlyContinue
+        $p = Start-Process -FilePath $exe -PassThru -ArgumentList (@('agent') + $a + @('--report', (Q $report)))
+        $null = $p.Handle
+        if (-not $p.WaitForExit(120 * 1000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw "agent $($a -join ' ') 超过 120 秒没有结束" }
+        if (-not (Test-Path $report)) { throw "agent $($a -join ' ') 没有生成报告（退出码 $($p.ExitCode)）" }
+        Read-Report $report
+    }
+
+    $installed = $false
+    try {
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        $r = AgentCmd @('--install', '--mode', 'precise', '--flush-seconds', '5') 'install'
+        if ($r['ok'] -ne '1') { Fail $case "安装失败：$($r['message']) $($r['log_tail'])"; return }
+        $installed = $true
+        $installSeconds = '{0:N1}' -f $sw.Elapsed.TotalSeconds
+        # 会话列表用 agent --status 的 sessions_active（QueryAllTracesW）：logman query -ets 的输出偶尔漏掉会话（2b.5 本机实测）
+        $st = AgentCmd @('--status') 'status-start'
+        if ($st['sessions_active'] -notmatch '(^|,)DiskThinner-Agent(,|$)') { Fail $case "装好后没有 DiskThinner-Agent 会话（$($st['sessions_active'])，状态 $($st['agent_state'])）"; return }
+
+        $load = Join-Path $dir 'load'
+        New-Item -ItemType Directory -Force $load | Out-Null
+        $bytes = [byte[]]::new(65536)
+        for ($i = 0; $i -lt 20; $i++) { [IO.File]::WriteAllBytes((Join-Path $load "f$i.bin"), $bytes) }
+        $s = $null
+        for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep 2
+            $s = AgentCmd @('--status', '--dir', (Q $load)) 'status'
+            if ([long]$s['dir_creates'] -ge 20) { break }
+        }
+
+        if ([long]$s['dir_creates'] -lt 20) { Fail $case "60 秒内经管道没有查到负载（新建 $($s['dir_creates'])，状态 $($s['agent_state'])，$($s['client_error'])）"; return }
+        $u = AgentCmd @('--uninstall', '--delete-data') 'uninstall'
+        $installed = $u['ok'] -ne '1'
+        if ($installed) { Fail $case "卸载失败：$($u['message'])"; return }
+        Start-Sleep 1
+        $left = @()
+        if (Get-Service $svc -ErrorAction SilentlyContinue) { $left += '服务' }
+        $after = AgentCmd @('--status') 'status-after'
+        if ($after['sessions_active'] -match '(^|,)DiskThinner-Agent(,|$)') { $left += '会话' }
+        if (Test-Path $progDir) { $left += '程序目录' }
+        if (Test-Path $dataDir) { $left += '数据目录' }
+        if ($left.Count -gt 0) { Fail $case "卸载后还留着：$($left -join '、')"; return }
+        Notice $case "安装 $installSeconds 秒，版本 $($s['agent_version'])，新建 $($s['dir_creates'])，估算增长 $($s['dir_growth'])，收到 $($s['received']) 个事件，丢失 $($s['lost'])，工作集 $(Mb $s['working_set_bytes'])；卸载后不留服务、会话和目录"
+    }
+    catch {
+        Fail $case "$_"
+    }
+    finally {
+        if ($installed) {
+            try { AgentCmd @('--uninstall', '--delete-data') 'cleanup' | Out-Null } catch { Say "WARN $case：清理失败：$_" }
+        }
+    }
+}
+
 foreach ($kind in 'selfcontained', 'framework') {
     if (-not $packages.ContainsKey($kind)) { continue }
     $exe = $packages[$kind]
@@ -178,6 +257,7 @@ foreach ($kind in 'selfcontained', 'framework') {
     if ($extra.Count -gt 0) { Fail "$kind-package" "包里有不该带的：$($extra -join ', ')" }
 
     Run-Monitor "$kind-monitor" $exe
+    Run-Agent "$kind-agent" $exe
 
     if ($kind -eq 'selfcontained') {
         if (-not $elevated) {

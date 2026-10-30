@@ -46,6 +46,24 @@ $fd = Publish 'DiskThinner' @('--self-contained', 'false')
 $sc = Publish 'DiskThinner-selfcontained' @('--self-contained', 'true', '-p:PublishSingleFile=true',
     '-p:IncludeNativeLibrariesForSelfExtract=true', '-p:EnableCompressionInSingleFile=false')
 
+# 常驻监控服务（阶段 2b，docs/phase2b-design.md 5.8 节）：Native AOT 发布一次，两个包都放进 Agent\（只要 exe 和 e_sqlite3.dll）。
+# AOT 警告当作错误：有任何 IL2xxx / IL3xxx 警告就不打包
+$agentDir = Join-Path $out 'agent-publish'
+$agentLog = Join-Path $logs 'agent.log'
+& $dotnet publish (Join-Path $root 'src\DiskThinner.Agent\DiskThinner.Agent.csproj') -c Release -r win-x64 -o $agentDir -nologo -p:DebugType=none "-p:Version=$version" *> $agentLog
+if ($LASTEXITCODE -ne 0) { Get-Content $agentLog -Tail 30; throw '服务的 AOT 发布失败' }
+$aotWarnings = @(Select-String -Path $agentLog -Pattern 'warning (IL\d{4}|IL3\d{3})' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
+if ($aotWarnings.Count -gt 0) { $aotWarnings | Select-Object -First 10; throw "服务的 AOT 发布有 $($aotWarnings.Count) 个警告" }
+foreach ($dir in $fd, $sc) {
+    $target = Join-Path $dir 'Agent'
+    New-Item -ItemType Directory -Force $target | Out-Null
+    Copy-Item (Join-Path $agentDir 'DiskThinner.Agent.exe'), (Join-Path $agentDir 'e_sqlite3.dll') $target
+}
+
+# 第 1.2 节：依赖运行库版解压后（含服务）不超过 10 MB
+$fdBytes = (Get-ChildItem $fd -File -Recurse | Measure-Object Length -Sum).Sum
+if ($fdBytes -gt 10MB) { throw ("依赖运行库版解压后 {0:N2} MB，超过 10 MB" -f ($fdBytes / 1MB)) }
+
 $zips = @(
     @{ Dir = $fd; Zip = Join-Path $out "DiskThinner-$version-win-x64.zip" },
     @{ Dir = $sc; Zip = Join-Path $out "DiskThinner-$version-win-x64-selfcontained.zip" }

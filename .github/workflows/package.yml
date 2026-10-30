@@ -2,6 +2,7 @@
 #   build：用 tools/release/build-release.ps1 打两个 zip，作为构建产物 packages 上传
 #   smoke：在全新的 windows-2022 和 windows-2025 上解压运行（tools/verify/smoke.ps1）。
 #          runner 是管理员，所以会用 MFT 扫描整个系统盘、生成清理计划；只读，不执行任何清理。
+#          还会用包里的 Agent\ 装一次常驻服务、查到数据后卸载并删除数据（runner 用完就丢）。
 #          先测自包含版（不依赖运行库），装上 .NET 10 之后再测依赖运行库的版本。
 name: Package
 
@@ -91,6 +92,7 @@ jobs:
           path: |
             smoke/**/smoke.txt
             smoke/**/report.txt
+            smoke/**/*-agent/*.txt
             smoke/**/*.png
             smoke/**/crash-*.txt
           if-no-files-found: warn
