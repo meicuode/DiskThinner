@@ -2,7 +2,7 @@
 
 一个轻量的 Windows C 盘空间分析与清理工具，要回答四个问题：哪里大、哪里在涨、是谁的、能不能删。只在本机运行，不联网，不上传任何信息。
 
-当前版本 **0.2.0**（阶段 1 和阶段 2a 完成）：查看 C 盘哪里占用最大，每个位置是什么、归哪个软件、风险多大、该怎么处理，也可以按软件或按类别汇总；保存快照后能看到哪些目录在变大、按这个速度多少天写满；以管理员身份运行时可以开 1 到 24 小时的写入监控，看到是哪个程序在哪些目录新建、删除、写入了文件；在清理计划里确认后删除或运行官方清理命令，每一项都写入操作记录。开发中的阶段 2b 加了可选安装的常驻监控服务（开机自动记录，见下面"常驻监控服务"）；AI 分析在后续版本提供。
+当前版本 **0.3.0**（阶段 1 和阶段 2 完成）：查看 C 盘哪里占用最大，每个位置是什么、归哪个软件、风险多大、该怎么处理，也可以按软件或按类别汇总；保存快照后能看到哪些目录在变大、按这个速度多少天写满；以管理员身份运行时可以开 1 到 24 小时的写入监控，看到是哪个程序在哪些目录新建、删除、写入了文件；在清理计划里确认后删除或运行官方清理命令，每一项都写入操作记录。也可以安装可选的常驻监控服务，开机自动记录（见下面"常驻监控服务"）。AI 分析在后续版本提供。
 
 ## 下载和运行
 
@@ -149,10 +149,10 @@ git push origin v0.2.0
 ## 文档
 
 - 研发方案：[docs/dev-plan-v0.2.md](docs/dev-plan-v0.2.md)
-- 验收报告：[阶段 0](docs/phase0-report.md)、[M1](docs/m1-report.md)、[M2 上半](docs/m2a-report.md)、[M2 下半](docs/m2b-report.md)、[M3](docs/m3-report.md)、[M4](docs/m4-report.md)、[M5](docs/m5-report.md)、[阶段 2a](docs/phase2a-report.md)
+- 验收报告：[阶段 0](docs/phase0-report.md)、[M1](docs/m1-report.md)、[M2 上半](docs/m2a-report.md)、[M2 下半](docs/m2b-report.md)、[M3](docs/m3-report.md)、[M4](docs/m4-report.md)、[M5](docs/m5-report.md)、[阶段 2a](docs/phase2a-report.md)、[阶段 2b](docs/phase2b-report.md)
 - 阶段 2a 设计（写入监控的诊断模式）：[docs/phase2a-design.md](docs/phase2a-design.md)
 - 阶段 2b 设计（常驻监控服务）：[docs/phase2b-design.md](docs/phase2b-design.md)，报告：[docs/phase2b-report.md](docs/phase2b-report.md)
-- 发布说明：[0.2.0](docs/release-notes-0.2.0.md)、[0.1.0](docs/release-notes-0.1.0.md)
+- 发布说明：[0.3.0](docs/release-notes-0.3.0.md)、[0.2.0](docs/release-notes-0.2.0.md)、[0.1.0](docs/release-notes-0.1.0.md)
 - 已知问题和讲述人人工检查清单：[docs/known-issues.md](docs/known-issues.md)
 - 规则格式：[rules/README.md](rules/README.md)
 - 界面原型：[prototype/index.html](prototype/index.html)（双击用浏览器打开）
