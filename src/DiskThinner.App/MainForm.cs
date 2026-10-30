@@ -51,6 +51,8 @@ internal sealed class MainForm : Form
     private readonly ToolStripStatusLabel _statusMonitor = new() { TextAlign = ContentAlignment.MiddleRight };
     private readonly StatusPill _pill = new() { Margin = new Padding(0) };
     private readonly Monitor.MonitorHost _monitorHost;
+    private readonly Agent.AgentLayout _agentLayout;
+    private bool _agentBusy;
     private DiskThinner.Monitor.WriteIndex? _weekWrites;
     private DiskThinner.Monitor.WriteIndex? _monthWrites;
     private string? _monitorLoadError;
@@ -95,7 +97,13 @@ internal sealed class MainForm : Form
         KeyPreview = true;
 
         // 写入监控：这里只建宿主，第一次开始时才加载 TraceEvent（docs/phase2a-design.md 第 12.2 节第 21 条）
-        _monitorHost = new Monitor.MonitorHost(this, options.MonitorDb ?? DiskThinner.Monitor.MonitorStore.DefaultPath, options.SnapshotDb ?? SnapshotStore.DefaultPath);
+        _monitorHost = new Monitor.MonitorHost(this, options.MonitorDb ?? DiskThinner.Monitor.MonitorStore.DefaultPath, options.SnapshotDb ?? SnapshotStore.DefaultPath,
+            new Monitor.PipeAgentSource(options.AgentPipe ?? DiskThinner.Monitor.Agent.AgentProtocol.PipeName, options.AgentService ?? DiskThinner.Monitor.Agent.AgentProtocol.ServiceName));
+        _agentLayout = Agent.AgentLayout.Default(options.AgentSource) with
+        {
+            ServiceName = options.AgentService ?? DiskThinner.Monitor.Agent.AgentProtocol.ServiceName,
+            PipeName = options.AgentPipe ?? DiskThinner.Monitor.Agent.AgentProtocol.PipeName,
+        };
         _monitorHost.StatusChanged += (_, _) => UpdateMonitorUi();
         _monitorHost.DataChanged += (_, _) => _writesLoad = ReloadWrites();
 
@@ -161,6 +169,8 @@ internal sealed class MainForm : Form
         _settingsPage.SetMonitorInfo(_monitorHost.DbPath, _monitorHost.DbBytes);
         _settingsPage.SettingsChanged += (_, s) => ApplySettings(s);
         _settingsPage.ScheduleChanged += (_, e) => SetSchedule(e.Enabled, e.Time);
+        _settingsPage.AgentActionRequested += (_, action) => AgentAction(action);
+        _settingsPage.AgentConfigureRequested += (_, c) => ConfigureAgent(c.Mode, c.KeepDays);
         _rescan.Click += (_, _) => StartScan(SelectedDrive());
         _drives.SelectedIndexChanged += (_, _) =>
         {
@@ -500,6 +510,7 @@ internal sealed class MainForm : Form
 
         memory.Add(("inventory", Environment.WorkingSet));
         var owners = OwnerMap.Build(c, inventory, cancellationToken: token);
+        ApplyObservedOwners(owners, r.Tree);
         memory.Add(("owners", Environment.WorkingSet));
         var sw = Stopwatch.StartNew();
         var byOwner = SpaceGroups.ByOwner(owners, cancellationToken: token);
@@ -511,6 +522,42 @@ internal sealed class MainForm : Form
         planWatch.Stop();
         memory.Add(("plan", Environment.WorkingSet));
         return new Analysis(c, owners, byOwner, byKind, wait.Elapsed, sw.Elapsed, memory, plan, planWatch.Elapsed);
+    }
+
+    /// <summary>
+    /// 实测的归属（E11，后台线程上）：常驻服务在运行时，取近 30 天服务的数据，给规则和推断都不认识的目录补上"实测：写入进程"。
+    /// 服务没装、连不上时什么都不做。
+    /// </summary>
+    private void ApplyObservedOwners(OwnerMap owners, NodeTree tree)
+    {
+        try
+        {
+            var snap = _monitorHost.Agent;
+            if (!snap.Installed)
+            {
+                snap = _monitorHost.AgentSource.Probe(); // 启动时的第一次查询可能还没完成
+            }
+
+            if (!snap.Running || !snap.ProtocolOk)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            if (_monitorHost.AgentSource.Query(now.AddDays(-30), now.AddHours(1)) is { } index)
+            {
+                var observed = Monitor.ObservedOwners.Compute(index, tree, owners, now);
+                owners.SetObserved(observed);
+                if (observed.Count > 0)
+                {
+                    AppLog.Write($"实测归属：{observed.Count} 处");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            AppLog.Write("实测归属没有算出来：" + ex.GetType().Name);
+        }
     }
 
     /// <summary>清理计划：官方命令只认已装软件探测到的程序；正在运行的程序用来提示"会跳过被占用的文件"。</summary>
@@ -982,6 +1029,18 @@ internal sealed class MainForm : Form
                     monitorShot.Save(Path.ChangeExtension(shot, null) + "-monitor.png");
                     monitorDialog.Close();
                 }
+
+                if (_options.ShowAgentDialog)
+                {
+                    // 只显示"安装常驻监控服务"对话框截图，不安装：截完直接关掉
+                    using var agentDialog = new AgentInstallDialog(_settings.Monitor.IsPrecise, _settings.Monitor.KeepDays, _elevated, _agentLayout.ProgramRoot, _agentLayout.DataDir);
+                    agentDialog.Show(this);
+                    await Task.Delay(800);
+                    agentDialog.Refresh();
+                    using var agentShot = CaptureForm(agentDialog, agentDialog.ClientRectangle);
+                    agentShot.Save(Path.ChangeExtension(shot, null) + "-agent.png");
+                    agentDialog.Close();
+                }
             }
 
             TopMost = false;
@@ -1126,6 +1185,13 @@ internal sealed class MainForm : Form
         yield return $"monitor_sessions_30d={_monthWrites?.Sessions.Count}";
         yield return $"monitor_rows_30d={_monthWrites?.Rows.Count}";
         yield return $"monitor_week_sessions={_weekWrites?.Sessions.Count}";
+        yield return $"monitor_agent_sessions_30d={_monthWrites?.Sessions.Count(x => x.Source == DiskThinner.Monitor.SessionSource.Agent)}";
+        yield return $"agent_installed={host.Agent.Installed}";
+        yield return $"agent_service_state={host.Agent.Service.State}";
+        yield return $"agent_recording={host.Agent.Recording}";
+        yield return $"agent_version={host.Agent.AgentVersion}";
+        yield return $"agent_settings_status={_settingsPage.AgentStatusText}";
+        yield return $"status_monitor={_statusMonitor.Text}";
         yield return $"growth_writer_cells={string.Join('|', _growthPage.Changes.Items.Select(i => i.Cells.Length > 4 ? i.Cells[4] + (i.Tag.Length > 0 ? " " + i.Tag : "") : ""))}";
         yield return $"growth_writers={_growthPage.Writers.Items.Count}";
         yield return $"overview_hint={_overview.Fastest.HintText}";
@@ -1204,6 +1270,21 @@ internal sealed class MainForm : Form
         }
 
         await _monitorHost.CheckAsync();
+        if (_options.InstallAgent is { } install && !IsDisposed)
+        {
+            // 以管理员身份重启后安装（用户已经在对话框里确认过）
+            if (_elevated)
+            {
+                _nav.Select("settings");
+                _settingsPage.ShowSection(L.T("写入监控"));
+                await InstallAgentAsync(install.Precise, install.KeepDays);
+            }
+            else
+            {
+                AppLog.Write("--install-agent 需要管理员权限，没有安装");
+            }
+        }
+
         if (_options.StartMonitor is not { } duration || IsDisposed)
         {
             return;
@@ -1243,6 +1324,25 @@ internal sealed class MainForm : Form
                 break;
             }
 
+            case Monitor.MonitorUiState.Agent:
+            {
+                var a = host.Agent;
+                var mode = Monitor.MonitorText.Mode(a.Precise ? DiskThinner.Monitor.MonitorMode.Precise : DiskThinner.Monitor.MonitorMode.Light);
+                _pill.Set(L.F("写入监控：常驻（{0}）· {1}", mode, a.RecordedFor(DateTime.UtcNow)), null, StatusPill.Running, L.T("常驻服务正在记录，点击打开设置里的写入监控一组"));
+                _statusMonitor.Text = L.F("写入监控：常驻（{0}）· {1}", mode, Monitor.MonitorText.Lost(a.LostRate));
+                break;
+            }
+
+            case Monitor.MonitorUiState.AgentDown:
+            {
+                var a = host.Agent;
+                var action = a.NeedsUpdate ? L.T("更新") : !a.Running ? L.T("启动") : null;
+                _pill.Set(a.NeedsUpdate ? L.T("写入监控：常驻服务需要更新") : L.T("写入监控：常驻服务没有运行"), action, StatusPill.Warning,
+                    _elevated ? a.Problem ?? L.T("点击处理") : L.T("以管理员身份打开 DiskThinner 后可以启动或更新服务"));
+                _statusMonitor.Text = L.F("写入监控：常驻服务{0}", a.Problem is { } problem ? L.F("（{0}）", problem) : L.T("没有运行"));
+                break;
+            }
+
             case Monitor.MonitorUiState.OtherInstance:
                 _pill.Set(L.T("写入监控：另一个窗口正在监控"), null, StatusPill.Running);
                 _statusMonitor.Text = L.T("写入监控：另一个 DiskThinner 窗口正在监控");
@@ -1265,7 +1365,8 @@ internal sealed class MainForm : Form
                 break;
         }
 
-        _growthPage.SetLive(s, host.LiveSession);
+        _growthPage.SetLive(s, host.LiveSession, host.Agent.Recording);
+        _settingsPage.SetAgent(host.Agent, _elevated, _agentLayout.SourceAvailable);
     }
 
     private async void PillClicked()
@@ -1282,6 +1383,20 @@ internal sealed class MainForm : Form
         {
             case Monitor.MonitorUiState.Running:
                 ConfirmStopMonitor();
+                break;
+            case Monitor.MonitorUiState.Agent:
+                _nav.Select("settings");
+                _settingsPage.ShowSection(L.T("写入监控"));
+                break;
+            case Monitor.MonitorUiState.AgentDown when !_elevated:
+                if (MessageBox.Show(this, L.T("启动或更新常驻服务需要管理员权限。\n\n现在以管理员身份重新打开 DiskThinner 吗？"), L.T("写入监控"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    RestartElevated(["--page", "settings"]);
+                }
+
+                break;
+            case Monitor.MonitorUiState.AgentDown:
+                AgentAction(host.Agent.NeedsUpdate ? "update" : !host.Agent.Running ? "start" : "settings");
                 break;
             case Monitor.MonitorUiState.Residual when _elevated:
                 await host.CheckAsync();
@@ -1305,6 +1420,13 @@ internal sealed class MainForm : Form
     {
         if (_monitorHost.IsRunning)
         {
+            return;
+        }
+
+        // 常驻服务在记录时不再开第二个会话（E12）
+        if (_monitorHost.Agent.Recording)
+        {
+            MessageBox.Show(this, L.T("常驻服务正在记录，不需要再开启诊断。"), L.T("写入监控"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -1361,6 +1483,206 @@ internal sealed class MainForm : Form
         }
 
         UpdateMonitorUi();
+    }
+
+    // ---------------- 常驻服务（docs/phase2b-design.md 5.3、5.6 节） ----------------
+
+    /// <summary>自动化验证时不弹结果框。</summary>
+    private bool Automation => _options.Screenshot is not null || _options.ExitAfterScan || _options.MonitorForAutomation;
+
+    private Agent.AgentInstaller NewAgentInstaller() => new(_agentLayout, DiskThinner.Monitor.Agent.ServiceManager.Instance);
+
+    /// <summary>以管理员身份重启并回到设置页（带上测试用的位置参数）。</summary>
+    private void RestartElevatedToSettings(IEnumerable<string>? extra = null)
+    {
+        var args = new List<string> { "--page", "settings" };
+        if (_options.AgentSource is { } src)
+        {
+            args.AddRange(["--agent-source", src]);
+        }
+
+        if (_options.SettingsFile is { } settings)
+        {
+            args.AddRange(["--settings", settings]);
+        }
+
+        args.AddRange(extra ?? []);
+        RestartElevated(args);
+    }
+
+    /// <summary>设置页服务一组的按钮、胶囊的"启动 / 更新"。</summary>
+    private async void AgentAction(string action)
+    {
+        if (_agentBusy)
+        {
+            return;
+        }
+
+        if (action is "start" or "stop" or "update" or "uninstall" && !_elevated)
+        {
+            RestartElevatedToSettings();
+            return;
+        }
+
+        switch (action)
+        {
+            case "settings":
+                _nav.Select("settings");
+                _settingsPage.ShowSection(L.T("写入监控"));
+                break;
+            case "elevate":
+                RestartElevatedToSettings();
+                break;
+            case "install":
+                OpenAgentInstallDialog();
+                break;
+            case "start":
+                await RunAgentAsync(L.T("正在启动常驻服务…"), () => SetAgentRunning(true), showSuccess: false);
+                break;
+            case "stop":
+                if (MessageBox.Show(this, L.T("停止常驻服务？停止后不再记录，已经记录的数据会保留。下次开机时服务会自动启动。"), L.T("常驻监控服务"),
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+                {
+                    await RunAgentAsync(L.T("正在停止常驻服务…"), () => SetAgentRunning(false), showSuccess: false);
+                }
+
+                break;
+            case "update":
+                await RunAgentAsync(L.T("正在更新常驻服务…"), () => NewAgentInstaller().Update(), showSuccess: true);
+                break;
+            case "uninstall":
+                if (ConfirmUninstallAgent() is { } deleteData)
+                {
+                    var r = await RunAgentAsync(L.T("正在卸载常驻服务…"), () => NewAgentInstaller().Uninstall(deleteData), showSuccess: true);
+                    if (r.Ok && _settings.Monitor.IsAgent)
+                    {
+                        // 卸载后回到"临时诊断"
+                        var next = _settings with { Monitor = _settings.Monitor with { Enabled = Settings.MonitorSettings.Diagnostic } };
+                        _settingsPage.SetSettings(next);
+                        ApplySettings(next);
+                    }
+                }
+
+                break;
+        }
+    }
+
+    private Agent.AgentOpResult SetAgentRunning(bool run)
+    {
+        var error = _monitorHost.AgentSource.SetServiceRunning(run);
+        return new Agent.AgentOpResult(error is null, error ?? (run ? L.T("已启动。") : L.T("已停止。")));
+    }
+
+    private async void OpenAgentInstallDialog()
+    {
+        bool precise;
+        int keep;
+        using (var dlg = new AgentInstallDialog(_settings.Monitor.IsPrecise, _settings.Monitor.KeepDays, _elevated, _agentLayout.ProgramRoot, _agentLayout.DataDir))
+        {
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            (precise, keep) = (dlg.Precise, dlg.KeepDays);
+        }
+
+        if (!_elevated)
+        {
+            RestartElevatedToSettings(["--install-agent", (precise ? "precise" : "light") + ":" + keep.ToString(CultureInfo.InvariantCulture)]);
+            return;
+        }
+
+        await InstallAgentAsync(precise, keep);
+    }
+
+    private async Task InstallAgentAsync(bool precise, int keep)
+    {
+        var r = await RunAgentAsync(L.T("正在安装常驻服务…"), () => NewAgentInstaller().Install(new Agent.AgentInstallOptions(precise ? "precise" : "light", keep)), showSuccess: true);
+        if (r.Ok)
+        {
+            var next = _settings with
+            {
+                Monitor = _settings.Monitor with
+                {
+                    Enabled = Settings.MonitorSettings.Agent,
+                    Mode = precise ? Settings.MonitorSettings.Precise : Settings.MonitorSettings.Light,
+                    KeepDays = keep,
+                },
+            };
+            _settingsPage.SetSettings(next);
+            ApplySettings(next);
+        }
+    }
+
+    /// <summary>在后台做一次服务的操作：期间显示进度、不接受别的操作；完成后刷新服务状态，失败时（或要求时）弹出结果。</summary>
+    private async Task<Agent.AgentOpResult> RunAgentAsync(string progress, Func<Agent.AgentOpResult> op, bool showSuccess)
+    {
+        _agentBusy = true;
+        UseWaitCursor = true;
+        _statusMonitor.Text = progress;
+        Agent.AgentOpResult r;
+        try
+        {
+            r = await Task.Run(op);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            r = new Agent.AgentOpResult(false, ex.Message);
+        }
+        finally
+        {
+            _agentBusy = false;
+            UseWaitCursor = false;
+        }
+
+        AppLog.Write($"常驻服务：{progress} {(r.Ok ? "完成" : "失败")}：{r.Message}");
+        await _monitorHost.RefreshAgentAsync();
+        if ((!r.Ok || showSuccess) && !Automation)
+        {
+            var text = r.Message + (r.LogTail is { Count: > 0 } tail ? "\n\n" + L.T("服务日志的最后几行：") + "\n" + string.Join("\n", tail) : "");
+            MessageBox.Show(this, text, L.T("常驻监控服务"), MessageBoxButtons.OK, r.Ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+
+        _writesLoad = ReloadWrites();
+        return r;
+    }
+
+    /// <summary>卸载确认（Q3）："卸载常驻监控服务？"，勾选框"同时删除监控数据"默认不勾选。返回是否删除数据；取消时返回 null。</summary>
+    private bool? ConfirmUninstallAgent()
+    {
+        var size = _monitorHost.Agent.Status?.DbBytes ?? 0;
+        var uninstall = new TaskDialogButton(L.T("卸载"));
+        var cancel = new TaskDialogButton(L.T("取消"));
+        var page = new TaskDialogPage
+        {
+            Caption = L.T("常驻监控服务"),
+            Heading = L.T("卸载常驻监控服务？"),
+            Text = L.T("服务会停止并删除，程序目录也一起删除。不勾选下面这一项时，已经记录的数据保留着，以后重新安装可以接着用。"),
+            Verification = new TaskDialogVerificationCheckBox(size > 0 ? L.F("同时删除监控数据（{0}）", ByteSize.Format(size)) : L.T("同时删除监控数据")),
+            Buttons = { uninstall, cancel },
+            DefaultButton = cancel,
+            Icon = TaskDialogIcon.Warning,
+        };
+        return TaskDialog.ShowDialog(this, page) == uninstall ? page.Verification.Checked : null;
+    }
+
+    /// <summary>选了常驻服务时改了记录模式或保留天数：发给服务（管理员）。</summary>
+    private async void ConfigureAgent(string? mode, int? keepDays)
+    {
+        if (!_elevated || _agentBusy)
+        {
+            return;
+        }
+
+        var source = _monitorHost.AgentSource;
+        var r = await Task.Run(() => source.Control("configure", mode, keepDays));
+        if (r?.Type != "ok" && !Automation)
+        {
+            MessageBox.Show(this, L.F("服务没有接受新的设置：{0}", r?.Code ?? L.T("连不上服务")), L.T("常驻监控服务"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        await _monitorHost.RefreshAgentAsync();
     }
 
     /// <summary>停止监控先确认（第 3.3 节 P8）："停止写入监控？已经记录的数据会保留。"</summary>
@@ -1424,8 +1746,8 @@ internal sealed class MainForm : Form
             }
 
             (_weekWrites, _monthWrites, _monitorLoadError) = (week, month, null);
-            var covered = Monitor.MonitorText.CoveredHours(week.Sessions, weekFrom, now, host.LiveSession, now);
-            _overview.SetWrites(week, covered, (now - weekFrom).TotalHours, enabled);
+            var covered = Monitor.MonitorText.CoveredHours(week.Sessions, weekFrom, now, host.LiveSession, now, host.Agent.Recording);
+            _overview.SetWrites(week, covered, (now - weekFrom).TotalHours, enabled && !host.Agent.Recording);
             _explorer.SetWriteIndex(month.Sessions.Count == 0 ? null : month);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)

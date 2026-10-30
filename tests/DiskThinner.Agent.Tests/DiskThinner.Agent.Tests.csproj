@@ -15,5 +15,7 @@
   <ItemGroup>
     <!-- 服务本身（内部类型由 InternalsVisibleTo 开放）；提权测试启动的是 DT_AGENT_EXE 指定的 AOT 发布版，没有指定时用这个项目的输出 -->
     <ProjectReference Include="..\..\src\DiskThinner.Agent\DiskThinner.Agent.csproj" />
+    <!-- 只为保证先构建测试负载（AgentServiceTests 从它自己的输出目录启动），不引用它的程序集 -->
+    <ProjectReference Include="..\DiskThinner.WriteLoad\DiskThinner.WriteLoad.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

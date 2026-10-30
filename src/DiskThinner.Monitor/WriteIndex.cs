@@ -18,6 +18,52 @@ public sealed class WriteIndex(IReadOnlyList<SessionRecord> sessions, IReadOnlyL
     public IReadOnlyList<IndexRow> Rows { get; } = rows;
     public IReadOnlyList<HourCoverage> Hours { get; } = hours;
 
+    /// <summary>常驻服务按调用者过滤掉的写入（其他用户个人目录下的），只有计数没有路径（Q7）；没有时为 null。</summary>
+    public Counters? HiddenOtherUsers { get; init; }
+
+    public int HiddenRows { get; init; }
+
+    /// <summary>有常驻服务的数据。</summary>
+    public bool HasAgent => Sessions.Any(s => s.Source == SessionSource.Agent);
+
+    /// <summary>
+    /// 合并几份索引（本机诊断库 + 常驻服务，docs/phase2b-design.md 5.6 节）：会话、行、小时直接拼起来。
+    /// 服务的会话号在转换时已经取负数（<c>AgentClient</c>），不会和诊断库的冲突；覆盖小时按 HourUtc 去重计算（<see cref="MonitoredHours"/>）。
+    /// </summary>
+    public static WriteIndex Merge(params WriteIndex?[] parts)
+    {
+        var list = parts.Where(p => p is not null && (p.Sessions.Count > 0 || p.Rows.Count > 0 || p.HiddenOtherUsers is not null)).Cast<WriteIndex>().ToList();
+        if (list.Count == 0)
+        {
+            return Empty;
+        }
+
+        if (list.Count == 1)
+        {
+            return list[0];
+        }
+
+        var ids = list.SelectMany(p => p.Sessions).GroupBy(s => s.Id).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+        if (ids.Count > 0)
+        {
+            throw new ArgumentException("session ids overlap: " + string.Join(",", ids));
+        }
+
+        Counters? hidden = null;
+        foreach (var h in list.Select(p => p.HiddenOtherUsers).OfType<Counters>())
+        {
+            var c = hidden ?? new Counters();
+            c.Add(h);
+            hidden = c;
+        }
+
+        return new WriteIndex([.. list.SelectMany(p => p.Sessions).OrderBy(s => s.StartedUtc)], [.. list.SelectMany(p => p.Rows)], [.. list.SelectMany(p => p.Hours)])
+        {
+            HiddenOtherUsers = hidden,
+            HiddenRows = list.Sum(p => p.HiddenRows),
+        };
+    }
+
     /// <summary>有监控的小时数（不同会话的同一个小时只算一次）。</summary>
     public int MonitoredHours => Hours.Select(h => h.HourUtc).Distinct().Count();
 

@@ -77,13 +77,18 @@ internal static class RuleView
     /// <summary>实测（原型 .s-obs）：本机上看到的事实，例如程序就装在这里、正在运行。</summary>
     public static readonly TagStyle ObservedSource = new(Color.White, Theme.Accent, ColorTranslator.FromHtml("#8db8e3"));
 
-    /// <summary>归属的来源标签：规则 = 实线框，推断 = 虚线框。</summary>
-    public static (string Text, TagStyle Style) SourceTag(OwnerSource source) => source == OwnerSource.Rule ? (L.T("规则"), RuleSource) : (L.T("推断"), InferredSource);
+    /// <summary>归属的来源标签：规则 = 实线框，推断 = 虚线框，实测（常驻监控的写入进程，E11）= 蓝框。</summary>
+    public static (string Text, TagStyle Style) SourceTag(OwnerSource source) => source switch
+    {
+        OwnerSource.Rule => (L.T("规则"), RuleSource),
+        OwnerSource.Observed => (L.T("实测"), ObservedSource),
+        _ => (L.T("推断"), InferredSource),
+    };
 
     /// <summary>证据的标签样式：本机上看到的（程序、进程、命令行工具）用实测样式，按名称对上的用推断样式。</summary>
     public static TagStyle EvidenceStyle(OwnerEvidenceKind kind) => kind switch
     {
-        OwnerEvidenceKind.Program or OwnerEvidenceKind.Process or OwnerEvidenceKind.CommandLine => ObservedSource,
+        OwnerEvidenceKind.Program or OwnerEvidenceKind.Process or OwnerEvidenceKind.CommandLine or OwnerEvidenceKind.Monitor => ObservedSource,
         _ => InferredSource,
     };
 

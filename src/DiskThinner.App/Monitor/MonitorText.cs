@@ -5,6 +5,12 @@ using DiskThinner.Rules;
 
 namespace DiskThinner.App.Monitor;
 
+/// <summary>会话表里的一段（几个首尾相接的常驻服务会话行合成一段，Rows 是合了几行）。</summary>
+internal sealed record SessionSpan(DateTime StartUtc, DateTime EndUtc, bool Live, SessionSource Source, MonitorMode Mode, bool Downgraded, string? EndReason, long Received, long Lost, int Rows)
+{
+    public double LostRate => Received + Lost == 0 ? 0 : (double)Lost / (Received + Lost);
+}
+
 /// <summary>"写入进程"一格的内容：文字、标签（"实测"或空）、工具提示。</summary>
 internal sealed record WriterCell(string Text, string Tag, string? Note, bool Observed);
 
@@ -20,6 +26,11 @@ internal static class MonitorText
     /// <summary>"svchost.exe[wuauserv,bits]" → "svchost.exe（服务 wuauserv、bits）"；三个以上写"服务 A、B 等 4 个"。</summary>
     public static string Link(string link)
     {
+        if (link == DiskThinner.Monitor.Agent.AgentProtocol.OtherUserImage)
+        {
+            return OtherUserProgram;
+        }
+
         var open = link.IndexOf('[');
         if (open < 0 || !link.EndsWith(']'))
         {
@@ -42,7 +53,11 @@ internal static class MonitorText
     }
 
     /// <summary>映像的显示名：exe 名，服务宿主带上服务名。</summary>
+    /// <summary>常驻服务给普通用户查询时，其他用户个人目录下的程序换成这个（E4）。</summary>
+    public static string OtherUserProgram => L.T("其他用户的程序");
+
     public static string Image(StoredImage? image) =>
+        image?.Path == DiskThinner.Monitor.Agent.AgentProtocol.OtherUserImage ? OtherUserProgram :
         image is null ? "—" : image.Services.Length == 0 ? image.ExeName : image.ExeName + L.F("（{0}）", Services(image.Services));
 
     /// <summary>写入进程（进程链的第一环）。</summary>
@@ -122,6 +137,9 @@ internal static class MonitorText
         "external" => L.T("被外部停止"),
         "store-error" => L.T("写库失败，已停止"),
         "error" => L.T("因错误停止"),
+        "service-stop" => L.T("服务停止"),
+        "shutdown" => L.T("关机时停止"),
+        "config" => L.T("改了设置后重新开始"),
         _ => "",
     };
 
@@ -129,10 +147,10 @@ internal static class MonitorText
     /// 会话在 [fromUtc, toUtc) 里覆盖的小时数（多个会话重叠的部分只算一次）。正在监控的会话（名字是 <paramref name="liveSession"/>）算到现在，
     /// 其他没有结束时间的会话算到最后一次落盘。
     /// </summary>
-    public static double CoveredHours(IEnumerable<SessionRecord> sessions, DateTime fromUtc, DateTime toUtc, string? liveSession = null, DateTime? nowUtc = null)
+    public static double CoveredHours(IEnumerable<SessionRecord> sessions, DateTime fromUtc, DateTime toUtc, string? liveSession = null, DateTime? nowUtc = null, bool agentLive = false)
     {
         var spans = sessions
-            .Select(s => (Start: s.StartedUtc, End: s.EndedUtc ?? (s.Name == liveSession ? nowUtc ?? DateTime.UtcNow : s.LastFlushUtc)))
+            .Select(s => (Start: s.StartedUtc, End: s.EndedUtc ?? (s.Name == liveSession || (agentLive && s.Source == SessionSource.Agent) ? nowUtc ?? DateTime.UtcNow : s.LastFlushUtc)))
             .Select(s => (Start: s.Start < fromUtc ? fromUtc : s.Start, End: s.End > toUtc ? toUtc : s.End))
             .Where(s => s.End > s.Start)
             .OrderBy(s => s.Start)
@@ -161,6 +179,41 @@ internal static class MonitorText
         }
 
         return total.TotalHours;
+    }
+
+    /// <summary>
+    /// 会话表和时间轴上的时段（docs/phase2b-design.md 3.2 节 Q5）：常驻服务按天轮换的会话行，只要首尾相接（轮换，间隔不超过 2 分钟、模式相同）就合成一段。
+    /// 正在进行的：诊断是名字等于 <paramref name="liveSession"/> 的那一行，常驻服务是还没有结束时间的行（服务在记录时）。
+    /// </summary>
+    public static List<SessionSpan> Spans(IEnumerable<SessionRecord> sessions, string? liveSession, bool diagnosticRunning, bool agentLive, DateTime nowUtc)
+    {
+        var list = new List<SessionSpan>();
+        var lastAgent = -1; // 和诊断的时段交错时，常驻服务的行照样和上一段常驻服务合并
+        foreach (var s in sessions.OrderBy(s => s.StartedUtc))
+        {
+            var agent = s.Source == SessionSource.Agent;
+            var live = agent ? agentLive && s.EndedUtc is null : diagnosticRunning && s.Name == liveSession;
+            var end = s.EndedUtc ?? (live ? nowUtc : s.LastFlushUtc);
+            var span = new SessionSpan(s.StartedUtc, end, live, s.Source, s.Mode, s.DowngradedUtc is not null, s.EndReason, s.Stats.Received, s.Stats.Lost, 1);
+            if (agent && lastAgent >= 0 && list[lastAgent] is { EndReason: "rotate" } last && last.Mode == s.Mode
+                && s.StartedUtc - last.EndUtc <= TimeSpan.FromMinutes(2))
+            {
+                list[lastAgent] = last with
+                {
+                    EndUtc = end, Live = live, EndReason = s.EndReason, Downgraded = last.Downgraded || span.Downgraded,
+                    Received = last.Received + span.Received, Lost = last.Lost + span.Lost, Rows = last.Rows + 1,
+                };
+                continue;
+            }
+
+            list.Add(span);
+            if (agent)
+            {
+                lastAgent = list.Count - 1;
+            }
+        }
+
+        return list;
     }
 
     /// <summary>
@@ -273,6 +326,23 @@ internal static class MonitorEvidence
         var rows = index.Under(dir, exact: !isDirectory);
         var hours = MonitorText.Hours(MonitorText.CoveredHours(index.Sessions, now.AddDays(-30), now, nowUtc: now));
         var scope = L.F("近 30 天 {0} 次诊断（共 {1} 小时）", index.Sessions.Count, hours);
+        if (index.HasAgent)
+        {
+            // 有常驻服务的数据（Q6）：按近 30 天常驻监控的覆盖天数写，不再按诊断的次数
+            var agentHours = MonitorText.CoveredHours(index.Sessions.Where(s => s.Source == SessionSource.Agent), now.AddDays(-30), now, nowUtc: now, agentLive: true);
+            scope = agentHours < 24
+                ? L.F("近 30 天常驻监控（共 {0} 小时）", MonitorText.Hours(agentHours))
+                : L.F("近 30 天常驻监控（共 {0} 天）", ((int)Math.Round(agentHours / 24)).ToString(CultureInfo.InvariantCulture));
+            if (rows.Count > 0 && MonitorText.MainChain(rows, netDecrease: false, precise: index.PreciseHours > 0) is { } top)
+            {
+                var c = top.Main.Counters;
+                var approx = c.Sampled ? "≈ " : "";
+                var what = index.PreciseHours == 0 ? L.F("新建了 {0} 个文件", c.Creates.ToString("N0", CultureInfo.InvariantCulture))
+                    : c.Creates > 0 ? L.F("新建了 {0} 个文件，估算增长 {1}{2}", c.Creates.ToString("N0", CultureInfo.InvariantCulture), approx, ByteSize.FormatDelta(c.Growth))
+                    : L.F("写入了 {0}{1}", approx, ByteSize.Format(c.WriteBytes));
+                return [L.F("{0}中，{1} {2}{3}；进程链：{4}", scope, MonitorText.Writer(top.Main.Chain), here, what, MonitorText.FullChain(top.Main.Chain))];
+            }
+        }
         if (rows.Count == 0)
         {
             if (index.NearestRecordedAncestor(dir) is { } ancestor)

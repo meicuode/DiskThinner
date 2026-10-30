@@ -487,14 +487,7 @@ public sealed class MonitorAggregator
     /// <summary>停止时：还在表里的关闭时删除的文件按删除处理（V12）；记下名字表的淘汰数。</summary>
     public void Finish(long nowTicks)
     {
-        var hour = HourOf(nowTicks);
-        foreach (var (key, state) in _files.Where(f => f.Value.DeleteOnClose).ToList())
-        {
-            _files.Remove(key);
-            ref var c = ref Bucket(hour, key.Dir, state.CreatorChain);
-            c.Deletes++;
-            c.Growth -= state.MaxPos;
-        }
+        SettleDeleteOnClose(nowTicks);
 
         Stats.NameMapEvicted = _names.Evicted;
         if (_names.Evicted > 0)
@@ -510,6 +503,22 @@ public sealed class MonitorAggregator
         if (Chains.Full)
         {
             Flags |= SessionFlags.ChainTableFull;
+        }
+    }
+
+    /// <summary>
+    /// 关闭时删除的文件（V12）：NameDelete 要等系统拆掉文件名缓存才到，可能晚很久。还在表里的按删除算（记在 <paramref name="nowTicks"/> 所在的小时）。
+    /// 停止时和常驻服务按天轮换时调用：这种文件不会留下来，它的估算增长不应该跨过会话行。
+    /// </summary>
+    public void SettleDeleteOnClose(long nowTicks)
+    {
+        var hour = HourOf(nowTicks);
+        foreach (var (key, state) in _files.Where(f => f.Value.DeleteOnClose).ToList())
+        {
+            _files.Remove(key);
+            ref var c = ref Bucket(hour, key.Dir, state.CreatorChain);
+            c.Deletes++;
+            c.Growth -= state.MaxPos;
         }
     }
 

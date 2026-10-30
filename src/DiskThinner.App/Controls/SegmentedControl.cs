@@ -47,7 +47,7 @@ internal sealed class SegmentedControl : FlowLayoutPanel
             b.FlatAppearance.MouseOverBackColor = Theme.Background;
             b.CheckedChanged += (_, _) =>
             {
-                b.ForeColor = b.Checked ? Theme.Accent : Theme.Text;
+                b.ForeColor = !Enabled ? Theme.Subtle : b.Checked ? Theme.Accent : Theme.Text;
                 b.Font = b.Checked ? Theme.SmallBold : Theme.Small;
                 if (b.Checked && _selected != index)
                 {
@@ -67,6 +67,17 @@ internal sealed class SegmentedControl : FlowLayoutPanel
     }
 
     public event EventHandler? SelectedIndexChanged;
+
+    /// <summary>平面按钮在禁用时文字不变灰（文字颜色是自己设的）：禁用时自己换成浅色。</summary>
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        foreach (var b in _items)
+        {
+            b.ForeColor = !Enabled ? Theme.Subtle : b.Checked ? Theme.Accent : Theme.Text;
+            b.Cursor = Enabled ? Cursors.Hand : Cursors.Default;
+        }
+    }
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int SelectedIndex

@@ -106,6 +106,9 @@ public sealed class AgentServiceTests
             Assert.True(loadRow.Counters.Growth >= 20 * 16384, "估算增长 " + loadRow.Counters.Growth);
             Assert.Contains("testhost", loadRow.Writer?.Path ?? "", StringComparison.OrdinalIgnoreCase);
 
+            // ---- WriteLoad 默认参数，精确模式逐项比对（第 1.3 节第 2 条，口径同 2a 的第 1.3 节第 7 条）：服务的数据经管道查询 ----
+            CompareWriteLoad();
+
             // ---- 控制命令：管理员可以，去掉 Administrators 的令牌和匿名连接被拒绝（W5）----
             var ok = Single(Send(new AgentRequest { Cmd = "control", Action = "configure", KeepDays = 30 }));
             Assert.Equal("ok", ok.Type);
@@ -124,6 +127,7 @@ public sealed class AgentServiceTests
             RunTool("logman", "stop", SessionName, "-ets");
             WaitFor(() => Status() is { State: "recording", ExternalStops: 1 }, TimeSpan.FromSeconds(30), "外部停止后没有重开");
             Assert.Contains(Sessions(), s => s.EndReason == "external");
+            CheckDeleteOnClose();
             AssertOneSession();
 
             // ---- taskkill /F 后 SCM 重启，被结束的那一行标"程序意外退出"（第 1.3 节第 5 条，W6）----
@@ -212,6 +216,118 @@ public sealed class AgentServiceTests
     }
 
     private static bool WriteIndexIsUnder(string path, string ancestor) => DiskThinner.Monitor.WriteIndex.IsUnder(path, ancestor);
+
+    /// <summary>跑一次默认参数的 WriteLoad，等服务落盘，经管道查询，各子目录的计数和负载报告一致（和 2a 的 EtwSessionTests 同一套口径）。</summary>
+    private void CompareWriteLoad()
+    {
+        var dir = Path.Combine(_load, "DiskThinner-2b-wl"); // WriteLoad 只写 %TEMP% 下名字以 DiskThinner-2a- / 2b- 开头的目录
+        var report = Path.Combine(_load, "wl.json");
+        var sw = Stopwatch.StartNew();
+        var psi = new ProcessStartInfo(WriteLoadExe()) { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var a in new[] { "--dir", dir, "--report", report })
+        {
+            psi.ArgumentList.Add(a);
+        }
+
+        using (var p = Process.Start(psi)!)
+        {
+            Assert.True(p.WaitForExit(180_000), "WriteLoad 3 分钟内没有结束");
+            Assert.Equal(0, p.ExitCode);
+        }
+
+        _notes.Add($"writeload_ms={sw.ElapsedMilliseconds}");
+        using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(report));
+        var parts = json.RootElement.GetProperty("parts");
+        long P(string part, string field) => parts.GetProperty(part).GetProperty(field).GetInt64();
+        var expectedSmall = P("small", "created_files");
+
+        // 重排窗口 1 秒 + 实时会话的缓冲刷新 + 测试服务 5 秒一次的落盘
+        List<RowDto> rows = [];
+        WaitFor(() =>
+        {
+            rows = [.. Send(Query()).SelectMany(r => r.Rows ?? []).Where(r => r.Dir is not null && WriteIndexIsUnder(r.Dir, dir))];
+            return rows.Where(r => WriteIndexIsUnder(r.Dir!, Path.Combine(dir, "small"))).Sum(r => r.Counters.Creates) >= expectedSmall;
+        }, TimeSpan.FromSeconds(40), "服务的数据里没有 WriteLoad 的新建");
+        Thread.Sleep(7000); // 再等一次落盘，后到的删除、改名也写进去
+        rows = [.. Send(Query()).SelectMany(r => r.Rows ?? []).Where(r => r.Dir is not null && WriteIndexIsUnder(r.Dir, dir))];
+
+        var failures = new List<string>();
+        DiskThinner.Monitor.Counters Totals(string rel)
+        {
+            var c = new DiskThinner.Monitor.Counters();
+            foreach (var r in rows.Where(r => WriteIndexIsUnder(r.Dir!, Path.Combine(dir, rel))))
+            {
+                c.Add(r.Counters.ToCounters());
+            }
+
+            return c;
+        }
+
+        void Check(string rel, string what, long expected, long actual, long tolerance = 0)
+        {
+            if (Math.Abs(expected - actual) > tolerance)
+            {
+                failures.Add($"{rel} {what}: 期望 {expected}，实际 {actual}");
+            }
+        }
+
+        var small = Totals("small");
+        Check("small", "creates", P("small", "created_files"), small.Creates);
+        Check("small", "deletes", P("small", "deleted"), small.Deletes);
+        Check("small", "renames", P("small", "renamed"), small.Renames);
+        Check("small", "write_bytes", P("small", "bytes_written"), small.WriteBytes);
+        Check("small", "growth", P("small", "final_bytes"), small.Growth);
+        var big = Totals("big");
+        Check("big", "write_bytes", P("big", "bytes_written"), big.WriteBytes);
+        Check("big", "growth", P("big", "final_bytes"), big.Growth);
+        var append = Totals("append");
+        Check("append", "write_bytes", P("append", "bytes_written") + P("append", "cmd_append_bytes"), append.WriteBytes, tolerance: 4096);
+        Check("append", "growth", P("append", "final_bytes"), append.Growth, tolerance: 4096);
+        // 关闭时删除的文件（V12）靠 NameDelete 认出来，它要等系统拆掉文件名缓存才到，可能晚很久；会话行结束时（停止、外部停止、轮换）
+        // 还没到的都按删除算。这里只比新建，删除和估算增长在外部停止之后再比（CheckDeleteOnClose）
+        var temp = Totals("temp");
+        Check("temp", "creates", P("temp", "created_files"), temp.Creates);
+        _notes.Add($"temp_live_deletes={temp.Deletes}/{P("temp", "deleted")}");
+        _wl = (dir, P("temp", "deleted"));
+        Check("prealloc", "growth", 0, Totals("prealloc").Growth);
+        if (json.RootElement.GetProperty("short_name").ValueKind == System.Text.Json.JsonValueKind.String)
+        {
+            Check("short", "growth", P("short", "final_bytes"), Totals("LongDirectoryNameForShortPath").Growth);
+        }
+
+        Check(@"move\tmp", "growth", 0, Totals(@"move\tmp").Growth);
+        Check(@"move\dst", "growth", P("move-dst", "final_bytes"), Totals(@"move\dst").Growth);
+        Check(@"move\done", "growth", P("move-done", "final_bytes"), Totals(@"move\done").Growth);
+        Assert.Contains(rows, r => r.Writer?.Path.EndsWith("DiskThinner.WriteLoad.exe", StringComparison.OrdinalIgnoreCase) == true);
+        _notes.Add($"writeload_rows={rows.Count} writeload_failures={failures.Count}");
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
+    private (string Dir, long TempDeletes)? _wl;
+
+    /// <summary>会话行结束之后（外部停止时最后一次落盘会把还没等到 NameDelete 的关闭时删除的文件按删除算）：temp 的删除数和估算增长对上。</summary>
+    private void CheckDeleteOnClose()
+    {
+        var (dir, expected) = _wl!.Value;
+        var temp = new DiskThinner.Monitor.Counters();
+        foreach (var r in Send(Query()).SelectMany(r => r.Rows ?? []).Where(r => r.Dir is not null && WriteIndexIsUnder(r.Dir, Path.Combine(dir, "temp"))))
+        {
+            temp.Add(r.Counters.ToCounters());
+        }
+
+        _notes.Add($"temp_after_end deletes={temp.Deletes}/{expected} growth={temp.Growth}");
+        Assert.Equal(expected, temp.Deletes);
+        Assert.Equal(0, temp.Growth);
+    }
+
+    private static string WriteLoadExe()
+    {
+        // tests/DiskThinner.Agent.Tests/bin/<配置>/<框架>/ → tests/DiskThinner.WriteLoad/bin/<配置>/<框架>/
+        var dir = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd('\\'));
+        var exe = Path.Combine(dir.Parent!.Parent!.Parent!.Parent!.FullName, "DiskThinner.WriteLoad", "bin", dir.Parent.Name, dir.Name, "DiskThinner.WriteLoad.exe");
+        Assert.True(File.Exists(exe), "找不到 " + exe);
+        return exe;
+    }
 
     private AgentRequest Query() => new() { Cmd = "query", FromUtc = DateTime.UtcNow.AddHours(-2), ToUtc = DateTime.UtcNow.AddHours(1) };
 

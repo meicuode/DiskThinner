@@ -176,6 +176,36 @@ public sealed class RecorderTests : IDisposable
         Assert.Single(b.Select(x => x.HourUtc).Distinct());
     }
 
+    /// <summary>关闭时删除的文件（V12）没等到 NameDelete：轮换时按删除算进旧行，估算增长不跨天。</summary>
+    [Fact]
+    public void RotationSettlesDeleteOnCloseFiles()
+    {
+        using var r = NewRecorder();
+        Start(r);
+        var at = new DateTime(2026, 10, 27, 23, 20, 0, DateTimeKind.Utc);
+        var c = E(MonitorEventKind.CreateNewFile, at);
+        c.Path = D(@"C:\work\t\x.tmp");
+        c.CreateOptions = 0x1000; // FILE_DELETE_ON_CLOSE
+        r.OnParsed(c);
+        var n = E(MonitorEventKind.NameCreate, at.AddMilliseconds(1));
+        n.Path = D(@"C:\work\t\x.tmp");
+        n.FileKey = 0x9999;
+        r.OnParsed(n);
+        Write(r, 0x9999, 0, 8192, at.AddSeconds(1));
+
+        _now = new DateTime(2026, 10, 28, 0, 1, 30, DateTimeKind.Utc);
+        Create(r, @"C:\work\u\later.bin", _now.AddSeconds(-1));
+        r.FlushIfDue();
+        r.End("service-stop", TimeSpan.FromSeconds(10));
+
+        var sessions = r.Store!.Sessions(new DateTime(2026, 10, 27, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 29, 0, 0, 0, DateTimeKind.Utc));
+        var index = r.Store.LoadIndex(new DateTime(2026, 10, 27, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 29, 0, 0, 0, DateTimeKind.Utc));
+        var t = index.Rows.Where(x => x.Dir == @"C:\work\t").ToList();
+        Assert.All(t, x => Assert.Equal(sessions[0].Id, x.SessionId));
+        Assert.Equal(1, Sum(t).Deletes);
+        Assert.Equal(0, Sum(t).Growth);
+    }
+
     [Fact]
     public void NoRotationWithoutRotateName()
     {

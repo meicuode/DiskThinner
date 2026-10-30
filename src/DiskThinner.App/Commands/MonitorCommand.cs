@@ -28,7 +28,7 @@ internal static class MonitorCommand
 
         bool Flag(string name) => args.Any(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
 
-        var report = new Report(Value("--report"));
+        var report = new KeyValueReport(Value("--report"), Log);
         var db = Value("--db") ?? MonitorStore.DefaultPath;
         try
         {
@@ -135,7 +135,7 @@ internal static class MonitorCommand
         }
     }
 
-    private static void Fill(Report report, MonitorRunner runner)
+    private static void Fill(KeyValueReport report, MonitorRunner runner)
     {
         var s = runner.Status;
         report.Set("received", s.Received.ToString(CultureInfo.InvariantCulture));
@@ -151,47 +151,4 @@ internal static class MonitorCommand
     }
 
     private static void Log(string message) => AppLog.Append(LogPath, message, 256 * 1024);
-
-    /// <summary>key=value 的 UTF-8 文件，每次整体重写：先写同目录的临时文件再替换。写不了只记一次日志，不影响监控。</summary>
-    private sealed class Report(string? path)
-    {
-        private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
-        private readonly List<string> _order = [];
-        private bool _warned;
-
-        public void Set(string key, string value)
-        {
-            if (!_values.ContainsKey(key))
-            {
-                _order.Add(key);
-            }
-
-            _values[key] = value.ReplaceLineEndings(" ");
-        }
-
-        public void Save()
-        {
-            if (path is null)
-            {
-                return;
-            }
-
-            try
-            {
-                var full = Path.GetFullPath(path);
-                Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-                var tmp = full + ".tmp";
-                File.WriteAllLines(tmp, _order.Select(k => $"{k}={_values[k]}"));
-                File.Move(tmp, full, overwrite: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                if (!_warned)
-                {
-                    _warned = true;
-                    Log("monitor report write failed: " + ex.GetType().Name);
-                }
-            }
-        }
-    }
 }

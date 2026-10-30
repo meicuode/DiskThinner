@@ -40,10 +40,11 @@ internal sealed record MonitorSettings
 {
     public const string Off = "off";
     public const string Diagnostic = "diagnostic";
+    public const string Agent = "agent";
     public const string Light = "light";
     public const string Precise = "precise";
 
-    /// <summary>"off"：不提示开启诊断，也不出现入口；"diagnostic"：需要时手动开启（D12）。</summary>
+    /// <summary>"off"：不提示开启诊断，也不出现入口；"diagnostic"：需要时手动开启（D12）；"agent"：常驻服务（阶段 2b，服务装没装以 SCM 为准）。</summary>
     public string Enabled { get; init; } = Diagnostic;
 
     /// <summary>对话框里默认的记录模式（D2：2a.1 实测后定为精确）。</summary>
@@ -60,6 +61,9 @@ internal sealed record MonitorSettings
 
     [JsonIgnore]
     public bool IsPrecise => Mode == Precise;
+
+    [JsonIgnore]
+    public bool IsAgent => Enabled == Agent;
 }
 
 /// <summary>
@@ -121,7 +125,7 @@ internal sealed record AppSettings
             },
             Monitor = monitor with
             {
-                Enabled = monitor.Enabled is MonitorSettings.Off ? MonitorSettings.Off : MonitorSettings.Diagnostic,
+                Enabled = monitor.Enabled is MonitorSettings.Off or MonitorSettings.Agent ? monitor.Enabled : MonitorSettings.Diagnostic,
                 Mode = monitor.Mode is MonitorSettings.Light ? MonitorSettings.Light : MonitorSettings.Precise,
                 DefaultHours = monitor.DefaultHours <= 0 ? 4 : Nearest(MonitorHourChoices, monitor.DefaultHours),
                 KeepDays = monitor.KeepDays <= 0 ? 90 : Nearest(MonitorKeepChoices, monitor.KeepDays),

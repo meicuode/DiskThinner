@@ -192,9 +192,10 @@ public sealed class SessionDto
         PeakEventsPerSecond = s.PeakEventsPerSecond, AvgCpuPermille = s.AvgCpuPermille, PeakWorkingSetBytes = s.PeakWorkingSetBytes, Flags = (int)s.Flags,
     };
 
-    public SessionRecord ToRecord() => new()
+    /// <summary>转成会话行；<paramref name="fromAgent"/> 时会话号取负数、来源标成常驻服务（和本机诊断库合并时不冲突）。</summary>
+    public SessionRecord ToRecord(bool fromAgent = false) => new()
     {
-        Id = Id, Name = Name, StartedUtc = Utc(StartedUtc), PlannedEndUtc = Utc(PlannedEndUtc), EndedUtc = EndedUtc is { } e ? Utc(e) : null, LastFlushUtc = Utc(LastFlushUtc),
+        Id = fromAgent ? -Id : Id, Source = fromAgent ? SessionSource.Agent : SessionSource.Diagnostic, Name = Name, StartedUtc = Utc(StartedUtc), PlannedEndUtc = Utc(PlannedEndUtc), EndedUtc = EndedUtc is { } e ? Utc(e) : null, LastFlushUtc = Utc(LastFlushUtc),
         Mode = Mode == "light" ? MonitorMode.Light : MonitorMode.Precise, EndReason = EndReason, DowngradedUtc = DowngradedUtc is { } d ? Utc(d) : null,
         Stats = new MonitorStats
         {
@@ -225,8 +226,8 @@ public sealed class HourDto
         SampledOut = h.SampledOut, UnresolvedBytes = h.UnresolvedBytes, WriteBytes = h.WriteBytes, Flags = h.Flags,
     };
 
-    public HourCoverage ToCoverage() =>
-        new(SessionId, SessionDto.Utc(HourUtc), Mode == "light" ? MonitorMode.Light : MonitorMode.Precise, Received, Lost, SampledOut, UnresolvedBytes, WriteBytes, Flags);
+    public HourCoverage ToCoverage(bool fromAgent = false) =>
+        new(fromAgent ? -SessionId : SessionId, SessionDto.Utc(HourUtc), Mode == "light" ? MonitorMode.Light : MonitorMode.Precise, Received, Lost, SampledOut, UnresolvedBytes, WriteBytes, Flags);
 }
 
 public sealed class ImageDto
@@ -277,7 +278,7 @@ public sealed class RowDto
     public int UnknownPid { get; set; }
     public CountersDto Counters { get; set; } = new();
 
-    public IndexRow ToRow() => new(SessionId, SessionDto.Utc(HourUtc), Dir,
+    public IndexRow ToRow(bool fromAgent = false) => new(fromAgent ? -SessionId : SessionId, SessionDto.Utc(HourUtc), Dir,
         new StoredChain((ChainKind)Kind, Writer?.ToImage(), Top?.ToImage(), Links, UnknownPid), Counters.ToCounters());
 }
 

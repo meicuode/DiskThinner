@@ -418,6 +418,8 @@ internal sealed class OverviewPage : UserControl
 
         public string ValueText => _value.Text;
 
+        public string FootText => _foot.Text;
+
         public void Set(string value, string foot, double? meter)
         {
             _value.Text = value;

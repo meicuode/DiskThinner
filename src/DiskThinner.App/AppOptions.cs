@@ -24,6 +24,11 @@ namespace DiskThinner.App;
 ///   --monitor-mode m     light / precise，和 --start-monitor、--monitor-seconds 一起用
 ///   --monitor-seconds 20 启动后开始写入监控（秒，10 到 86400，自动化验证用，优先于 --start-monitor）
 ///   --show-monitor-dialog 截图后再截一张"开启写入监控"对话框（只显示，不开始）
+/// 常驻服务（docs/phase2b-design.md 5.6 节）：
+///   --install-agent precise:90  启动后安装常驻服务（以管理员身份重启时带上，用户已经在对话框里确认过；只在管理员下执行）
+///   --agent-source 目录   服务程序所在的目录（默认是 DiskThinner.exe 旁边的 Agent\，开发和测试用）
+///   --agent-pipe 名字     服务的管道名（测试用另一个）；--agent-service 名字：服务名
+///   --show-agent-dialog   截图后再截一张"安装常驻监控服务"对话框（只显示，不安装）
 /// </summary>
 internal sealed record AppOptions
 {
@@ -77,6 +82,17 @@ internal sealed record AppOptions
     public bool MonitorForAutomation { get; init; }
 
     public bool ShowMonitorDialog { get; init; }
+
+    /// <summary>启动后安装常驻服务（模式, 保留天数）；null 表示不安装。</summary>
+    public (bool Precise, int KeepDays)? InstallAgent { get; init; }
+
+    public string? AgentSource { get; init; }
+
+    public string? AgentPipe { get; init; }
+
+    public string? AgentService { get; init; }
+
+    public bool ShowAgentDialog { get; init; }
 
     /// <summary>参数里被忽略的值（超出范围、不认识），启动后记日志。</summary>
     public IReadOnlyList<string> Ignored { get; init; } = [];
@@ -132,6 +148,11 @@ internal sealed record AppOptions
             MonitorPrecise = precise,
             MonitorForAutomation = seconds is not null,
             ShowMonitorDialog = Flag("--show-monitor-dialog"),
+            InstallAgent = ParseInstall(Value("--install-agent"), ignored),
+            AgentSource = Value("--agent-source") is { } src && Directory.Exists(src) ? Path.GetFullPath(src) : null,
+            AgentPipe = SafeName(Value("--agent-pipe")),
+            AgentService = SafeName(Value("--agent-service")),
+            ShowAgentDialog = Flag("--show-agent-dialog"),
             Ignored = ignored,
             Drive = NormalizeDrive(Value("--scan")) ?? ExistingFolder(Value("--scan")),
             ForceWalk = Flag("--walk"),
@@ -156,6 +177,29 @@ internal sealed record AppOptions
             NoRules = Flag("--no-rules"),
         };
     }
+
+    /// <summary>"precise:90" → (true, 90)；格式不对时忽略并记下。</summary>
+    private static (bool, int)? ParseInstall(string? value, List<string> ignored)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var parts = value.Split(':');
+        if (parts.Length == 2 && parts[0] is "precise" or "light" && int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var keep)
+            && Settings.AppSettings.MonitorKeepChoices.Contains(keep))
+        {
+            return (parts[0] == "precise", keep);
+        }
+
+        ignored.Add("--install-agent " + value);
+        return null;
+    }
+
+    /// <summary>管道名、服务名：只允许字母、数字、点、横线、下划线。</summary>
+    private static string? SafeName(string? value) =>
+        value is { Length: > 0 and <= 120 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_') ? value : null;
 
     /// <summary>也可以只扫描一个文件夹（总是用遍历扫描）。</summary>
     private static string? ExistingFolder(string? value) =>

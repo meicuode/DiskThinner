@@ -227,10 +227,10 @@ internal sealed class DetailPanel : Panel
             cell.Controls.Add(new Label { Text = ro.Owner.Display, AutoSize = true, MaximumSize = new Size(valueWidth, 0), ForeColor = Theme.Text, Font = Theme.Ui, Margin = new Padding(0, 2, 4, 0), UseMnemonic = false });
             var (tagText, tagStyle) = RuleView.SourceTag(ro.Owner.Source);
             cell.Controls.Add(new TagBox(tagText, tagStyle));
-            if (ro.Root != n && ro.Owner.Source == OwnerSource.Inferred)
+            if (ro.Root != n && ro.Owner.Source is OwnerSource.Inferred or OwnerSource.Observed)
             {
                 cell.SetFlowBreak(cell.Controls[^1], true);
-                cell.Controls.Add(new Label { Text = L.F("按上级目录 {0} 推断", tree.GetNameString(ro.Root)), AutoSize = true, ForeColor = Theme.Subtle, Font = Theme.Small, Margin = new Padding(0, 2, 0, 0), UseMnemonic = false });
+                cell.Controls.Add(new Label { Text = ro.Owner.Source == OwnerSource.Observed ? L.F("按上级目录 {0} 的写入监控", tree.GetNameString(ro.Root)) : L.F("按上级目录 {0} 推断", tree.GetNameString(ro.Root)), AutoSize = true, ForeColor = Theme.Subtle, Font = Theme.Small, Margin = new Padding(0, 2, 0, 0), UseMnemonic = false });
             }
 
             kv.Controls.Add(new Label { Text = L.T("归属"), AutoSize = true, ForeColor = Theme.Muted, Font = Theme.Ui, Margin = new Padding(0, 3, 4, 3), UseMnemonic = false });
@@ -548,7 +548,7 @@ internal sealed class DetailPanel : Panel
             _content.Controls.Add(link);
         }
 
-        if (group.Owner is { Source: OwnerSource.Inferred } inferred)
+        if (group.Owner is { Source: OwnerSource.Inferred or OwnerSource.Observed } inferred)
         {
             _content.Controls.Add(SectionTitle(L.T("证据")));
             AddOwnerEvidence(inferred.Evidence, width);

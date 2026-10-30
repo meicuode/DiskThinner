@@ -2,7 +2,7 @@
 //   DiskThinner.WriteLoad.exe --dir <目录> --report <json>
 //     [--small 500] [--small-size 65536] [--rename 50] [--delete 100] [--big-size 134217728] [--chunk 1048576]
 //     [--append 50] [--reopen 50] [--delete-on-close 50] [--prealloc 20] [--short-path 20] [--move 20]
-// --dir 必须在 %TEMP% 下、名字以 DiskThinner-2a- 开头，否则退出码 2，什么都不写。只在这个目录下写。
+// --dir 必须在 %TEMP% 下、名字以 DiskThinner-2a- 或 DiskThinner-2b- 开头，否则退出码 2，什么都不写。只在这个目录下写。
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -23,9 +23,9 @@ internal static partial class Program
 
         var dir = Path.GetFullPath(o.Dir);
         var temp = Path.GetFullPath(Path.GetTempPath());
-        if (!dir.StartsWith(temp, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(dir.TrimEnd('\\')).StartsWith("DiskThinner-2a-", StringComparison.Ordinal))
+        if (!dir.StartsWith(temp, StringComparison.OrdinalIgnoreCase) || !(Path.GetFileName(dir.TrimEnd('\\')).StartsWith("DiskThinner-2a-", StringComparison.Ordinal) || Path.GetFileName(dir.TrimEnd('\\')).StartsWith("DiskThinner-2b-", StringComparison.Ordinal)))
         {
-            Console.Error.WriteLine("--dir 必须在 %TEMP% 下、名字以 DiskThinner-2a- 开头：" + dir);
+            Console.Error.WriteLine("--dir 必须在 %TEMP% 下、名字以 DiskThinner-2a- 或 DiskThinner-2b- 开头：" + dir);
             return 2;
         }
 

@@ -54,6 +54,7 @@ internal sealed class GrowthPage : UserControl
     private bool _monitorEnabled = true;
     private MonitorStatus _live = MonitorStatus.Idle;
     private string? _liveSession;
+    private bool _agentLive;
     private WriteIndex? _index;
     private string? _indexError;
     private DateTime _rangeFrom;
@@ -267,11 +268,12 @@ internal sealed class GrowthPage : UserControl
     }
 
     /// <summary>监控状态（2 秒一次）：只更新覆盖卡片的脚注、进行中的那一行和按钮，不重新查询。</summary>
-    public void SetLive(MonitorStatus status, string? liveSession)
+    public void SetLive(MonitorStatus status, string? liveSession, bool agentLive = false)
     {
-        var changed = status.State != _live.State || liveSession != _liveSession;
+        var changed = status.State != _live.State || liveSession != _liveSession || agentLive != _agentLive;
         _live = status;
         _liveSession = liveSession;
+        _agentLive = agentLive;
         if (changed || status.State == MonitorState.Running)
         {
             RenderMonitor();
@@ -479,7 +481,7 @@ internal sealed class GrowthPage : UserControl
         RenderMonitor();
     }
 
-    private double CoveredHours => _index is { } index ? MonitorText.CoveredHours(index.Sessions, _rangeFrom, _rangeTo, _liveSession) : 0;
+    private double CoveredHours => _index is { } index ? MonitorText.CoveredHours(index.Sessions, _rangeFrom, _rangeTo, _liveSession, agentLive: _agentLive) : 0;
 
     private double RangeHours => Math.Max(0, (_rangeTo - _rangeFrom).TotalHours);
 
@@ -569,6 +571,15 @@ internal sealed class GrowthPage : UserControl
             return new ListItem(node, [WriterName(w), Product(w), TopApp(w), w.Counters.Creates.ToString("N0", CultureInfo.InvariantCulture), writeBytes, mainDir],
                 w.Writer is { } img ? PathDisplay.Shorten(img.Path) : null, RuleView.ObservedSource, "");
         }).ToList();
+
+        // 常驻服务给普通用户的查询里，其他用户个人目录下的写入合成一行，只有计数没有路径（Q7）
+        if (index?.HiddenOtherUsers is { } hidden)
+        {
+            var bytes = !precise ? "—" : ByteSize.Format(hidden.WriteBytes);
+            items.Add(new ListItem(-1, [L.T("其他用户的目录（需要管理员）"), "—", "—", hidden.Creates.ToString("N0", CultureInfo.InvariantCulture), bytes, "—"],
+                L.T("其他用户个人目录下的写入，以管理员身份打开 DiskThinner 才能看到是谁写的、写在哪里"), RuleView.ObservedSource, ""));
+        }
+
         _writers.SetItems(items);
         _writers.SetPlaceholder(items.Count == 0 ? L.F("监控的 {0} 小时里没有记录到写入", MonitorText.Hours(covered)) : null);
     }
@@ -577,7 +588,7 @@ internal sealed class GrowthPage : UserControl
     {
         ChainKind.System => MonitorText.SystemWriter,
         ChainKind.Unknown => L.T("未知进程"),
-        _ => w.Writer?.ExeName ?? "—",
+        _ => w.Writer?.Path == DiskThinner.Monitor.Agent.AgentProtocol.OtherUserImage ? MonitorText.OtherUserProgram : w.Writer?.ExeName ?? "—",
     };
 
     /// <summary>"产品 · 公司"；服务宿主写"服务 wuauserv · Microsoft"。</summary>
@@ -611,7 +622,7 @@ internal sealed class GrowthPage : UserControl
         var running = _live.State == MonitorState.Running;
         _diagnose.Text = running ? L.T("停止监控") : L.T("开启诊断");
         _diagnose.AccessibleName = _diagnose.Text;
-        _diagnose.Visible = running || _monitorEnabled;
+        _diagnose.Visible = running || (_monitorEnabled && !_agentLive); // 常驻服务在记录时不再开诊断（E12）
         var rangeHours = RangeHours;
         var covered = CoveredHours;
 
@@ -631,6 +642,7 @@ internal sealed class GrowthPage : UserControl
         else
         {
             var foot = running ? L.F("诊断中，剩余 {0}", MonitorText.Remaining(_live.Remaining))
+                : _agentLive ? L.T("常驻服务记录中 · ") + MonitorText.Lost(_index?.LostRate ?? 0)
                 : covered > 0 ? MonitorText.Lost(_index?.LostRate ?? 0) + (_index?.LostRate > 0.01 ? L.T("，部分数据不全") : "")
                 : _monitorEnabled ? L.T("这段时间没有监控，可以开启诊断") : L.T("写入监控已在设置里关闭");
             _monitor.Set(MonitorText.Coverage(covered, rangeHours), foot, null);
@@ -641,12 +653,8 @@ internal sealed class GrowthPage : UserControl
         _coverageTitle.Text = _hasDiff && _index is not null
             ? L.F("写入监控覆盖时段（{0}）", MonitorText.Coverage(covered, rangeHours))
             : L.T("写入监控覆盖时段");
-        var spans = sessions.Select(s =>
-        {
-            var live = s.Name == _liveSession && running;
-            var end = s.EndedUtc ?? (live ? DateTime.UtcNow : s.LastFlushUtc);
-            return (StartUtc: s.StartedUtc, EndUtc: end, Running: live);
-        }).ToList();
+        var merged = MonitorText.Spans(sessions, _liveSession, running, _agentLive, DateTime.UtcNow);
+        var spans = merged.Select(s => (s.StartUtc, s.EndUtc, Running: s.Live)).ToList();
         _timeline.SetData(_hasDiff ? _rangeFrom : DateTime.UtcNow.AddDays(-7), _hasDiff ? _rangeTo : DateTime.UtcNow, spans);
 
         _sessions.SuspendLayout();
@@ -658,44 +666,44 @@ internal sealed class GrowthPage : UserControl
         _sessions.Controls.Clear();
         _sessions.RowStyles.Clear();
         _sessions.RowCount = 0;
-        var shown = sessions.OrderBy(s => s.StartedUtc).TakeLast(MaxSessionRows).ToList();
+        var shown = merged.TakeLast(MaxSessionRows).ToList();
         foreach (var s in shown)
         {
-            var live = s.Name == _liveSession && running;
-            var start = s.StartedUtc.ToLocalTime();
-            var endUtc = s.EndedUtc ?? (live ? DateTime.UtcNow : s.LastFlushUtc);
+            var live = s.Live;
+            var start = s.StartUtc.ToLocalTime();
+            var endUtc = s.EndUtc;
             var end = endUtc.ToLocalTime();
             var when = live ? L.F("{0} – 进行中", start.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture))
                 : start.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture) + " – " + end.ToString(start.Date == end.Date ? "HH:mm" : "MM-dd HH:mm", CultureInfo.InvariantCulture);
-            var what = L.F("诊断 · {0}模式", MonitorText.Mode(s.Mode));
-            if (s.DowngradedUtc is not null)
+            var what = s.Source == SessionSource.Agent ? L.F("常驻 · {0}模式", MonitorText.Mode(s.Mode)) : L.F("诊断 · {0}模式", MonitorText.Mode(s.Mode));
+            if (s.Downgraded)
             {
                 what += L.T(" · 已降为轻量");
             }
 
-            if (live)
+            if (live && s.Source == SessionSource.Diagnostic)
             {
                 what += L.F(" · 剩余 {0}", MonitorText.Remaining(_live.Remaining));
             }
-            else if (s.EndReason is "crashed" or "external" or "error" or "store-error")
+            else if (!live && s.EndReason is "crashed" or "external" or "error" or "store-error")
             {
                 what += " · " + MonitorText.EndReason(s.EndReason);
             }
 
-            var lost = s.Stats.Received + s.Stats.Lost == 0 ? 0 : (double)s.Stats.Lost / (s.Stats.Received + s.Stats.Lost);
+            var lost = s.LostRate;
             var row = _sessions.RowCount++;
             _sessions.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             _sessions.Controls.Add(SessionCell(when, false, Theme.Text), 0, row);
             _sessions.Controls.Add(SessionCell(what, false, Theme.Text), 1, row);
-            _sessions.Controls.Add(SessionCell(MonitorText.Duration(endUtc - s.StartedUtc), true, Theme.Text), 2, row);
+            _sessions.Controls.Add(SessionCell(MonitorText.Duration(endUtc - s.StartUtc), true, Theme.Text), 2, row);
             _sessions.Controls.Add(SessionCell(MonitorText.Lost(lost), true, lost > 0.01 ? Theme.WarnText : Theme.Muted), 3, row);
         }
 
-        if (sessions.Count > shown.Count)
+        if (merged.Count > shown.Count)
         {
             var row = _sessions.RowCount++;
             _sessions.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var more = SessionCell(L.F("另有 {0} 次", sessions.Count - shown.Count), false, Theme.Muted);
+            var more = SessionCell(L.F("另有 {0} 段", merged.Count - shown.Count), false, Theme.Muted);
             _sessions.Controls.Add(more, 0, row);
             _sessions.SetColumnSpan(more, 4);
         }
@@ -705,7 +713,7 @@ internal sealed class GrowthPage : UserControl
             : _loadWrites is null ? L.T("写入监控不可用。")
             : !_monitorEnabled && !running ? L.T("写入监控已在设置里关闭。快照对比只知道哪里变了、变了多少，不知道是谁写的。")
             : sessions.Count == 0 ? L.T("这段时间里没有写入监控记录。快照对比只知道哪里变了、变了多少，不知道是谁写的；开启诊断后，这里会显示有写入进程记录的时段。")
-            : L.T("蓝色时段有写入进程记录。其余时段只有快照对比，只知道哪里变了，不知道是谁写的。");
+            : (_agentLive ? L.T("常驻服务正在记录。") : "") + L.T("蓝色时段有写入进程记录。其余时段只有快照对比，只知道哪里变了，不知道是谁写的。");
     }
 
     private static Label SessionCell(string text, bool right, Color color) => new()

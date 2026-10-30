@@ -20,6 +20,12 @@ internal static class Program
             return Commands.MonitorCommand.Run(args[1..]);
         }
 
+        // 常驻服务的安装、更新、卸载、状态（阶段 2b，FR-9）
+        if (args.Length > 0 && string.Equals(args[0], "agent", StringComparison.OrdinalIgnoreCase))
+        {
+            return Commands.AgentCommand.Run(args[1..]);
+        }
+
         // 未处理异常的兜底：界面线程上的异常记日志、提示后继续运行；其他线程上的只能记日志（进程随后会退出）
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => ReportUiException(e.Exception);

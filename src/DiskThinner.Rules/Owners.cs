@@ -5,11 +5,15 @@ using DiskThinner.Scanner;
 
 namespace DiskThinner.Rules;
 
-/// <summary>归属从哪来（原型的来源标签）：规则 = 内置规则写明的应用；推断 = 按已装软件、目录名和程序签名推断。</summary>
+/// <summary>
+/// 归属从哪来（原型的来源标签）：规则 = 内置规则写明的应用；推断 = 按已装软件、目录名和程序签名推断；
+/// 实测 = 规则和推断都不认识的位置，常驻监控里主要的写入进程（阶段 2b，E11）。
+/// </summary>
 public enum OwnerSource
 {
     Rule,
     Inferred,
+    Observed,
 }
 
 public enum OwnerEvidenceKind
@@ -31,6 +35,9 @@ public enum OwnerEvidenceKind
 
     /// <summary>目录名和软件名一致。</summary>
     DirName,
+
+    /// <summary>写入监控（常驻服务）记录到的写入进程。</summary>
+    Monitor,
 }
 
 /// <summary>一条归属证据。<see cref="ExePath"/> 不为空时界面可以再去查这个程序的签名。</summary>
@@ -43,6 +50,7 @@ public sealed record OwnerEvidence(OwnerEvidenceKind Kind, string Text, string? 
         OwnerEvidenceKind.CommandLine => L.T("命令行工具"),
         OwnerEvidenceKind.Process => L.T("运行中"),
         OwnerEvidenceKind.Program => L.T("程序"),
+        OwnerEvidenceKind.Monitor => "ETW",
         _ => L.T("目录名"),
     };
 }
@@ -95,6 +103,7 @@ public sealed class OwnerMap
     private readonly bool[] _ruleIsFixed;
     private readonly InventorySnapshot _inventory;
     private readonly Dictionary<string, IReadOnlyList<OwnerEvidence>> _appEvidence = [];
+    private IReadOnlyDictionary<int, Owner> _observed = new Dictionary<int, Owner>();
 
     private OwnerMap(Classification c, InventorySnapshot inventory, Dictionary<int, Owner> inferred, TimeSpan duration)
     {
@@ -121,6 +130,15 @@ public sealed class OwnerMap
     public int InferredCount => _inferred.Count;
 
     public IReadOnlyDictionary<int, Owner> InferredRoots => _inferred;
+
+    /// <summary>实测的归属（E11）：节点 → 归属，只用在规则和推断都给不出归属的位置。</summary>
+    public IReadOnlyDictionary<int, Owner> Observed => _observed;
+
+    /// <summary>
+    /// 设置实测的归属（常驻监控的数据到了以后，可以在任何时候设置；整体替换）。只在 <see cref="Resolve"/> 原本返回 null 的位置生效，
+    /// 规则写明的归属、推断和通用规则的兜底文字都不被覆盖；不改变类别、风险和清理计划。
+    /// </summary>
+    public void SetObserved(IReadOnlyDictionary<int, Owner> observed) => _observed = observed;
 
     /// <summary>只有规则、没有已装软件信息时的归属（测试和规则没加载 Inventory 时用）。</summary>
     public static OwnerMap RulesOnly(Classification c) => new(c, InventorySnapshot.Empty, [], TimeSpan.Zero);
@@ -156,7 +174,24 @@ public sealed class OwnerMap
             }
         }
 
-        return ownRule >= 0 && _ruleOwners[ownRule] is { } fallback ? (fallback, _c.RootOf(node)!.Node) : null;
+        if (ownRule >= 0 && _ruleOwners[ownRule] is { } fallback)
+        {
+            return (fallback, _c.RootOf(node)!.Node);
+        }
+
+        var observed = _observed;
+        if (observed.Count > 0)
+        {
+            for (var n = node; n >= 0; n = n == tree.Root ? -1 : tree[n].Parent)
+            {
+                if (observed.TryGetValue(n, out var o))
+                {
+                    return (o, n);
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>规则给出的归属（写明的应用、系统位置、用户文件或通用规则的兜底文字）。</summary>

@@ -23,6 +23,15 @@ public sealed class SessionRecord
     public SessionFlags Flags { get; set; }
 
     public TimeSpan Covered => (EndedUtc ?? LastFlushUtc) - StartedUtc;
+
+    /// <summary>数据来源：本机的诊断库，还是常驻服务（经管道查询，会话号取负数，docs/phase2b-design.md 5.6 节）。不存进库。</summary>
+    public SessionSource Source { get; init; }
+}
+
+public enum SessionSource
+{
+    Diagnostic,
+    Agent,
 }
 
 /// <summary>落盘的一行：目录（null 表示对不上目录）× 进程链。</summary>

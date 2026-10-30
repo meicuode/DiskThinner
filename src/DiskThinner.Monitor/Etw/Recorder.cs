@@ -608,6 +608,7 @@ public sealed class Recorder : IDisposable
             lock (_gate)
             {
                 var a = _aggregator!;
+                a.SettleDeleteOnClose(boundary.Ticks - 1); // 记在旧行的最后一个小时
                 sealedHours = [.. a.SealBefore(now.Ticks).Union(_carry.Keys.Where(h => h < boundary.Ticks)).Where(h => h < boundary.Ticks).Order()];
                 hours = Collect(a, sealedHours);
                 old = _record!;

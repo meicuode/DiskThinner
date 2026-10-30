@@ -7,7 +7,7 @@ using DiskThinner.Rules;
 namespace DiskThinner.App.Pages;
 
 /// <summary>
-/// 设置（原型 .p-settings）：左边是分类，右边是各组卡片。写入监控、快照、清理、规则四组可用（写入监控的常驻服务是阶段 2b）；
+/// 设置（原型 .p-settings）：左边是分类，右边是各组卡片。写入监控（含阶段 2b 的常驻服务）、快照、清理、规则四组可用；
 /// AI（阶段 3）显示为后续版本。改动立即保存到 settings.json。
 /// </summary>
 internal sealed class SettingsPage : UserControl
@@ -31,6 +31,19 @@ internal sealed class SettingsPage : UserControl
     private readonly Label _paths = Ui.Label("", Theme.Small, Theme.Muted);
     private readonly RadioButton _monOff = new() { Text = L.T("关闭"), AutoSize = true, Font = Theme.Ui, Margin = new Padding(0) };
     private readonly RadioButton _monDiag = new() { Text = L.T("临时诊断（推荐）"), AutoSize = true, Font = Theme.Ui, Margin = new Padding(0, 6, 0, 0) };
+    private readonly RadioButton _monAgent = new() { Text = L.T("常驻服务"), AutoSize = true, Font = Theme.Ui, Margin = new Padding(0, 6, 0, 0) };
+    private readonly FlowLayoutPanel _agentGroup = new() { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, BackColor = Theme.Background, Margin = new Padding(0, 8, 0, 0), Padding = new Padding(12, 10, 12, 10), AccessibleName = L.T("常驻监控服务") };
+    private readonly Label _agentStatus = Ui.Label("", Theme.Ui);
+    private readonly Label _agentHint = Hint("");
+    private readonly Button _agentInstall = Ui.Button(L.T("安装…"));
+    private readonly Button _agentStartStop = Ui.Button(L.T("停止服务"));
+    private readonly Button _agentUpdate = Ui.Button(L.T("更新服务"));
+    private readonly Button _agentUninstall = Ui.Button(L.T("卸载…"));
+    private readonly Button _agentElevate = Ui.Button(L.T("以管理员身份重启"));
+    private readonly Label _monModeHint = Hint("");
+    private readonly Label _monKeepHint = Hint("");
+    private Monitor.AgentSnapshot _agent = Monitor.AgentSnapshot.None;
+    private bool _agentBound;
     private readonly SegmentedControl _monMode = new(L.T("记录模式"), L.T("轻量"), L.T("精确"));
     private readonly ComboBox _monHours = Combo(L.T("写入监控默认时长"), AppSettings.MonitorHourChoices.Select(h => L.F("{0} 小时", h)).ToArray(), width: 120);
     private readonly ComboBox _monKeep = Combo(L.T("写入监控数据保留时长"), AppSettings.MonitorKeepChoices.Select(d => L.F("{0} 天", d)).ToArray(), width: 120);
@@ -57,8 +70,23 @@ internal sealed class SettingsPage : UserControl
         var monOptions = Stack(
             _monOff, Hint(L.T("不提示开启诊断。看得到哪里变了，看不到是谁写的。")),
             _monDiag, Hint(L.T("需要时手动开启 1 到 24 小时，到时自动停止。需要管理员权限，不安装后台服务。")),
-            new RadioButton { Text = L.T("常驻服务（后续版本）"), Enabled = false, AutoSize = true, Font = Theme.Ui, Margin = new Padding(0, 6, 0, 0) },
-            Hint(L.T("安装 Windows 服务持续记录。服务只做监控，不联网，不删除文件。")));
+            _monAgent, Hint(L.T("开机自动记录，不需要打开 DiskThinner。以 SYSTEM 身份运行，只监控、不联网、不删除文件，可以随时卸载。")),
+            _agentGroup);
+        var agentButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0, 8, 0, 0) };
+        foreach (var b in new[] { _agentInstall, _agentStartStop, _agentUpdate, _agentUninstall, _agentElevate })
+        {
+            b.Margin = new Padding(0, 0, 8, 0);
+        }
+
+        agentButtons.Controls.AddRange([_agentInstall, _agentStartStop, _agentUpdate, _agentUninstall, _agentElevate]);
+        _agentStatus.Margin = new Padding(0);
+        _agentStatus.MaximumSize = new Size(600, 0);
+        _agentGroup.Controls.AddRange([_agentStatus, agentButtons, _agentHint]);
+        _agentInstall.Click += (_, _) => AgentActionRequested?.Invoke(this, "install");
+        _agentStartStop.Click += (_, _) => AgentActionRequested?.Invoke(this, _agent.Running ? "stop" : "start");
+        _agentUpdate.Click += (_, _) => AgentActionRequested?.Invoke(this, "update");
+        _agentUninstall.Click += (_, _) => AgentActionRequested?.Invoke(this, "uninstall");
+        _agentElevate.Click += (_, _) => AgentActionRequested?.Invoke(this, "elevate");
         monOptions.AccessibleName = L.T("写入监控");
         _monMode.Margin = new Padding(0);
         var monKeepRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
@@ -66,9 +94,9 @@ internal sealed class SettingsPage : UserControl
         monKeepRow.Controls.AddRange([_monKeep, _monDbSize]);
         AddSection(nav, L.T("写入监控"), Card(L.T("写入监控（ETW）"),
             Row("", monOptions),
-            Row(L.T("记录模式"), Stack(_monMode, Hint(L.T("轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。")))),
-            Row(L.T("默认时长"), _monHours),
-            Row(L.T("保留"), Stack(monKeepRow, Hint(L.T("这么多天内的监控记录全部保留，另有 64 MB 的上限，超出时先删最早的会话。"))))));
+            Row(L.T("记录模式"), Stack(_monMode, Hint(L.T("轻量：只记录新建、删除、重命名，看不到写了多少。精确：额外记录每次写入，能估算每个程序让目录涨了多少；编译、npm install 时开销更大。")), _monModeHint)),
+            Row(L.T("默认时长"), Stack(_monHours, Hint(L.T("只对临时诊断有效。")))),
+            Row(L.T("保留"), Stack(monKeepRow, Hint(L.T("这么多天内的监控记录全部保留。诊断数据另有 64 MB 的上限，常驻服务的数据另有 256 MB 的上限，超出时先删最早的。")), _monKeepHint))));
 
         var dailyRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
         _daily.Margin = new Padding(0, 4, 8, 0);
@@ -146,9 +174,32 @@ internal sealed class SettingsPage : UserControl
                 Change(_settings with { Monitor = _settings.Monitor with { Enabled = MonitorSettings.Diagnostic } });
             }
         };
-        _monMode.SelectedIndexChanged += (_, _) => Change(_settings with { Monitor = _settings.Monitor with { Mode = _monMode.SelectedIndex == 1 ? MonitorSettings.Precise : MonitorSettings.Light } });
+        _monAgent.CheckedChanged += (_, _) =>
+        {
+            if (_monAgent.Checked)
+            {
+                Change(_settings with { Monitor = _settings.Monitor with { Enabled = MonitorSettings.Agent } });
+            }
+
+            RenderAgent();
+        };
+        _monMode.SelectedIndexChanged += (_, _) =>
+        {
+            Change(_settings with { Monitor = _settings.Monitor with { Mode = _monMode.SelectedIndex == 1 ? MonitorSettings.Precise : MonitorSettings.Light } });
+            if (!_binding && _agentBound)
+            {
+                AgentConfigureRequested?.Invoke(this, (_monMode.SelectedIndex == 1 ? "precise" : "light", null));
+            }
+        };
         _monHours.SelectedIndexChanged += (_, _) => Change(_settings with { Monitor = _settings.Monitor with { DefaultHours = AppSettings.MonitorHourChoices[_monHours.SelectedIndex] } });
-        _monKeep.SelectedIndexChanged += (_, _) => Change(_settings with { Monitor = _settings.Monitor with { KeepDays = AppSettings.MonitorKeepChoices[_monKeep.SelectedIndex] } });
+        _monKeep.SelectedIndexChanged += (_, _) =>
+        {
+            Change(_settings with { Monitor = _settings.Monitor with { KeepDays = AppSettings.MonitorKeepChoices[_monKeep.SelectedIndex] } });
+            if (!_binding && _agentBound)
+            {
+                AgentConfigureRequested?.Invoke(this, (null, AppSettings.MonitorKeepChoices[_monKeep.SelectedIndex]));
+            }
+        };
         _auto.CheckedChanged += (_, _) => Change(_settings with { Snapshot = _settings.Snapshot with { AutoAfterScan = _auto.Checked } });
         _minDir.SelectedIndexChanged += (_, _) => Change(_settings with { Snapshot = _settings.Snapshot with { MinDirMb = AppSettings.MinDirChoices[_minDir.SelectedIndex] } });
         _keep.SelectedIndexChanged += (_, _) => Change(_settings with { Snapshot = _settings.Snapshot with { KeepDays = AppSettings.KeepDayChoices[_keep.SelectedIndex] } });
@@ -169,6 +220,12 @@ internal sealed class SettingsPage : UserControl
 
     /// <summary>设置改了（已经是规范化的值），由主窗口保存并应用。</summary>
     public event EventHandler<AppSettings>? SettingsChanged;
+
+    /// <summary>常驻服务的按钮：install / start / stop / update / uninstall / elevate。</summary>
+    public event EventHandler<string>? AgentActionRequested;
+
+    /// <summary>选了常驻服务、服务在运行时改了记录模式或保留天数（管理员）：发给服务。</summary>
+    public event EventHandler<(string? Mode, int? KeepDays)>? AgentConfigureRequested;
 
     /// <summary>开启或关闭每日快照（注册或移除计划任务）。</summary>
     public event EventHandler<(bool Enabled, string Time)>? ScheduleChanged;
@@ -216,15 +273,133 @@ internal sealed class SettingsPage : UserControl
     public void SetMonitorInfo(string dbPath, long bytes)
     {
         _monitorDbPath = dbPath;
-        _monDbSize.Text = bytes > 0 ? L.F("当前占用 {0}", ByteSize.Format(bytes)) : L.T("还没有记录");
+        _diagDbBytes = bytes;
+        RenderDbSize();
         SetInfo(_info.Rules, _info.Error, _info.SnapshotBytes);
+    }
+
+    private long _diagDbBytes;
+
+    /// <summary>"当前占用 1.2 MB"；装了常驻服务时是"诊断 1.2 MB · 常驻服务 12.4 MB"（原型的设置页）。</summary>
+    private void RenderDbSize()
+    {
+        if (_agent.Status is { } s)
+        {
+            _monDbSize.Text = L.F("诊断 {0} · 常驻服务 {1}", _diagDbBytes > 0 ? ByteSize.Format(_diagDbBytes) : L.T("没有记录"), ByteSize.Format(s.DbBytes));
+            return;
+        }
+
+        _monDbSize.Text = _diagDbBytes > 0 ? L.F("当前占用 {0}", ByteSize.Format(_diagDbBytes)) : L.T("还没有记录");
     }
 
     internal string MonitorDbSizeText => _monDbSize.Text;
 
+    private bool _elevated;
+    private bool _agentSource = true;
+
+    /// <summary>常驻服务的状态（主窗口每次查完服务后调用，docs/phase2b-design.md 3.2 节 Q1）。</summary>
+    public void SetAgent(Monitor.AgentSnapshot agent, bool elevated, bool sourceAvailable)
+    {
+        _agent = agent;
+        _elevated = elevated;
+        _agentSource = sourceAvailable;
+        RenderAgent();
+    }
+
+    /// <summary>
+    /// 服务一组：选了常驻服务或者已经装了时显示。没有安装时只有"安装…"；装了时显示状态和按钮（普通权限下只有"以管理员身份重启"）。
+    /// 选了常驻服务、服务在记录时，记录模式和保留显示服务的值，修改发给服务；普通权限下这两项不能改。
+    /// </summary>
+    private void RenderAgent()
+    {
+        var a = _agent;
+        RenderDbSize();
+        var bound = _monAgent.Checked && a.Running && a.ProtocolOk && a.Status is not null;
+        _agentBound = bound;
+        if (bound)
+        {
+            var was = _binding;
+            _binding = true;
+            _monMode.SelectedIndex = a.Precise ? 1 : 0;
+            _monKeep.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.MonitorKeepChoices, a.Status!.KeepDays));
+            _binding = was;
+        }
+
+        _monModeHint.Text = !bound ? "" : _elevated
+            ? L.T("选了常驻服务：记录模式和下面的\u201c保留\u201d作用于服务，所有用户共用。")
+            : L.T("选了常驻服务：记录模式和保留天数是服务的设置，以管理员身份打开 DiskThinner 才能修改。");
+        _monModeHint.Visible = bound;
+        _monKeepHint.Text = bound ? L.T("改了之后服务在下一次删除旧数据时按新的天数（每天一次）。") : "";
+        _monKeepHint.Visible = bound;
+        _monMode.Enabled = !bound || _elevated;
+        _monKeep.Enabled = !bound || _elevated;
+
+        var show = _monAgent.Checked || a.Installed;
+        _agentGroup.Visible = show;
+        if (!show)
+        {
+            return;
+        }
+
+        foreach (var b in new[] { _agentInstall, _agentStartStop, _agentUpdate, _agentUninstall, _agentElevate })
+        {
+            b.Visible = false;
+        }
+
+        if (!a.Installed)
+        {
+            _agentStatus.Text = L.T("没有安装");
+            _agentStatus.ForeColor = Theme.Muted;
+            _agentInstall.Visible = true;
+            _agentInstall.Text = _elevated ? L.T("安装…") : L.T("以管理员身份重启并安装");
+            _agentInstall.AccessibleName = _agentInstall.Text;
+            _agentInstall.Enabled = _agentSource;
+            _agentHint.Text = _agentSource ? L.T("安装前会说明服务做什么、装在哪、数据在哪。没有安装时，临时诊断照常可用。")
+                : L.T("这个发布包里没有服务程序（Agent\\ 目录），请下载完整的发布包。");
+            return;
+        }
+
+        var problem = a.Problem;
+        if (problem is null)
+        {
+            var s = a.Status!;
+            var since = s.RecordingSinceUtc is { } r ? r.ToLocalTime().ToString("MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "—";
+            _agentStatus.Text = L.F("运行中 · {0} · 版本 {1} · 从 {2} 开始记录 · 数据 {3}", Monitor.MonitorText.Mode(a.Precise ? DiskThinner.Monitor.MonitorMode.Precise : DiskThinner.Monitor.MonitorMode.Light),
+                a.AgentVersion ?? "—", since, ByteSize.Format(s.DbBytes)) + (a.NeedsUpdate ? L.F(" · 可以更新到 {0}", Agent.AppVersion.Current) : "");
+            _agentStatus.ForeColor = Theme.Text;
+        }
+        else
+        {
+            _agentStatus.Text = problem;
+            _agentStatus.ForeColor = a.Service.State == "stopped" ? Theme.Muted : Theme.WarnText;
+        }
+
+        if (_elevated)
+        {
+            _agentStartStop.Visible = true;
+            _agentStartStop.Text = a.Running ? L.T("停止服务") : L.T("启动服务");
+            _agentStartStop.AccessibleName = _agentStartStop.Text;
+            _agentUpdate.Visible = a.NeedsUpdate || !a.Running;
+            _agentUninstall.Visible = true;
+            _agentHint.Text = L.T("服务的记录模式和保留天数是所有用户共用的，选了常驻服务时在下面修改。停止服务后不再记录，直到再启动或重启电脑。");
+        }
+        else
+        {
+            _agentElevate.Visible = true;
+            _agentHint.Text = L.T("启动、停止、更新和卸载服务需要管理员权限。");
+        }
+    }
+
     internal RadioButton MonitorOff => _monOff;
 
     internal RadioButton MonitorDiagnostic => _monDiag;
+
+    internal RadioButton MonitorAgent => _monAgent;
+
+    internal string AgentStatusText => _agentGroup.Visible ? _agentStatus.Text : "";
+
+    /// <summary>服务一组里看得见的按钮（测试用）。</summary>
+    internal IEnumerable<Button> AgentButtons => new[] { _agentInstall, _agentStartStop, _agentUpdate, _agentUninstall, _agentElevate }.Where(b => _agentGroup.Visible && b.Visible);
 
     internal SegmentedControl MonitorMode => _monMode;
 
@@ -248,7 +423,8 @@ internal sealed class SettingsPage : UserControl
         _tempAge.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.TempAgeChoices, s.Cleanup.TempMinAgeDays));
         _locked.SelectedIndex = s.Cleanup.AskWhenLocked ? 1 : 0;
         _monOff.Checked = s.Monitor.IsOff;
-        _monDiag.Checked = !s.Monitor.IsOff;
+        _monDiag.Checked = s.Monitor.Enabled == MonitorSettings.Diagnostic;
+        _monAgent.Checked = s.Monitor.IsAgent;
         _monMode.SelectedIndex = s.Monitor.IsPrecise ? 1 : 0;
         _monHours.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.MonitorHourChoices, s.Monitor.DefaultHours));
         _monKeep.SelectedIndex = Math.Max(0, Array.IndexOf(AppSettings.MonitorKeepChoices, s.Monitor.KeepDays));
@@ -260,6 +436,7 @@ internal sealed class SettingsPage : UserControl
 
         _remove.Enabled = false;
         _binding = false;
+        RenderAgent();
     }
 
     private void Change(AppSettings next)

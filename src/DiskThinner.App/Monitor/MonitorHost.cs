@@ -16,6 +16,12 @@ internal enum MonitorUiState
 
     /// <summary>上次的会话没有正常结束、还在运行，这次没有清理掉（普通权限下）。</summary>
     Residual,
+
+    /// <summary>常驻服务在记录（阶段 2b，Q4）。</summary>
+    Agent,
+
+    /// <summary>装了常驻服务，但它没有在记录（停止了、出错了、需要更新）。</summary>
+    AgentDown,
 }
 
 /// <summary>
@@ -29,15 +35,20 @@ internal sealed class MonitorHost : IDisposable
     private readonly string _snapshotDb;
     private readonly System.Windows.Forms.Timer _tick = new() { Interval = 2000 };
     private readonly System.Windows.Forms.Timer _debounce = new() { Interval = 500 };
+    private readonly System.Windows.Forms.Timer _agentTick = new() { Interval = 10_000 };
     private MonitorRunner? _runner;
     private bool _otherLive;
     private bool _residual;
+    private volatile AgentSnapshot _agent = AgentSnapshot.None;
+    private bool _agentRefreshing;
 
-    public MonitorHost(Control owner, string dbPath, string snapshotDb)
+    public MonitorHost(Control owner, string dbPath, string snapshotDb, IAgentSource? agentSource = null)
     {
         _owner = owner;
         DbPath = Path.GetFullPath(dbPath);
         _snapshotDb = snapshotDb;
+        AgentSource = agentSource ?? new PipeAgentSource(DiskThinner.Monitor.Agent.AgentProtocol.PipeName, DiskThinner.Monitor.Agent.AgentProtocol.ServiceName);
+        _agentTick.Tick += async (_, _) => await RefreshAgentAsync();
         _tick.Tick += (_, _) => OnTick();
         _debounce.Tick += (_, _) =>
         {
@@ -58,7 +69,59 @@ internal sealed class MonitorHost : IDisposable
 
     public bool IsRunning => _runner is { Status.State: not MonitorState.Stopped } && _runner.SessionName is not null;
 
-    public MonitorUiState State => IsRunning ? MonitorUiState.Running : _otherLive ? MonitorUiState.OtherInstance : _residual ? MonitorUiState.Residual : MonitorUiState.Idle;
+    public MonitorUiState State => IsRunning ? MonitorUiState.Running
+        : _agent.Recording ? MonitorUiState.Agent
+        : _otherLive ? MonitorUiState.OtherInstance
+        : _residual ? MonitorUiState.Residual
+        : _agent.Installed ? MonitorUiState.AgentDown
+        : MonitorUiState.Idle;
+
+    /// <summary>常驻服务的来源（测试换成假的）。</summary>
+    public IAgentSource AgentSource { get; set; }
+
+    /// <summary>常驻服务最近一次的状态（10 秒刷新一次）。</summary>
+    public AgentSnapshot Agent => _agent;
+
+    /// <summary>
+    /// 查一次常驻服务的状态（后台线程上），状态变了就发 <see cref="StatusChanged"/>；服务落盘了（最后落盘时间变了）或者开始、停止记录时发 <see cref="DataChanged"/>。
+    /// 上一次还没查完时不再查。
+    /// </summary>
+    public async Task RefreshAgentAsync()
+    {
+        if (_agentRefreshing)
+        {
+            return;
+        }
+
+        _agentRefreshing = true;
+        try
+        {
+            var source = AgentSource;
+            AgentSnapshot next;
+            try
+            {
+                next = await Task.Run(source.Probe);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                Log("agent probe failed: " + ex.GetType().Name);
+                next = AgentSnapshot.None;
+            }
+
+            var previous = _agent;
+            _agent = next;
+            if (next.Recording != previous.Recording || next.Installed != previous.Installed || next.Status?.LastFlushUtc != previous.Status?.LastFlushUtc)
+            {
+                ScheduleDataChanged();
+            }
+
+            StatusChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            _agentRefreshing = false;
+        }
+    }
 
     /// <summary>上一次会话的结束原因（这个窗口里开始的；null 表示还没有结束过）。</summary>
     public StopReason? LastEndReason { get; private set; }
@@ -92,6 +155,9 @@ internal sealed class MonitorHost : IDisposable
     /// <summary>启动时（任何权限）：标出没有结束的会话记录，管理员下停掉残留会话（第 5.1.2 节）。在后台线程上做。</summary>
     public async Task CheckAsync()
     {
+        // 常驻服务的状态和诊断库的清理同时查，之后每 10 秒查一次服务
+        var agent = RefreshAgentAsync();
+        _agentTick.Start();
         MonitorCleanup.Result r;
         try
         {
@@ -101,8 +167,11 @@ internal sealed class MonitorHost : IDisposable
                                        or System.Runtime.InteropServices.COMException)
         {
             Log("monitor check failed: " + ex.GetType().Name);
+            await agent;
             return;
         }
+
+        await agent;
 
         _otherLive = r.Live && !IsRunning;
         _residual = !r.Live && r.ActiveListed && r.ResidualFound > r.ResidualStopped;
@@ -226,9 +295,29 @@ internal sealed class MonitorHost : IDisposable
 
     /// <summary>
     /// 读 [fromUtc, toUtc) 的汇总（任何线程）。库不存在时返回空索引，不建库；打不开时抛出（调用方显示"写入监控数据读不了"）。
+    /// 常驻服务在运行、协议一致时再经管道查服务的数据，两份合在一起（服务的会话号是负数，docs/phase2b-design.md 5.6 节）；服务查不到时只用诊断库的。
     /// </summary>
-    public WriteIndex Load(DateTime fromUtc, DateTime toUtc) =>
-        File.Exists(DbPath) ? MonitorStore.OpenExisting(DbPath)?.LoadIndex(fromUtc, toUtc) ?? WriteIndex.Empty : WriteIndex.Empty;
+    public WriteIndex Load(DateTime fromUtc, DateTime toUtc)
+    {
+        var local = File.Exists(DbPath) ? MonitorStore.OpenExisting(DbPath)?.LoadIndex(fromUtc, toUtc) ?? WriteIndex.Empty : WriteIndex.Empty;
+        var agent = _agent;
+        if (!agent.Running || !agent.ProtocolOk)
+        {
+            return local;
+        }
+
+        WriteIndex? remote = null;
+        try
+        {
+            remote = AgentSource.Query(fromUtc, toUtc);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Log("agent query failed: " + ex.GetType().Name);
+        }
+
+        return WriteIndex.Merge(local, remote);
+    }
 
     private void OnTick()
     {
@@ -262,6 +351,7 @@ internal sealed class MonitorHost : IDisposable
 
     public void Dispose()
     {
+        _agentTick.Dispose();
         _tick.Dispose();
         _debounce.Dispose();
         _runner?.Dispose();
