@@ -2,7 +2,7 @@
 
 一个轻量的 Windows C 盘空间分析与清理工具，要回答四个问题：哪里大、哪里在涨、是谁的、能不能删。只在本机运行，不联网，不上传任何信息。
 
-当前版本 **0.2.0**（阶段 1 和阶段 2a 完成）：查看 C 盘哪里占用最大，每个位置是什么、归哪个软件、风险多大、该怎么处理，也可以按软件或按类别汇总；保存快照后能看到哪些目录在变大、按这个速度多少天写满；以管理员身份运行时可以开 1 到 24 小时的写入监控，看到是哪个程序在哪些目录新建、删除、写入了文件；在清理计划里确认后删除或运行官方清理命令，每一项都写入操作记录。常驻监控服务（阶段 2b）和 AI 分析在后续版本提供。
+当前版本 **0.2.0**（阶段 1 和阶段 2a 完成）：查看 C 盘哪里占用最大，每个位置是什么、归哪个软件、风险多大、该怎么处理，也可以按软件或按类别汇总；保存快照后能看到哪些目录在变大、按这个速度多少天写满；以管理员身份运行时可以开 1 到 24 小时的写入监控，看到是哪个程序在哪些目录新建、删除、写入了文件；在清理计划里确认后删除或运行官方清理命令，每一项都写入操作记录。开发中的阶段 2b 加了可选安装的常驻监控服务（开机自动记录，见下面"常驻监控服务"）；AI 分析在后续版本提供。
 
 ## 下载和运行
 
@@ -11,7 +11,7 @@
 | `DiskThinner-<版本>-win-x64.zip` | 体积小，需要先装 [.NET 10 桌面运行库（x64）](https://dotnet.microsoft.com/download/dotnet/10.0)；没装时双击会提示去下载 |
 | `DiskThinner-<版本>-win-x64-selfcontained.zip` | 单个 exe，不需要装运行库 |
 
-解压到任意目录，运行 `DiskThinner.exe`。支持 Windows 10 / 11 64 位。程序不需要安装，删除解压出来的目录和 `%LOCALAPPDATA%\DiskThinner` 即可完全卸载（如果开启了每日快照，先在设置里关掉）。
+解压到任意目录，运行 `DiskThinner.exe`。支持 Windows 10 / 11 64 位。程序不需要安装，删除解压出来的目录和 `%LOCALAPPDATA%\DiskThinner` 即可完全卸载（如果开启了每日快照，先在设置里关掉；如果装了常驻监控服务，先在设置里卸载它）。
 
 ## 权限
 
@@ -19,6 +19,7 @@
 - 以管理员身份运行时直接读取 NTFS 主文件表（MFT），C 盘几秒扫完，能识别硬链接。界面上可以一键"以管理员身份重启"。
 - 用另一个管理员账户提权时（登录的是 A，提权成 B），`%USERPROFILE%` 指向 B：这时不清理用户目录、不运行官方命令，只清理系统位置，界面上会说明。
 - 写入监控（阶段 2a）需要管理员：普通权限下点"开启诊断"，对话框的按钮是"以管理员身份重启并开始"。
+- 常驻监控服务（阶段 2b）安装、启动、停止、更新、卸载需要管理员；装好以后，普通权限下也能看到它记录的数据（其他用户个人目录下的记录除外）。
 
 ## 写入监控（阶段 2a，诊断模式）
 
@@ -27,6 +28,15 @@
 - 只在本机记录，按"目录 × 进程（写入进程 ← 顶层应用）× 小时"汇总；不记录文件名和文件内容，不联网，不修改、不打开被写入的文件。
 - 看不到的情况：监控开始前就打开的文件（数据库、虚拟磁盘）的写入对不上目录；虚拟磁盘里面是谁写的；缓存回写记为"系统"。详见 [docs/known-issues.md](docs/known-issues.md)。
 - 设置里可以把写入监控改成"关闭"（不再提示开启诊断），也可以改默认模式、默认时长和保留天数。
+
+## 常驻监控服务（阶段 2b，可选）
+
+- 在"设置 → 写入监控"里选"常驻服务"，点"安装…"。服务名 `DiskThinnerAgent`（显示名"DiskThinner 写入监控"），以 SYSTEM 身份运行，开机自动启动（延迟），出错时 1 分钟和 5 分钟后各自动重启一次。
+- 服务程序从发布包的 `Agent\` 复制到 `C:\Program Files\DiskThinner\Agent\<版本>\`，复制后核对 SHA-256，不从解压目录运行。数据在 `C:\ProgramData\DiskThinner\Agent\`：`monitor.db`、`agent.json`（记录模式、保留天数）、`logs\agent.log`。这个目录只有 SYSTEM 和 Administrators 能访问；安装时如果已经有人建好了它、权限不对，会收回所有权并重设权限。
+- 记录的内容和临时诊断一样，会话按天轮换；保留天数之外另有 256 MB 的上限。界面通过本机的命名管道 `\\.\pipe\DiskThinner.Agent.v1` 查询，和自己的诊断数据合在一起显示，会话表里标"常驻"。普通用户查询时看不到其他用户个人目录下的记录。
+- 服务在记录时，"开启诊断"换成"常驻服务正在记录"。服务只监控、只写自己的数据目录，不联网，不打开被写入的文件，不删除任何文件。
+- 卸载时可以选择是否同时删除监控数据（默认保留，重新安装后接着用）。卸载会停止并删除服务、删除程序目录。
+- 规则和推断都不认识的目录，如果近 30 天常驻监控覆盖了 7 天以上、主要写入进程占估算增长的 80% 以上，归属显示为"实测：写入进程（顶层应用）"。
 
 ## 清理是怎么做的
 
@@ -47,7 +57,7 @@
 | `snapshots.db` | 快照：每个 C 盘快照只记 50 MB 以上的目录和 100 MB 以上的文件，几十 KB |
 | `monitor.db` | 写入监控的汇总：按会话、小时、目录、进程链；默认保留 90 天，不超过 64 MB。删掉这个文件就清掉了全部监控数据 |
 | `user.db` | 操作记录：每次删除、运行命令、手动清理和拦截，只追加不修改，可以导出 CSV |
-| `logs\` | `app.log`、`snapshot.log`、`monitor.log`，出错时的 `crash-*.txt` |
+| `logs\` | `app.log`、`snapshot.log`、`monitor.log`、`agent-install.log`（常驻服务的安装、更新、卸载），出错时的 `crash-*.txt` |
 | `rules\` | 内置规则库（程序自带，首次运行时释放） |
 
 扫描整个盘后，距离上次快照超过 6 小时会自动保存一次；也可以点"创建快照"，或在设置 / 增长分析页开启每日快照（Windows 计划任务）。命令行：
@@ -66,6 +76,12 @@ DiskThinner.exe --scan D:                             # 启动后扫描指定磁
 DiskThinner.exe monitor --seconds 600 [--mode light|precise] [--db monitor.db] [--report r.txt] [--verify-parser]
 DiskThinner.exe monitor --cleanup [--db monitor.db]   # 停掉上次没有正常结束的会话（管理员），标出没有结束的记录
 DiskThinner.exe monitor --status [--report r.txt]     # 有没有窗口在监控、有没有残留会话（不需要管理员）
+
+# 常驻监控服务（阶段 2b），结果写在 --report 和 logs\agent-install.log 里
+DiskThinner.exe agent --install [--mode light|precise] [--keep-days 30|90|180]   # 需要管理员
+DiskThinner.exe agent --update                         # 用这个发布包里的服务程序更新（需要管理员）
+DiskThinner.exe agent --uninstall [--delete-data]      # 需要管理员
+DiskThinner.exe agent --status [--dir 路径] [--report r.txt]   # 服务和管道的状态；给了 --dir 时统计这个目录近 24 小时的写入（不需要管理员）
 ```
 
 退出码：0 成功，1 出错，2 不是管理员，3 另一个实例正在监控，4 参数不对。
@@ -107,10 +123,18 @@ MFT 扫描和删除类验收需要管理员，用 `tools/verify/` 下的脚本�
 
 所有验收都把库、设置和报告写在 `-OutDir` 下，不碰默认位置的数据；只删除自己在 `%TEMP%\DiskThinner-2a-<guid>` 下建的目录。构建前先用普通权限 `dotnet build -c Release`。
 
+常驻服务的验收（阶段 2b）用 `tools/verify/phase2b-elevated.ps1 -OutDir <目录> -Part <部分>`（同样会弹 UAC）：
+
+| 部分 | 内容 |
+|---|---|
+| `agent` | 以 `DT_AGENT_TESTS=1` 跑 `AgentServiceTests`：装一个测试服务 `DiskThinnerAgentTest`（自己的管道名、会话名和临时数据目录），核对启动、WriteLoad 逐项比对、控制命令的权限、外部停止、强制结束和错误退出后的重启、停止，最后删掉。`-AgentExe` 是 AOT 发布的服务程序 |
+| `accept` | 真实服务名的安装、配置和权限核对、普通权限查询、界面截图、外部停止、强制结束、停止和启动、更新（含坏版本退回）、卸载和重新安装，最后卸载并删除数据。已经装了服务或者有数据目录时不做。`-AgentSource` 是服务程序所在的目录 |
+| `perf` | 装上服务空闲 `-IdleMinutes` 分钟（默认 30），每分钟记一次 CPU 和工作集，然后卸载并删除数据 |
+
 GitHub Actions：
 
-- `ci.yml`：推送到 main 和 PR 时跑规则校验、构建、测试；推送到 main 时再打包并冒烟测试。
-- `package.yml`（被另外两个调用）：打两个 zip（打包时检查没有带 TraceEvent 和它的原生 DLL，并写出文件清单），在全新的 windows-2022 和 windows-2025 上解压运行 `tools/verify/smoke.ps1`：扫描测试文件夹、以管理员身份用 MFT 扫描整个系统盘并生成清理计划（只读，不执行清理）、跑 snapshot 子命令、跑 15 秒的精确模式 `monitor --verify-parser`（要求收到事件、解析器和系统解码一致、不留会话）。自包含版在装 .NET 之前测，依赖运行库的版本装好 .NET 10 之后测。截图和报告作为构建产物保存。
+- `ci.yml`：推送到 main 和 PR 时跑规则校验、构建、常驻服务的 AOT 发布（AOT 警告当作错误）、测试；推送到 main 时再打包并冒烟测试。
+- `package.yml`（被另外两个调用）：打两个 zip（打包时检查没有带 TraceEvent 和它的原生 DLL，并写出文件清单），在全新的 windows-2022 和 windows-2025 上解压运行 `tools/verify/smoke.ps1`：扫描测试文件夹、以管理员身份用 MFT 扫描整个系统盘并生成清理计划（只读，不执行清理）、跑 snapshot 子命令、跑 15 秒的精确模式 `monitor --verify-parser`（要求收到事件、解析器和系统解码一致、不留会话），再用包里的 `Agent\` 装一次常驻服务、经管道查到写入后卸载并删除数据（要求不留服务、会话和目录）。自包含版在装 .NET 之前测，依赖运行库的版本装好 .NET 10 之后测。截图和报告作为构建产物保存。
 - `release.yml`：推送 `v主.次.修订` 形式的标签（如 `v0.2.0`，或 `v0.2.0-beta.1` 发布为预发布）时，跑同样的检查和冒烟测试，都通过后才创建 GitHub Release 并上传 zip 和 `SHA256SUMS.txt`。版本号以标签为准；发布说明取 `docs/release-notes-<版本>.md`，没有就用通用说明。
 
 发布新版本：
@@ -127,6 +151,7 @@ git push origin v0.2.0
 - 研发方案：[docs/dev-plan-v0.2.md](docs/dev-plan-v0.2.md)
 - 验收报告：[阶段 0](docs/phase0-report.md)、[M1](docs/m1-report.md)、[M2 上半](docs/m2a-report.md)、[M2 下半](docs/m2b-report.md)、[M3](docs/m3-report.md)、[M4](docs/m4-report.md)、[M5](docs/m5-report.md)、[阶段 2a](docs/phase2a-report.md)
 - 阶段 2a 设计（写入监控的诊断模式）：[docs/phase2a-design.md](docs/phase2a-design.md)
+- 阶段 2b 设计（常驻监控服务）：[docs/phase2b-design.md](docs/phase2b-design.md)，报告：[docs/phase2b-report.md](docs/phase2b-report.md)
 - 发布说明：[0.2.0](docs/release-notes-0.2.0.md)、[0.1.0](docs/release-notes-0.1.0.md)
 - 已知问题和讲述人人工检查清单：[docs/known-issues.md](docs/known-issues.md)
 - 规则格式：[rules/README.md](rules/README.md)
@@ -140,7 +165,7 @@ git push origin v0.2.0
 | `tests/` | 单元测试；`tests/fixtures/` 是规则匹配和热点分解的 JSON 用例（目录树加期望结果，格式见其中的 README） |
 | `tools/` | 规则工具 dtrule、验收和打包脚本 |
 | `rules/` | 内置规则（YAML） |
-| `spikes/` | 技术验证程序（阶段 0 的扫描对比、阶段 2a 的 ETW 实测 EtwBench），不进入产品 |
+| `spikes/` | 技术验证程序（阶段 0 的扫描对比、阶段 2a 的 ETW 实测 EtwBench、阶段 2b 的 AOT 验证 AotProbe），不进入产品 |
 | `docs/` | 设计文档和验证报告 |
 | `prototype/` | HTML 界面原型 |
 
