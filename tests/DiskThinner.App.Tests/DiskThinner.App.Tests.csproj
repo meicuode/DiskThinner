@@ -19,4 +19,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DiskThinner.App\DiskThinner.App.csproj" />
   </ItemGroup>
+  <!-- AI 模块的界面测试只在带 AI 构建时编译（docs/phase3-design.md 4.2 节） -->
+  <ItemGroup Condition="'$(DiskThinnerAi)' != 'true'">
+    <Compile Remove="Ai\**" />
+  </ItemGroup>
 </Project>

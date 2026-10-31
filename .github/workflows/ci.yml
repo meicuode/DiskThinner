@@ -51,6 +51,30 @@ jobs:
           path: TestResults
           if-no-files-found: ignore
 
+  # 可选的 AI 模块要随时能切干净（docs/phase3-design.md 4.2 节）：不带 AI 构建主程序并跑 App 测试
+  no-ai:
+    runs-on: windows-latest
+    env:
+      DOTNET_CLI_UI_LANGUAGE: en
+      DOTNET_NOLOGO: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: 不带 AI 构建和测试
+        run: pwsh -NoProfile -File tools/verify/run.ps1 noai
+
+      - name: 构建输出
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: noai-logs
+          path: artifacts/logs
+          if-no-files-found: ignore
+
   package:
     if: github.event_name == 'push'
     needs: build

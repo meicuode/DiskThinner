@@ -6,8 +6,9 @@
 #   pwsh -File tools\verify\run.ps1 release            发布配置构建
 #   pwsh -File tools\verify\run.ps1 test               构建并运行全部测试
 #   pwsh -File tools\verify\run.ps1 test <项目路径>     构建并运行一个测试项目
+#   pwsh -File tools\verify\run.ps1 noai               不带 AI 模块构建主程序并跑 App 测试（输出在 artifacts\noai，docs/phase3-design.md 4.2 节）
 param(
-    [Parameter(Mandatory)] [ValidateSet('build', 'test', 'release')] [string] $Action,
+    [Parameter(Mandatory)] [ValidateSet('build', 'test', 'release', 'noai')] [string] $Action,
     [string] $Project = 'DiskThinner.slnx'
 )
 
@@ -44,6 +45,21 @@ switch ($Action) {
         Invoke-Logged 'build' @('build', $Project, '-nologo', '-v', 'q', '-nodeReuse:false')
         if ($script:LastCode -eq 0) {
             Invoke-Logged 'test' @('test', $Project, '--no-build', '-nologo', '--blame-hang-timeout', '90s', '-m:1', '-nodeReuse:false')
+        }
+    }
+    'noai' {
+        # 单独的输出和中间目录，不和平常的构建混在一起
+        $noai = Join-Path $root 'artifacts\noai'
+        $props = @('-p:DiskThinnerAi=false', '--artifacts-path', $noai, '-nologo', '-nodeReuse:false')
+        $tests = 'tests\DiskThinner.App.Tests\DiskThinner.App.Tests.csproj'
+        Invoke-Logged 'noai-build' (@('build', $tests, '-c', 'Release', '-v', 'q') + $props)
+        if ($script:LastCode -eq 0) {
+            $leak = Get-ChildItem $noai -Recurse -Filter 'DiskThinner.AI.dll' -ErrorAction SilentlyContinue
+            if ($leak) { Write-Host "FAIL 不带 AI 的输出里有 DiskThinner.AI.dll：$($leak[0].FullName)"; $script:LastCode = 1 }
+            else { Write-Host 'OK 输出里没有 DiskThinner.AI.dll' }
+        }
+        if ($script:LastCode -eq 0) {
+            Invoke-Logged 'noai-test' (@('test', $tests, '-c', 'Release', '--no-build', '--blame-hang-timeout', '90s') + $props)
         }
     }
 }

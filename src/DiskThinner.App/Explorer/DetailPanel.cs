@@ -299,7 +299,7 @@ internal sealed class DetailPanel : Panel
         if (c is not null && rule is null && node.AllocSize > 0 && c.Unexplained(n) >= node.AllocSize)
         {
             var hint = resolved is null
-                ? L.T("没有规则认识这里。打开所在位置看看内容；AI 分析会在后续版本加入。")
+                ? L.T("没有规则认识这里。打开所在位置看看内容。")
                 : L.T("知道归谁，但没有规则说明这里存的是什么、能不能删。可以在对应软件的设置里找清理选项，或者打开所在位置看看。");
             _content.Controls.Add(Wrap(Ui.Label(hint, Theme.Small, Theme.Muted), new Padding(0, 10, 0, 0)));
         }
@@ -524,8 +524,8 @@ internal sealed class DetailPanel : Panel
         if (group.IsUnknown)
         {
             _content.Controls.Add(Callout(group.Kind is null && group.Owner is null && group.Name == L.T("未识别")
-                ? L.T("没有规则认识这些位置。打开所在位置看看内容；AI 分析会在后续版本加入。")
-                : L.T("没有规则认识、也推断不出归属的位置。打开所在位置看看内容；AI 分析会在后续版本加入。"), width, false));
+                ? L.T("没有规则认识这些位置。打开所在位置看看内容。")
+                : L.T("没有规则认识、也推断不出归属的位置。打开所在位置看看内容。"), width, false));
         }
 
         _content.Controls.Add(SectionTitle(L.T("最大的几个位置")));

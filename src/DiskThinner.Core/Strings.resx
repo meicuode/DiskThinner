@@ -68,9 +68,9 @@
     <value>AI 分析在后续版本提供</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
   </data>
-  <data name="AI 分析在后续版本（阶段 3）提供：接口配置、发送前预览、MCP 服务都会放在这里。DiskThinner 现在不联网。" xml:space="preserve">
-    <value>AI 分析在后续版本（阶段 3）提供：接口配置、发送前预览、MCP 服务都会放在这里。DiskThinner 现在不联网。</value>
-    <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  <data name="AI 分析提示词" xml:space="preserve">
+    <value>AI 分析提示词</value>
+    <comment>DiskThinner.AI/AiModule.cs</comment>
   </data>
   <data name="AI 建议" xml:space="preserve">
     <value>AI 建议</value>
@@ -79,6 +79,10 @@
   <data name="AI 建议被采纳" xml:space="preserve">
     <value>AI 建议被采纳</value>
     <comment>DiskThinner.App/Pages/HistoryPage.cs</comment>
+  </data>
+  <data name="AI 接口" xml:space="preserve">
+    <value>AI 接口</value>
+    <comment>DiskThinner.AI/AiModule.cs</comment>
   </data>
   <data name="AWS 凭据" xml:space="preserve">
     <value>AWS 凭据</value>
@@ -111,6 +115,10 @@
   <data name="DiskThinner {0}&#xA;时间：{1:O}&#xA;位置：{2}&#xA;系统：{3}，.NET {4}，{5} 位&#xA;&#xA;{6}&#xA;" xml:space="preserve">
     <value>DiskThinner {0}&#xA;时间：{1:O}&#xA;位置：{2}&#xA;系统：{3}，.NET {4}，{5} 位&#xA;&#xA;{6}&#xA;</value>
     <comment>DiskThinner.App/Shell/AppLog.cs</comment>
+  </data>
+  <data name="DiskThinner 不联网。提示词里只有目录结构和统计信息，用户名已替换；只有你自己粘贴时，这些信息才会离开这台电脑。" xml:space="preserve">
+    <value>DiskThinner 不联网。提示词里只有目录结构和统计信息，用户名已替换；只有你自己粘贴时，这些信息才会离开这台电脑。</value>
+    <comment>DiskThinner.AI/AiModule.cs</comment>
   </data>
   <data name="DiskThinner 以 {0} 的身份运行，而登录的是 {1}。为避免清到别人的目录，这次不清理用户目录、不运行官方命令，只清理系统位置。" xml:space="preserve">
     <value>DiskThinner 以 {0} 的身份运行，而登录的是 {1}。为避免清到别人的目录，这次不清理用户目录、不运行官方命令，只清理系统位置。</value>
@@ -1372,9 +1380,13 @@
     <value>名称过长</value>
     <comment>DiskThinner.Scanner/NamePool.cs, DiskThinner.Scanner/NodeTree.cs</comment>
   </data>
-  <data name="后续版本提供（保存 AI 结论为本地规则、导入、导出）。" xml:space="preserve">
-    <value>后续版本提供（保存 AI 结论为本地规则、导入、导出）。</value>
+  <data name="后续版本提供（自己添加规则、导入、导出）。" xml:space="preserve">
+    <value>后续版本提供（自己添加规则、导入、导出）。</value>
     <comment>DiskThinner.App/Pages/SettingsPage.cs</comment>
+  </data>
+  <data name="后续版本提供：直接调用 OpenAI 兼容接口（含中转站）或 Anthropic 接口，发送前预览，MCP 服务。" xml:space="preserve">
+    <value>后续版本提供：直接调用 OpenAI 兼容接口（含中转站）或 Anthropic 接口，发送前预览，MCP 服务。</value>
+    <comment>DiskThinner.AI/AiModule.cs</comment>
   </data>
   <data name="否" xml:space="preserve">
     <value>否</value>
@@ -1459,6 +1471,10 @@
   <data name="在空间浏览中查看" xml:space="preserve">
     <value>在空间浏览中查看</value>
     <comment>DiskThinner.App/Pages/CleanupPage.cs</comment>
+  </data>
+  <data name="在空间浏览里选中规则不认识的目录，点&quot;生成 AI 分析提示词&quot;，复制到任意 AI 对话里。" xml:space="preserve">
+    <value>在空间浏览里选中规则不认识的目录，点"生成 AI 分析提示词"，复制到任意 AI 对话里。</value>
+    <comment>DiskThinner.AI/AiModule.cs</comment>
   </data>
   <data name="在系统设置里调整" xml:space="preserve">
     <value>在系统设置里调整</value>
@@ -2660,20 +2676,20 @@
     <value>没有能对上这里的写入</value>
     <comment>DiskThinner.App/Monitor/MonitorText.cs</comment>
   </data>
-  <data name="没有规则认识、也推断不出归属的位置。打开所在位置看看内容；AI 分析会在后续版本加入。" xml:space="preserve">
-    <value>没有规则认识、也推断不出归属的位置。打开所在位置看看内容；AI 分析会在后续版本加入。</value>
+  <data name="没有规则认识、也推断不出归属的位置。打开所在位置看看内容。" xml:space="preserve">
+    <value>没有规则认识、也推断不出归属的位置。打开所在位置看看内容。</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
-  <data name="没有规则认识这些位置。打开所在位置看看内容；AI 分析会在后续版本加入。" xml:space="preserve">
-    <value>没有规则认识这些位置。打开所在位置看看内容；AI 分析会在后续版本加入。</value>
+  <data name="没有规则认识这些位置。打开所在位置看看内容。" xml:space="preserve">
+    <value>没有规则认识这些位置。打开所在位置看看内容。</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
   <data name="没有规则认识这里" xml:space="preserve">
     <value>没有规则认识这里</value>
     <comment>DiskThinner.App/Pages/OverviewPage.cs</comment>
   </data>
-  <data name="没有规则认识这里。打开所在位置看看内容；AI 分析会在后续版本加入。" xml:space="preserve">
-    <value>没有规则认识这里。打开所在位置看看内容；AI 分析会在后续版本加入。</value>
+  <data name="没有规则认识这里。打开所在位置看看内容。" xml:space="preserve">
+    <value>没有规则认识这里。打开所在位置看看内容。</value>
     <comment>DiskThinner.App/Explorer/DetailPanel.cs</comment>
   </data>
   <data name="没有记录" xml:space="preserve">

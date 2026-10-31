@@ -13,5 +13,9 @@
     <Company>DiskThinner contributors</Company>
     <Copyright>Copyright (c) 2026 DiskThinner contributors</Copyright>
     <Version>0.3.0</Version>
+
+    <!-- 可选的 AI 模块（docs/phase3-design.md 4.2 节）。-p:DiskThinnerAi=false 构建不带 AI 的版本：
+         主程序不引用 DiskThinner.AI，也不编译 src/DiskThinner.App/Ai 下的文件，界面上没有 AI 的入口。 -->
+    <DiskThinnerAi Condition="'$(DiskThinnerAi)' == ''">true</DiskThinnerAi>
   </PropertyGroup>
 </Project>

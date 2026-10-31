@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 可选的 AI 模块（docs/phase3-design.md 4.1 节）：证据卡、脱敏、提示词、回答格式。不引用 WinForms，不联网。
+       切掉 AI 时整个项目连同 src/DiskThinner.App/Ai、tests/DiskThinner.AI.Tests、tests/DiskThinner.App.Tests/Ai 一起删除。 -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DiskThinner.Core\DiskThinner.Core.csproj" />
+    <ProjectReference Include="..\DiskThinner.Scanner\DiskThinner.Scanner.csproj" />
+    <ProjectReference Include="..\DiskThinner.Rules\DiskThinner.Rules.csproj" />
+    <ProjectReference Include="..\DiskThinner.Inventory\DiskThinner.Inventory.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskThinner.AI.Tests" />
+    <InternalsVisibleTo Include="DiskThinner.App.Tests" />
+  </ItemGroup>
+</Project>

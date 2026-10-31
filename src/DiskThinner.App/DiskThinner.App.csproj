@@ -19,10 +19,18 @@
          dtrule 是构建工具，不进发布包：publish -r win-x64 / 自包含时这些属性不传给它，它总是输出到下面 DtRuleDll 的固定位置
          （否则会输出到 ...\win-x64\ 下，干净的机器上找不到 dtrule.dll）。 -->
     <ProjectReference Include="..\..\tools\dtrule\dtrule.csproj" ReferenceOutputAssembly="false" Private="false"
-                      UndefineProperties="RuntimeIdentifier;SelfContained;PublishSingleFile;IncludeNativeLibrariesForSelfExtract;EnableCompressionInSingleFile;PublishDir" />
+                      UndefineProperties="RuntimeIdentifier;SelfContained;PublishSingleFile;IncludeNativeLibrariesForSelfExtract;EnableCompressionInSingleFile;PublishDir;ArtifactsPath;UseArtifactsOutput" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DiskThinner.App.Tests" />
+  </ItemGroup>
+
+  <!-- 可选的 AI 模块（docs/phase3-design.md 4.2 节）：DiskThinnerAi=false 时不引用 DiskThinner.AI，也不编译 Ai 文件夹 -->
+  <ItemGroup Condition="'$(DiskThinnerAi)' == 'true'">
+    <ProjectReference Include="..\DiskThinner.AI\DiskThinner.AI.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DiskThinnerAi)' != 'true'">
+    <Compile Remove="Ai\**" />
   </ItemGroup>
 
   <!-- 内置规则库：校验并编译 rules 目录，嵌入为资源。规则有错误时构建失败。 -->
@@ -30,7 +38,8 @@
     <RulesSourceDir>$(MSBuildThisFileDirectory)..\..\rules\</RulesSourceDir>
     <DtRuleDll>$(MSBuildThisFileDirectory)..\..\tools\dtrule\bin\$(Configuration)\$(TargetFramework)\dtrule.dll</DtRuleDll>
     <!-- IntermediateOutputPath 在项目正文求值时还没有定义（为空时会写到项目目录），这里用 BaseIntermediateOutputPath 自己拼 -->
-    <RulesDb>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\rules.db</RulesDb>
+    <!-- Path.Combine：BaseIntermediateOutputPath 平常是相对路径，用 artifacts 输出（run.ps1 noai）时是绝对路径 -->
+    <RulesDb>$([System.IO.Path]::Combine($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath), $(Configuration), $(TargetFramework), 'rules.db'))</RulesDb>
   </PropertyGroup>
   <ItemGroup>
     <RuleSource Include="$(RulesSourceDir)**\*.yaml" />

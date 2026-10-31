@@ -8,7 +8,7 @@ namespace DiskThinner.App.Pages;
 
 /// <summary>
 /// 设置（原型 .p-settings）：左边是分类，右边是各组卡片。写入监控（含阶段 2b 的常驻服务）、快照、清理、规则四组可用；
-/// AI（阶段 3）显示为后续版本。改动立即保存到 settings.json。
+/// AI（阶段 3）一组只在带 AI 模块构建时出现（<see cref="OptionalAi"/>）。改动立即保存到 settings.json。
 /// </summary>
 internal sealed class SettingsPage : UserControl
 {
@@ -110,8 +110,13 @@ internal sealed class SettingsPage : UserControl
             Row(L.T("只记录大于"), Stack(_minDir, Hint(L.T("更小的目录并入上级。改小会让快照库变大；文件固定为 100 MB 以上才单独记录。")))),
             Row(L.T("保留"), Stack(keepRow, Hint(L.T("这么多天内的快照全部保留，更早的每周只留一个。"))))));
 
-        AddSection(nav, "AI", Card("AI",
-            Row("", Hint(L.T("AI 分析在后续版本（阶段 3）提供：接口配置、发送前预览、MCP 服务都会放在这里。DiskThinner 现在不联网。")))));
+        // AI（阶段 3）：只有带 AI 模块构建时才有这一组
+        if (OptionalAi.Current is { } ai)
+        {
+            AddSection(nav, "AI", Card("AI", ai.SettingsRows
+                .Select(r => (Control)Row(r.Label, r.Hint.Length == 0 ? Body(r.Text) : Stack(Body(r.Text), Hint(r.Hint))))
+                .ToArray()));
+        }
 
         var protectButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
         var showBuiltIn = Ui.Button(L.T("查看内置保护名单"));
@@ -131,7 +136,7 @@ internal sealed class SettingsPage : UserControl
         openData.Margin = new Padding(0, 8, 0, 0);
         AddSection(nav, L.T("规则"), Card(L.T("规则"),
             Row(L.T("内置规则"), _rules),
-            Row(L.T("本地规则"), Hint(L.T("后续版本提供（保存 AI 结论为本地规则、导入、导出）。"))),
+            Row(L.T("本地规则"), Hint(L.T("后续版本提供（自己添加规则、导入、导出）。"))),
             Row(L.T("数据位置"), Stack(_paths, openData))));
 
         _scroll.Controls.Add(_stack);
@@ -233,6 +238,9 @@ internal sealed class SettingsPage : UserControl
     public AppSettings Settings => _settings;
 
     internal ListBox ProtectedList => _protected;
+
+    /// <summary>各组的名字（测试用）。</summary>
+    internal IReadOnlyCollection<string> SectionNames => _sections.Keys;
 
     internal ComboBox TempAgeBox => _tempAge;
 
@@ -599,6 +607,14 @@ internal sealed class SettingsPage : UserControl
         var flow = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, BackColor = Color.Transparent, Margin = new Padding(0) };
         flow.Controls.AddRange(items);
         return flow;
+    }
+
+    private static Label Body(string text)
+    {
+        var l = Ui.Label(text, Theme.Ui);
+        l.MaximumSize = new Size(620, 0);
+        l.Margin = new Padding(0, 2, 0, 0);
+        return l;
     }
 
     private static Label Hint(string text)
