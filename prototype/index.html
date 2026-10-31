@@ -61,6 +61,7 @@ svg.ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;st
 #v-dlg-etw:checked ~ .shell .p-dlg-etw,
 #v-dlg-agent:checked ~ .shell .p-dlg-agent,
 #v-dlg-send:checked ~ .shell .p-dlg-send,
+#v-dlg-prompt:checked ~ .shell .p-dlg-prompt,
 #v-dlg-clean:checked ~ .shell .p-dlg-clean{display:grid}
 #v-overview:checked ~ .shell .nav label[for="v-overview"],
 #v-explorer:checked ~ .shell .nav label[for="v-explorer"],
@@ -278,6 +279,13 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
 .dlg-f{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px;background:#f5f5f5;border-top:1px solid var(--border)}
 .dlg-f .left{margin-right:auto;font-size:12px;color:var(--muted)}
 
+/* ---------- AI 分析提示词（阶段 3） ---------- */
+.prompt-box{display:block;width:100%;height:330px;resize:vertical;font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;line-height:1.5;border:1px solid var(--border);border-radius:4px;padding:8px 10px;box-sizing:border-box;color:var(--text);background:#fff}
+.planned{margin-top:12px;border:1px dashed #c8c8c8;border-radius:6px;padding:8px 12px 4px;background:#fafafa}
+.planned-h{font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.proto-sample{margin-top:18px;border:1px dashed #d4b106;border-radius:6px;padding:10px 12px;background:#fff}
+.proto-sample-h{font-size:12px;color:#6b4700;font-weight:600;margin-bottom:8px}
+
 /* ---------- 原型说明 ---------- */
 .proto-note{margin-top:16px;border:1px dashed #d4b106;background:#fffbe6;border-radius:6px;padding:8px 12px;font-size:12px;color:#4d3d00}
 .proto-note summary{cursor:pointer;font-weight:600}
@@ -299,6 +307,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
   <input type="radio" name="view" id="v-dlg-etw" class="view-radio" aria-label="对话框：开启写入监控">
   <input type="radio" name="view" id="v-dlg-agent" class="view-radio" aria-label="对话框：安装常驻监控服务">
   <input type="radio" name="view" id="v-dlg-send" class="view-radio" aria-label="对话框：AI 发送内容预览">
+  <input type="radio" name="view" id="v-dlg-prompt" class="view-radio" aria-label="对话框：AI 分析提示词">
   <input type="radio" name="view" id="v-dlg-clean" class="view-radio" aria-label="对话框：确认清理">
 
   <div class="shell">
@@ -308,7 +317,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
       <span class="logo" aria-hidden="true"></span>
       <span class="title">DiskThinner</span>
       <span class="muted small">C: 本地磁盘</span>
-      <span class="proto-badge">UI 原型 v0.2 · 示例数据</span>
+      <span class="proto-badge">UI 原型 v0.3 · 示例数据</span>
       <div class="winbtns" aria-hidden="true">
         <span><svg class="ico" viewBox="0 0 16 16"><path d="M3 8h10"/></svg></span>
         <span><svg class="ico" viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg></span>
@@ -337,9 +346,6 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
       <label class="pill" for="v-dlg-etw" title="开启写入监控后，可以看到是哪个程序在写 C 盘">
         <span class="dot"></span>写入监控：关闭<span class="subtle">·</span><span style="color:var(--accent)">开启诊断</span>
       </label>
-      <label class="btn ai" for="v-ai">
-        <svg class="ico" viewBox="0 0 16 16"><path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg>AI 分析
-      </label>
     </div>
 
     <div class="body">
@@ -354,9 +360,6 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
         </label>
         <label for="v-growth">
           <svg class="ico" viewBox="0 0 16 16"><path d="M1.5 12.5l4-4 3 3 6-6"/><path d="M10.5 5.5h4v4"/></svg>增长分析
-        </label>
-        <label for="v-ai">
-          <svg class="ico" viewBox="0 0 16 16"><path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg>AI 分析<span class="badge" style="background:#7a49a8">37</span>
         </label>
         <label for="v-cleanup">
           <svg class="ico" viewBox="0 0 16 16"><path d="M2.5 4h11"/><path d="M6 4V2.5h4V4"/><path d="M3.5 4l.8 9.5h7.4l.8-9.5"/></svg>清理计划<span class="badge">10</span>
@@ -374,11 +377,18 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
         <label for="v-dlg-agent">
           <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>安装常驻服务
         </label>
-        <label for="v-dlg-send">
-          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>AI 发送预览
+        <label for="v-dlg-prompt">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>AI 分析提示词
         </label>
         <label for="v-dlg-clean">
           <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>确认清理
+        </label>
+        <div class="group proto">原型：规划（以后做）</div>
+        <label for="v-ai">
+          <svg class="ico" viewBox="0 0 16 16"><path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg>AI 分析
+        </label>
+        <label for="v-dlg-send">
+          <svg class="ico" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13"/></svg>AI 发送预览
         </label>
       </nav>
 
@@ -411,7 +421,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
             <div class="card stat">
               <div class="k">未识别</div>
               <div class="v">9.8 GB <small>· 37 个目录</small></div>
-              <div class="foot"><label class="btn sm ai" for="v-ai">逐个用 AI 分析</label></div>
+              <div class="foot"><label class="btn sm ai" for="v-dlg-prompt">为最大的 10 处生成提示词</label></div>
             </div>
           </div>
 
@@ -445,7 +455,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                   <tr><td class="wrap">崩溃转储 3 个文件<div class="small muted">程序和系统崩溃时的内存快照</div></td><td class="num">11.6 GB</td><td><span class="tag r-safe">安全</span></td><td><label class="btn sm" for="v-cleanup">加入清理</label></td></tr>
                   <tr><td class="wrap">C 盘分页文件<div class="small muted">D 盘已有分页文件，C 盘这份可能是重复配置</div></td><td class="num">13.6 GB</td><td><span class="tag r-sys">系统设置</span></td><td><button class="btn sm" type="button">查看步骤</button></td></tr>
                   <tr><td class="wrap">开发工具缓存<div class="small muted">uv、NuGet、npm，用官方命令清理</div></td><td class="num">6.6 GB</td><td><span class="tag r-low">需重新下载</span></td><td><label class="btn sm" for="v-cleanup">加入清理</label></td></tr>
-                  <tr><td class="wrap path">%LOCALAPPDATA%\ms-playwright<div class="small muted" style="font-family:inherit">未识别，47 天没有写入</div></td><td class="num">2.4 GB</td><td><span class="tag s-ai">未识别</span></td><td><label class="btn sm ai" for="v-ai">AI 分析</label></td></tr>
+                  <tr><td class="wrap path">%LOCALAPPDATA%\ms-playwright<div class="small muted" style="font-family:inherit">未识别，47 天没有写入</div></td><td class="num">2.4 GB</td><td><span class="tag s-ai">未识别</span></td><td><label class="btn sm" for="v-explorer">查看</label></td></tr>
                 </tbody>
               </table>
             </div>
@@ -495,6 +505,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <li>四张卡片回答四个问题：还剩多少、涨得多快、能清多少、还有多少不认识。</li>
               <li>"按此速度约 N 天后写满"用最近 7 天快照的平均增速计算；没有快照历史时隐藏。</li>
               <li>标签区分来源：<span class="tag s-obs">实测</span> 来自 ETW 或文件占用查询，<span class="tag s-rule">规则</span> 来自内置规则，<span class="tag s-infer">推断</span> 来自路径和签名匹配，<span class="tag s-ai">AI 推断</span> 来自 AI 分析。</li>
+              <li>"未识别"卡片的"为最大的 10 处生成提示词"（阶段 3）打开"AI 分析提示词"对话框，一次覆盖按大小排在前 10 的未识别位置。没有 AI 模块的版本不显示这个按钮。</li>
               <li>WinForms 实现：卡片用 Panel 自绘，趋势图用 GDI 自绘，表格用 ListView（Details 视图）。</li>
               <li>"增长最快"的写入者列有三种：监控时段里有写入的写"写入进程 ← 顶层应用"加 <span class="tag s-obs">实测</span>（完整进程链放在提示里）；没有监控、但规则知道是什么的写类别加 <span class="tag s-none">未监控</span>；规则也不认识的只有 <span class="tag s-ai">未识别</span>。</li>
               <li>卡片底部的提示：从没开过监控时写"写入监控未开启，增长只能按快照对比，看不到是哪个程序写的。开启 4 小时诊断"；开过时写覆盖了多少小时。设置里选"关闭"时不显示这条提示。</li>
@@ -535,7 +546,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                   <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>Microsoft</td><td class="num">7.90 GB</td><td><span class="bar"><i style="width:25.3%"></i></span>25.3%</td><td>今天 10:02</td><td class="num up">+1.1 GB</td><td>多个微软应用</td><td>混合</td></tr>
                   <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>Temp</td><td class="num">4.07 GB</td><td><span class="bar"><i style="width:13%"></i></span>13.0%</td><td>刚刚</td><td class="num down">−1.9 GB</td><td>多个程序 <span class="tag s-rule">规则</span></td><td>临时文件 <span class="tag r-safe">安全</span></td></tr>
                   <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>Perplexity</td><td class="num">2.96 GB</td><td><span class="bar"><i style="width:9.5%"></i></span>9.5%</td><td>昨天</td><td class="num up">+0.2 GB</td><td>Perplexity Comet <span class="tag s-infer">推断</span></td><td>浏览器数据 <span class="tag r-medium">丢失登录态</span></td></tr>
-                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>ms-playwright</td><td class="num">2.41 GB</td><td><span class="bar"><i style="width:7.7%"></i></span>7.7%</td><td>47 天前</td><td class="num">0</td><td><span class="subtle">未识别</span> <label class="btn sm ai" for="v-ai">AI 分析</label></td><td></td></tr>
+                  <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>ms-playwright</td><td class="num">2.41 GB</td><td><span class="bar"><i style="width:7.7%"></i></span>7.7%</td><td>47 天前</td><td class="num">0</td><td><span class="tag s-ai">未识别</span></td><td></td></tr>
                   <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>NuGet</td><td class="num">1.78 GB</td><td><span class="bar"><i style="width:5.7%"></i></span>5.7%</td><td>3 天前</td><td class="num up">+0.1 GB</td><td>NuGet <span class="tag s-rule">规则</span></td><td>下载缓存 <span class="tag r-low">需重新下载</span></td></tr>
                   <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span>AWSToolkit</td><td class="num">1.71 GB</td><td><span class="bar"><i style="width:5.5%"></i></span>5.5%</td><td>21 天前</td><td class="num">0</td><td>AWS Toolkit <span class="tag s-infer">推断</span></td><td>缓存 <span class="tag r-low">需重新下载</span></td></tr>
                   <tr><td class="name" style="--l:5"><span class="chev">▶</span><span class="fi"></span><span class="muted">其他 296 项</span></td><td class="num">6.00 GB</td><td><span class="bar"><i style="width:19.2%"></i></span>19.2%</td><td></td><td class="num">−0.2 GB</td><td></td><td></td></tr>
@@ -629,6 +640,25 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <div class="sec-t">从根上解决</div>
               <div class="callout">设置环境变量 <code>UV_CACHE_DIR</code>，把缓存放到 D 盘，以后不再占 C 盘。<div style="margin-top:6px"><button class="btn sm" type="button">生成设置命令</button></div></div>
 
+              <div class="proto-sample" aria-label="原型示例：未识别目录的详情">
+                <div class="proto-sample-h">原型示例：选中规则不认识的目录时（阶段 3）</div>
+                <div class="d-title">ms-playwright <span class="tag s-ai">未识别</span></div>
+                <div class="path muted" style="margin-top:2px">C:\Users\demo\AppData\Local\ms-playwright</div>
+                <dl class="kv">
+                  <dt>大小</dt><dd><b>2.41 GB</b> · 4,127 个文件</dd>
+                  <dt>未识别</dt><dd>2.41 GB</dd>
+                  <dt>子目录</dt><dd>312 个</dd>
+                  <dt>最后写入</dt><dd>2026-09-02 14:20（含子项）</dd>
+                </dl>
+                <div class="small muted" style="margin-top:10px">没有规则认识这里。可以生成一段提示词，复制到任意 AI 对话里问一问；也可以打开所在位置看看内容。</div>
+                <div class="sec-t">操作</div>
+                <div class="btn-col">
+                  <label class="btn ai" for="v-dlg-prompt">生成 AI 分析提示词</label>
+                  <button class="btn" type="button">打开所在位置，自己清理</button>
+                  <button class="btn" type="button">复制路径</button>
+                </div>
+              </div>
+
               <details class="proto-note">
                 <summary>原型说明：空间浏览</summary>
                 <ul>
@@ -639,7 +669,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                   <li>树形列表用虚拟模式 ListView 模拟树，支持百万级条目；方块图用 GDI 自绘。</li>
                   <li>"按归属汇总"把同一个应用分散在多处的目录合并统计（比如 VS Code 的缓存、扩展、工作区存储）。</li>
                   <li>"可释放"要扣掉硬链接共享的部分，和"大小"不一定相等。</li>
-                  <li>未识别目录的归属列直接给出"AI 分析"入口。</li>
+                  <li>规则不认识的目录（完全未识别，或知道归谁但没有规则说明）的详情里有"生成 AI 分析提示词"（阶段 3，见上面的示例），打开"AI 分析提示词"对话框。规则认识的目录、文件、受硬保护的目录不显示。"按归属汇总"里的"未识别"组有"为最大的 10 处生成提示词"。没有 AI 模块的版本不显示这些按钮，说明文字里也不提 AI。</li>
                   <li>ETW 证据取近 30 天的诊断。进程链一律按"写入进程 ← 上级 ← 顶层"的方向写（全原型统一）。</li>
                   <li>监控过但这里没有写入时，按情况写：只有轻量模式的时段→"近 30 天 3 次诊断（共 14 小时）里这里没有新建、删除或重命名（轻量模式不记录写入量）"；有精确模式、但有不少写入对不上目录→"……没有记录到能对上这里的写入；另有 3.2 GB 的写入对不上目录（监控开始前已打开的文件）"；其余→"近 30 天 3 次诊断（共 14 小时）里没有程序在这里写入"。从没监控过时不显示这一条。</li>
                   <li>"按归属汇总""按类别汇总"里选中一个组时不显示 ETW 证据；选中组里的具体目录时照常显示。</li>
@@ -768,12 +798,14 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
             <div class="actions">
               <select class="select" aria-label="AI 提供方">
                 <option>我的 DeepSeek（OpenAI 兼容接口）</option>
-                <option>通过 MCP：Claude Code</option>
+                <option>中转站（OpenAI 兼容接口）</option>
                 <option>本地 Ollama</option>
               </select>
               <button class="btn" type="button">重新分析</button>
             </div>
           </div>
+
+          <div class="callout warn" style="margin-bottom:12px"><b>规划，本轮不做。</b>阶段 3 这一轮只做"生成 AI 分析提示词"（空间浏览的详情、"未识别"组、概览的"未识别"卡片），复制到任意 AI 对话里用。这一页是以后直接调用 AI 接口时的样子，做法见 docs/phase3-design.md 第 5.7 节。</div>
 
           <div class="ai-grid">
             <div class="stack">
@@ -842,14 +874,14 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                 <h2>继续追问</h2>
                 <div class="chat" aria-live="polite">
                   <div class="msg user">我最近没跑过测试，全删了会影响什么？</div>
-                  <div class="toolcall">调用 search_files：在 D:\Projects 中查找依赖 playwright 的项目 → 2 个结果</div>
-                  <div class="msg bot">找到两个依赖 Playwright 的项目：<span class="path">D:\Projects\web-e2e</span> 和 <span class="path">D:\Projects\scraper</span>。全部删除不会损坏它们，只是下次运行测试时要先执行 <code>npx playwright install</code>，重新下载约 1.4 GB。如果近期不跑测试，可以全删。</div>
+                  <div class="toolcall">调用 search_installed：查找和 Playwright 有关的软件 → npm 全局包 @playwright/test 1.48</div>
+                  <div class="msg bot">本机装有 Playwright 的 npm 全局包 @playwright/test 1.48，它用的浏览器是 chromium-1148。全部删除不会损坏任何项目，只是下次运行测试时要先执行 <code>npx playwright install</code>，重新下载约 1.4 GB。如果近期不跑测试，可以全删。</div>
                 </div>
                 <div class="composer">
                   <textarea aria-label="输入追问" placeholder="继续追问，比如：这个目录还会再变大吗？"></textarea>
                   <button class="btn primary" type="button">发送</button>
                 </div>
-                <div class="small muted" style="margin-top:6px">AI 只能调用只读工具：列出子目录、查写入历史、搜索文件、查已装软件。不能删除任何东西。</div>
+                <div class="small muted" style="margin-top:6px">AI 只能调用只读工具：列出子目录、查写入历史、在这个目录里找文件、查已装软件、查规则。不能删除任何东西。</div>
               </div>
             </div>
           </div>
@@ -859,8 +891,9 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
             <ul>
               <li>"一键分析"使用固定的技能提示词，要求 AI 按固定 JSON 返回（归属、作用、风险、建议、依据、置信度），工具校验后显示成结果卡片。</li>
               <li>"保存为本地规则"后，同一目录下次不再请求 AI；以后可以选择匿名分享到社区规则库。</li>
-              <li>提供方支持 OpenAI 兼容接口（DeepSeek、通义、Kimi、Ollama 等）、Anthropic 接口和 MCP。API Key 用 DPAPI 加密保存。</li>
-              <li>AI 推断的风险等级不能低于"需重新下载"，也就是 AI 不能把任何东西直接标成"安全"。（待确认）</li>
+              <li>（规划）提供方支持 OpenAI 兼容接口（DeepSeek、通义、Kimi、Ollama，以及各种中转站：填中转站的接口地址、Key 和模型名）和 Anthropic 接口。API Key 用 DPAPI 加密保存。MCP 是反方向的：让别的 AI 工具调用 DiskThinner 的只读功能，所以不在提供方列表里。</li>
+              <li>（规划）不配置接口时，也可以把网页 AI 的回答粘贴回来，显示成同样的结果卡片。</li>
+              <li>AI 推断的风险等级不能低于"需重新下载"，也就是 AI 不能把任何东西直接标成"安全"（决策点 F4）。本轮的提示词里就没有"安全"这一档。</li>
             </ul>
           </details>
         </section>
@@ -1002,14 +1035,18 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
 
               <div class="card" id="set-ai">
                 <h2>AI</h2>
-                <div class="form-row"><div class="lbl">接口类型</div><div><select class="select" aria-label="接口类型"><option>OpenAI 兼容（DeepSeek、通义、Kimi、Ollama 等）</option><option>Anthropic</option></select></div></div>
-                <div class="form-row"><div class="lbl">接口地址</div><div><input class="input" value="https://api.deepseek.com/v1" aria-label="接口地址"></div></div>
-                <div class="form-row"><div class="lbl">模型</div><div><input class="input" value="deepseek-chat" aria-label="模型"></div></div>
-                <div class="form-row"><div class="lbl">API Key</div><div><input class="input" type="password" value="sk-xxxxxxxxxxxxxxxx" aria-label="API Key"><div class="hint">用 Windows DPAPI 加密保存在本机，只有当前用户能解密。</div></div></div>
-                <div class="form-row"><div class="lbl"></div><div><button class="btn" type="button">测试连接</button></div></div>
-                <div class="form-row"><div class="lbl">发送前预览</div><div><input type="checkbox" class="toggle" checked aria-label="发送前预览"><div class="hint">每次发送前显示完整内容。用户名替换和不发送文件内容这两条不能关闭。</div></div></div>
-                <div class="form-row"><div class="lbl">MCP 服务</div><div><input type="checkbox" class="toggle" checked aria-label="启用 MCP 服务"><div class="hint">让 Claude Code、Codex、Kiro、Cursor 等工具调用 DiskThinner 的只读功能。把下面的配置加到对应工具的 MCP 设置里：</div>
-                  <pre class="code" style="margin-top:8px">{
+                <div class="form-row"><div class="lbl">AI 分析提示词</div><div>在空间浏览里选中规则不认识的目录，点"生成 AI 分析提示词"，复制到任意 AI 对话里。<div class="hint">DiskThinner 不联网。提示词里只有目录结构和统计信息，用户名已替换；只有你自己粘贴时，这些信息才会离开这台电脑。</div></div></div>
+                <div class="planned">
+                  <div class="planned-h"><span class="tag s-none">规划</span> 以后的版本：直接调用 AI 接口（本轮不做）</div>
+                  <div class="form-row"><div class="lbl">启用 AI 接口</div><div><input type="checkbox" class="toggle" aria-label="启用 AI 接口"><div class="hint">默认关闭。关闭时 DiskThinner 不联网，下面的设置都不生效。</div></div></div>
+                  <div class="form-row"><div class="lbl">接口类型</div><div><select class="select" aria-label="接口类型"><option>OpenAI 兼容（DeepSeek、通义、Kimi、Ollama、中转站等）</option><option>Anthropic</option></select><div class="hint">用中转站时选 OpenAI 兼容，接口地址、Key、模型名填中转站给的。</div></div></div>
+                  <div class="form-row"><div class="lbl">接口地址</div><div><input class="input" value="https://api.deepseek.com/v1" aria-label="接口地址"><div class="hint">必须是 https；只有本机地址（如 Ollama 的 http://localhost:11434/v1）可以用 http。</div></div></div>
+                  <div class="form-row"><div class="lbl">模型</div><div><input class="input" value="deepseek-chat" aria-label="模型"></div></div>
+                  <div class="form-row"><div class="lbl">API Key</div><div><input class="input" type="password" value="sk-xxxxxxxxxxxxxxxx" aria-label="API Key"><div class="hint">用 Windows DPAPI 加密保存在本机，只有当前用户能解密。</div></div></div>
+                  <div class="form-row"><div class="lbl"></div><div><button class="btn" type="button">测试连接</button></div></div>
+                  <div class="form-row"><div class="lbl">发送前预览</div><div><input type="checkbox" class="toggle" checked aria-label="发送前预览"><div class="hint">每次发送前显示完整内容。用户名替换和不发送文件内容这两条不能关闭。</div></div></div>
+                  <div class="form-row"><div class="lbl">MCP 服务</div><div><input type="checkbox" class="toggle" aria-label="启用 MCP 服务"><div class="hint">让 Claude Code、Codex、Kiro、Cursor 等工具调用 DiskThinner 的只读功能。把下面的配置加到对应工具的 MCP 设置里：</div>
+                    <pre class="code" style="margin-top:8px">{
   "mcpServers": {
     "diskthinner": {
       "command": "C:\\Program Files\\DiskThinner\\DiskThinner.exe",
@@ -1017,6 +1054,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
     }
   }
 }</pre></div></div>
+                </div>
               </div>
 
               <div class="card" id="set-clean">
@@ -1041,7 +1079,8 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
                   <li>服务在记录时，概览、增长分析的"开启诊断"换成"常驻服务正在记录"；服务没有运行时诊断照常可用。</li>
                   <li>选"关闭"时概览和增长分析不出现"开启诊断"的提示，点工具栏的胶囊跳到这里。</li>
                   <li>记录模式的默认值按实测的开销定（2a.1）：开销达标就默认精确，否则默认轻量。保留天数之外另有 64 MB 的上限，超出时删最早的会话。</li>
-                  <li>MCP 只暴露只读工具，删除永远只能在 DiskThinner 界面里由用户确认。</li>
+                  <li>"AI"一组（阶段 3）：本轮只有上面的说明。虚线框里是以后直接调用 AI 接口时的设置，标"规划"，本轮不做。没有 AI 模块的版本没有"AI"这一组。</li>
+                  <li>（规划）AI 的设置放在单独的 ai.json，不放进 settings.json。MCP 只暴露只读工具，删除永远只能在 DiskThinner 界面里由用户确认。</li>
                   <li>社区规则共享、远程规则更新属于第 4 阶段，这里暂不出现。</li>
                 </ul>
               </details>
@@ -1124,6 +1163,7 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
           <div class="dlg wide">
             <div class="dlg-h" id="h-dlg-send">发送给 AI 的内容</div>
             <div class="dlg-b">
+              <div class="callout warn" style="margin:4px 0 8px"><b>规划，本轮不做。</b>以后直接调用 AI 接口时，发送前显示这个对话框；内容和"AI 分析提示词"里的证据相同。</div>
               <p style="margin:4px 0 10px">将发送到 <b>我的 DeepSeek</b>（api.deepseek.com）。用户名已替换，不包含任何文件内容。</p>
 <pre class="code">{
   "skill": "diskthinner.analyze-directory/v1",
@@ -1158,6 +1198,109 @@ pre.code{background:#1f1f1f;color:#d8d8d8;border-radius:6px;padding:10px 12px;fo
               <span class="left">约 1,200 tokens · 发送记录会写入操作日志</span>
               <label class="btn" for="v-ai">取消</label>
               <label class="btn primary" for="v-ai">发送</label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== 对话框：AI 分析提示词（阶段 3） ============================== -->
+        <section class="page p-dlg p-dlg-prompt" role="dialog" aria-modal="true" aria-labelledby="h-dlg-prompt">
+          <div class="dlg wide" style="width:760px">
+            <div class="dlg-h" id="h-dlg-prompt">AI 分析提示词 · <span class="path" style="font-size:14px">%LOCALAPPDATA%\ms-playwright</span></div>
+            <div class="dlg-b">
+              <p style="margin:4px 0 10px">复制后粘贴到任意 AI 对话里（DeepSeek、通义千问、Kimi、豆包、ChatGPT、Claude 等）。DiskThinner 不会联网发送。目录名里可能有项目名、公司名，复制前请看一遍，可以直接删改。</p>
+<textarea class="prompt-box" aria-label="提示词" spellcheck="false">你是熟悉 Windows 软件和开发工具的磁盘空间顾问。下面是磁盘清理工具 DiskThinner 在一台 Windows 电脑上找到的一个占用较大、但它的规则库不认识的目录。请判断：它是什么、是哪个软件创建的、能不能删、怎么删最稳妥。
+
+关于这些信息：
+- 只有目录结构和统计数字，没有任何文件内容。
+- 用户目录写成了 %USERPROFILE%、%LOCALAPPDATA%、%APPDATA% 这样的形式；&lt;user&gt;、&lt;computer&gt;、&lt;email&gt; 是替换掉的个人信息。
+- owner_guess 是 DiskThinner 自己的推测，不一定对。writers 是写入监控实际看到的写入进程；它为空不代表没有程序写入，要结合 monitoring 看监控了多久。
+
+请遵守：
+1. 只根据给出的信息和你确定知道的事实判断。拿不准就直说，并告诉我还应该查看什么（例如某个子目录里有哪些文件）。不要编造软件名、路径或命令。
+2. 风险只能从下面五档里选一档，不要说"完全安全"：
+   - redownload：删了以后会重新下载或重新生成（缓存、安装包、旧版本、模型、工具链）
+   - history：会丢失历史记录、登录状态、设置这类不太重要的数据
+   - user_data：可能有我自己的数据（文档、项目、存档、聊天记录、数据库）
+   - program：程序本身或正在使用的运行环境，应该卸载，不要直接删除
+   - unknown：判断不了
+3. 优先推荐软件自带的清理功能或官方命令，其次才是手动删除。如果只建议删除其中一部分（例如旧版本的子目录），写出具体路径，路径必须在这个目录里面。
+4. 写清楚删除前要关闭哪些程序、删除后会发生什么。
+5. 如果能通过环境变量或软件设置把它放到别的盘，也告诉我。
+
+请用中文回答。先用三到五句话说结论，然后在一个 json 代码块里按下面的格式给出结果。字段都要有，不知道的写 null 或空数组：
+```json
+{
+  "path": "被分析的目录，照抄",
+  "owner": "归属的软件或组件",
+  "vendor": "厂商",
+  "purpose": "这个目录存的是什么",
+  "risk": "redownload | history | user_data | program | unknown",
+  "confidence": "high | medium | low",
+  "suggestion": "建议怎么处理",
+  "delete": [{ "path": "建议删除的路径", "reason": "理由" }],
+  "commands": ["官方清理命令"],
+  "close_first": ["删除前要关闭的程序"],
+  "relocate": "放到别的盘的方法，没有写 null",
+  "basis": ["判断依据"],
+  "check_before_delete": ["删除前建议我自己确认的事"]
+}
+```
+
+目录信息：
+```json
+{
+  "format": "diskthinner.evidence/v1",
+  "os": "Windows 11 25H2",
+  "path": "%LOCALAPPDATA%\\ms-playwright",
+  "size": "2.41 GB",
+  "size_bytes": 2587754086,
+  "files": 4127,
+  "dirs": 312,
+  "created": "2026-03-02",
+  "last_write": "2026-09-02",
+  "last_write_days_ago": 47,
+  "children": [
+    { "name": "chromium-1148", "type": "dir", "size": "618 MB", "files": 312, "last_write": "2026-09-02",
+      "children": [{ "name": "chrome-win", "type": "dir", "size": "617 MB" }, { "name": "INSTALLATION_COMPLETE", "type": "file", "size": "0 B" }] },
+    { "name": "chromium-1140", "type": "dir", "size": "612 MB", "files": 309, "last_write": "2026-06-11",
+      "children": [{ "name": "chrome-win", "type": "dir", "size": "611 MB" }] },
+    { "name": "webkit-2092", "type": "dir", "size": "515 MB", "files": 1802, "last_write": "2026-09-02" },
+    { "name": "firefox-1466", "type": "dir", "size": "402 MB", "files": 914, "last_write": "2026-09-02" },
+    { "name": "chromium_headless_shell-1148", "type": "dir", "size": "290 MB", "files": 774, "last_write": "2026-09-02" },
+    { "name": "ffmpeg-1010", "type": "dir", "size": "2 MB", "files": 3, "last_write": "2026-03-02" }
+  ],
+  "other_children": { "count": 0, "size": "0 B" },
+  "extensions": { ".dll": 0.41, ".exe": 0.18, ".pak": 0.16, ".dat": 0.07, "other": 0.18 },
+  "executables": [
+    { "path": "chromium-1148\\chrome-win\\chrome.exe", "product": "Chromium", "company": "The Chromium Authors", "version": "130.0.6723.31", "signer": null, "signature_valid": false }
+  ],
+  "owner_guess": null,
+  "installed_matches": [],
+  "dev_tools": ["Node.js 22.11.0", "npm 10.9.0", "Python 3.12.7", "uv 0.5.4", "dotnet 10.0.401", "git 2.47.0"],
+  "rules_inside": [],
+  "protected_inside": [],
+  "monitoring": "近 30 天常驻监控共 26 天",
+  "writers": [],
+  "open_by": []
+}
+```</textarea>
+              <details class="proto-note">
+                <summary>原型说明：AI 分析提示词</summary>
+                <ul>
+                  <li>入口：空间浏览里规则不认识的目录的详情（单个）；"按归属汇总"的"未识别"组和概览的"未识别"卡片（批量，按大小前 10 处，标题写"10 个未识别的位置（共 7.4 GB）"）。</li>
+                  <li>打开时先显示"正在收集信息…"，收集在后台进行，关闭对话框就取消。单个目录不超过 1 秒，批量不超过 5 秒。</li>
+                  <li>文本框可以直接删改，"复制提示词"复制的是改过的内容；改过以后"恢复原文"才可用。复制后按钮两秒内显示"已复制"。</li>
+                  <li>脱敏不能关闭：当前用户的目录写成 %LOCALAPPDATA% 等；其他用户的目录写成 C:\Users\&lt;user2&gt;；用户名、计算机名、邮箱、账户 SID 换成占位符。不读任何文件内容，不发完整的文件清单和已装软件清单。</li>
+                  <li>长度上限：单个 6,000 字，批量 16,000 字，超出时逐级减少明细。底部写实际字数。</li>
+                  <li>复制提示词不写操作记录：DiskThinner 自己没有发送任何东西（决策点 F7）。</li>
+                </ul>
+              </details>
+            </div>
+            <div class="dlg-f">
+              <span class="left">3,113 字 · 用户名已替换 · 不含文件内容</span>
+              <button class="btn" type="button" aria-disabled="true">恢复原文</button>
+              <label class="btn" for="v-explorer">关闭</label>
+              <button class="btn primary" type="button">复制提示词</button>
             </div>
           </div>
         </section>
